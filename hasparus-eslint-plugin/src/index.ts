@@ -8,8 +8,6 @@ const plugin: ESLint.Plugin = {
   configs: {
     all: {
       rules: {
-        // TODO: Discuss if we should enable it only in TSX files or TS files too?
-        // Maybe per package?
         "@hasparus/inlined-env": "warn",
       },
     },
