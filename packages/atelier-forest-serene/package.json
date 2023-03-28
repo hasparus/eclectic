@@ -3,6 +3,7 @@
   "displayName": "Atelier Forest Serene",
   "description": "Calm variations of Atelier Forest themes",
   "version": "0.1.0",
+  "publisher": "hasparus",
   "repository": {
     "type": "git",
     "url": "https://github.com/hasparus/eclectic",
@@ -26,6 +27,6 @@
   "scripts": {
     "package": "pnpx vsce package",
     "release": "pnpx vsce publish",
-    "open-marketplace": "xdg-open https://marketplace.visualstudio.com/manage/publishers/hasparus"
+    "open-marketplace": "open https://marketplace.visualstudio.com/manage/publishers/hasparus"
   }
 }
