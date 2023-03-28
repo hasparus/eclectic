@@ -1,0 +1,31 @@
+{
+  "name": "atelier-forest-serene",
+  "displayName": "Atelier Forest Serene",
+  "description": "Calm variations of Atelier Forest themes",
+  "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hasparus/eclectic",
+    "directory": "packages/atelier-forest-serene"
+  },
+  "engines": {
+    "vscode": "^1.76.0"
+  },
+  "categories": [
+    "Themes"
+  ],
+  "contributes": {
+    "themes": [
+      {
+        "label": "Atelier Forest Serene Light",
+        "uiTheme": "vs",
+        "path": "./themes/Atelier Forest Serene Light-color-theme.json"
+      }
+    ]
+  },
+  "scripts": {
+    "package": "pnpx vsce package",
+    "release": "pnpx vsce publish",
+    "open-marketplace": "xdg-open https://marketplace.visualstudio.com/manage/publishers/hasparus"
+  }
+}
