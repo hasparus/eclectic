@@ -1,5 +1,4 @@
 import tsEslintParser from "@typescript-eslint/parser";
-import eslintJs from "@eslint/js";
 
 const pluginHasparus = await import("./dist/index.js").then((m) => m.default);
 
@@ -17,13 +16,12 @@ export default [
     },
     rules: {
       "for-direction": "warn",
-
       "@hasparus/inlined-env": "warn",
     },
     languageOptions: {
       parser: tsEslintParser,
       parserOptions: {
-        project: "./tsconfig.json",
+        project: true,
       },
     },
   },

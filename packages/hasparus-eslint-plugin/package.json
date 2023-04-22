@@ -14,7 +14,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "lint": "ESLINT_USE_FLAT_CONFIG=true eslint -c eslint.config.mjs --max-warnings 0 **/*.ts",
+    "lint": "ESLINT_USE_FLAT_CONFIG=true eslint -c eslint.config.mjs --max-warnings 0 --report-unused-disable-directives src/**/*.ts",
     "ci": "pnpm lint && pnpm typecheck",
     "release": "pnpm build && pnpm publish"
   },
