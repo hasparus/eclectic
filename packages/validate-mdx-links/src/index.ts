@@ -38,14 +38,16 @@ export async function validateMdxLinks({
 
   const scanned = await scanURLs();
 
-  console.log(
-    "\n" +
-      "Scanned routes from the file system:\n" +
-      [...scanned.urls.keys(), ...scanned.fallbackUrls.map((x) => x.url)]
-        .map((x) => `"${x}"`)
-        .join(", ") +
-      "\n"
-  );
+  if (verbose) {
+    console.log(
+      "\n" +
+        "Scanned routes from the file system:\n" +
+        [...scanned.urls.keys(), ...scanned.fallbackUrls.map((x) => x.url)]
+          .map((x) => `"${x}"`)
+          .join(", ") +
+        "\n"
+    );
+  }
 
   const validations = await validateFiles(files, { scanned });
 
