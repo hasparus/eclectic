@@ -1,8 +1,9 @@
 {
   "name": "validate-mdx-links",
   "version": "1.0.4",
-  "main": "dist/index.js",
+  "license": "ISC",
   "type": "module",
+  "main": "dist/index.js",
   "bin": {
     "validate-mdx-links": "./dist/bin.js"
   },
@@ -14,7 +15,6 @@
     "email": "hasparus@gmail.com",
     "url": "https://haspar.us"
   },
-  "license": "ISC",
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "pnpm build"
