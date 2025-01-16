@@ -1,0 +1,28 @@
+{
+  "name": "validate-mdx-links",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "validate-mdx-links": "./dist/bin.js"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "author": {
+    "name": "Piotr Monwid-Olechnowicz",
+    "email": "hasparus@gmail.com",
+    "url": "https://haspar.us"
+  },
+  "license": "ISC",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "next-validate-link": "^1.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "typescript": "^5.7.3"
+  }
+}
