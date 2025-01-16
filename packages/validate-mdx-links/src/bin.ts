@@ -13,17 +13,28 @@
 import { parseArgs } from "node:util";
 import { validateMdxLinks, printErrors } from "./index.js";
 
+const args = (() => {
+  try {
+    return parseArgs({
+      options: {
+        cwd: { type: "string", default: process.cwd() },
+        files: { type: "string" },
+        verbose: { type: "boolean", default: false },
+        help: { type: "boolean", default: false },
+      },
+      strict: true,
+    });
+  } catch (error) {
+    console.error("Failed to parse args");
+    console.error(`Given: ${process.argv.join(" ")}`);
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+})();
+
 const {
   values: { help, cwd, verbose, files },
-} = parseArgs({
-  options: {
-    cwd: { type: "string", default: process.cwd() },
-    files: { type: "string" },
-    verbose: { type: "boolean", default: false },
-    help: { type: "boolean", default: false },
-  },
-  strict: true,
-});
+} = args;
 
 if (help) {
   console.log(
