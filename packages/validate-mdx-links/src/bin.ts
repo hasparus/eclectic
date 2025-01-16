@@ -13,7 +13,9 @@
 import { parseArgs } from "node:util";
 import { validateMdxLinks, printErrors } from "./index.js";
 
-const args = parseArgs({
+const {
+  values: { help, cwd, verbose, files },
+} = parseArgs({
   options: {
     cwd: { type: "string", default: process.cwd() },
     files: { type: "string" },
@@ -23,22 +25,23 @@ const args = parseArgs({
   strict: true,
 });
 
-if (args.values.help) {
+if (help) {
   console.log(
     'Usage: validate-mdx-links --cwd <path> --files "content/**/*.mdx" --verbose'
   );
   process.exit(0);
 }
 
-if (!args.values.files) {
+if (!files) {
   console.error("No files passed. Please pass the --files option.");
   process.exit(1);
 }
 
 try {
   const errors = await validateMdxLinks({
-    cwd: args.values.cwd,
-    files: args.values.files,
+    cwd,
+    files,
+    verbose,
   });
 
   if (errors.length > 0) {
