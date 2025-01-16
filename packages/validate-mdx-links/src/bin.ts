@@ -19,7 +19,7 @@ const args = (() => {
       options: {
         cwd: { type: "string", default: process.cwd() },
         files: { type: "string" },
-        verbose: { type: "boolean", default: false },
+        verbose: { type: "boolean", default: false, allowNegative: true },
         help: { type: "boolean", default: false },
       },
       strict: true,
