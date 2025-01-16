@@ -1,6 +1,6 @@
 import { globSync } from "node:fs";
 import { stat } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, basename } from "node:path";
 import {
   scanURLs,
   validateFiles,
@@ -61,18 +61,38 @@ export async function validateMdxLinks({
           // just assume it exists and check if the file exists.
           link = link.split("#")[0] || "";
 
-          // relative links inside of JSX lose the .mdx extension
+          {
+            const path = resolve(dirname(file), link);
+
+            if (await fileExists(path)) {
+              // file exists, the error is a false positive
+              continue;
+            }
+          }
+
+          // relative links can lose their .mdx extension
           if (!link.endsWith(".mdx")) {
-            link = `${link}.mdx`;
+            const dest = resolve(dirname(file), `${link}.mdx`);
+            if (await fileExists(dest)) {
+              // file exists, the error is a false positive
+              continue;
+            }
           }
 
-          const path = resolve(dirname(file), link);
-          const stats = await stat(path).catch(() => false);
-
-          if (stats) {
-            // file exists, the error is a false positive
-            continue;
+          // relative links inside of JSX lose the .mdx extension
+          // if the link is relative and the file containing the link is `page.mdx`,
+          // we can check if {destination}/page.mdx exists
+          if (basename(file) === "page.mdx") {
+            const dest = resolve(dirname(file), "..", link, "page.mdx");
+            if (await fileExists(dest)) {
+              continue;
+            }
           }
+
+          // There's another case for a false postive:
+          // We could have a relative link `./bar` from (a)/(b)/foo/page.mdx to (c)/bar/page.mdx
+          // We should either open an issue in `next-validate-link` or handle it with glob patterns.
+          // For now, prefer to use absolute links in cases like this.
         }
 
         filteredDetected.push(error);
@@ -95,4 +115,13 @@ export async function validateMdxLinks({
     (validation): validation is NonNullable<typeof validation> =>
       validation !== null
   );
+}
+
+async function fileExists(path: string) {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
 }

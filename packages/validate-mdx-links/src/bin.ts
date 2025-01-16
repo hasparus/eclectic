@@ -4,6 +4,9 @@
  * @file This script validates the internal links in the MDX files.
  * Note that it does not validate external links (e.g. to GitHub).
  *
+ * Take note that this is specific to Next.js App Router and Nextra
+ * resolution and might not be 1-1 with other frameworks.
+ *
  * Usage:
  * validate-mdx-links --cwd <path> --files "content/**\/*.mdx" --verbose
  */
