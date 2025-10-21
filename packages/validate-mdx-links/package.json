@@ -1,11 +1,16 @@
 {
   "name": "validate-mdx-links",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "license": "ISC",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
     "validate-mdx-links": "./dist/bin.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hasparus/eclectic.git",
+    "directory": "packages/validate-mdx-links"
   },
   "exports": {
     ".": "./dist/index.js"
