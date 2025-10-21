@@ -72,6 +72,21 @@ export async function validateMdxLinks({
             }
           }
 
+          // if the file is called index.mdx and is in content dir, it turns out
+          // both `./dirname/foo` and `./foo` links work and point to the same file and
+          if (basename(file) === "index.mdx") {
+            const dir = basename(dirname(file));
+            const isSameDir = dir === basename(dirname(link));
+
+            if (isSameDir) {
+              const path = resolve(dirname(file), "..", `${link}.mdx`);
+              if (await fileExists(path)) {
+                // file exists, the error is a false positive
+                continue;
+              }
+            }
+          }
+
           // relative links can lose their .mdx extension
           if (!link.endsWith(".mdx")) {
             const dest = resolve(dirname(file), `${link}.mdx`);
