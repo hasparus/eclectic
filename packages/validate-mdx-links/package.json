@@ -1,6 +1,6 @@
 {
   "name": "validate-mdx-links",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "license": "ISC",
   "type": "module",
   "main": "dist/index.js",
@@ -25,7 +25,7 @@
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "next-validate-link": "^1.4.1"
+    "next-validate-link": "1.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.7",

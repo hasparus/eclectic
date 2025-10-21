@@ -32,8 +32,8 @@ importers:
   packages/validate-mdx-links:
     dependencies:
       next-validate-link:
-        specifier: ^1.4.1
-        version: 1.4.1
+        specifier: 1.4.0
+        version: 1.4.0
     devDependencies:
       '@types/node':
         specifier: ^22.10.7
@@ -594,8 +594,8 @@ packages:
   natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
 
-  next-validate-link@1.4.1:
-    resolution: {integrity: sha512-cHQCvPIS4EGKdaqBhGfcBf+YEHDlWwPGDoT0f/NJN3IPGMwp5pUtncQ6xBDs42hsjCumVlOU7loqgLZ3rvFibQ==}
+  next-validate-link@1.4.0:
+    resolution: {integrity: sha512-Dr95QzDNuasGBTG9YmVvVNVvnolHDP5jg8O0YcipiAFaYWCJOrDlKnME9HK0/9N2eQJLD24p49xE+bjnv7mv/A==}
 
   once@1.4.0:
     resolution: {integrity: sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w==}
@@ -650,8 +650,8 @@ packages:
   queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
 
-  remark-gfm@4.0.0:
-    resolution: {integrity: sha512-U92vJgBPkbw4Zfu/IiW2oTZLSL3Zpv+uI7My2eq8JxKgqraFdU8YUGicEJCEgSbeaG+QDFqIcwwfMTOEelPxuA==}
+  remark-gfm@4.0.1:
+    resolution: {integrity: sha512-1quofZ2RQ9EWdeN34S79+KExV1764+wCUGop5CPL1WGdD0ocPpu91lzPGbwWMECpEpd42kJGQwzRfyov9j4yNg==}
 
   remark-parse@11.0.0:
     resolution: {integrity: sha512-FCxlKLNGknS5ba/1lmpYijMUzX2esxW5xQqjWxw2eHFfS2MSdaHVINFmhjo+qN1WhZhNimq0dZATN9pH0IDrpA==}
@@ -1544,13 +1544,13 @@ snapshots:
 
   natural-compare@1.4.0: {}
 
-  next-validate-link@1.4.1:
+  next-validate-link@1.4.0:
     dependencies:
       fast-glob: 3.3.3
       gray-matter: 4.0.3
       picocolors: 1.1.1
       remark: 15.0.1
-      remark-gfm: 4.0.0
+      remark-gfm: 4.0.1
       unist-util-visit: 5.0.0
     transitivePeerDependencies:
       - supports-color
@@ -1598,7 +1598,7 @@ snapshots:
 
   queue-microtask@1.2.3: {}
 
-  remark-gfm@4.0.0:
+  remark-gfm@4.0.1:
     dependencies:
       '@types/mdast': 4.0.4
       mdast-util-gfm: 3.0.0
