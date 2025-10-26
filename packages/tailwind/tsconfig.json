@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "/",
+    "module": "nodenext",
+    "lib": ["ESNext"]
+  },
+  "include": ["src", "test"]
+}
