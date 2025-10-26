@@ -1,0 +1,38 @@
+{
+  "name": "@hasparus/tailwind",
+  "version": "1.0.0",
+  "description": "a very small collection of Tailwind plugins",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hasparus/eclectic.git",
+    "directory": "packages/tailwind"
+  },
+  "exports": {
+    ".": {
+      "require": "./dist/index.js"
+    },
+    "./scrollview-fade": {
+      "require": "./dist/scrollview-fade.js"
+    }
+  },
+  "keywords": [
+    "tailwind",
+    "mask-image",
+    "scrollview",
+    "fade"
+  ],
+  "author": "@hasparus",
+  "license": "ISC",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.1.16"
+  }
+}
