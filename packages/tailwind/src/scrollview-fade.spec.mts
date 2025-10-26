@@ -91,15 +91,15 @@ it("generates base .scrollview-fade utility", async () => {
       mask-image: linear-gradient(
         var(--fade-angle),
         hsl(0 0% 0% / var(--fade-start-opacity)),
-        black var(--fade-size-start),
-        black calc(100% - var(--fade-size-end)),
+        black var(--fade-size-start,0),
+        black calc(100% - var(--fade-size-end,0)),
         hsl(0 0% 0% / var(--fade-end-opacity))
       );
       -webkit-mask-image: linear-gradient(
         var(--fade-angle),
         hsl(0 0% 0% / var(--fade-start-opacity)),
-        black var(--fade-size-start),
-        black calc(100% - var(--fade-size-end)),
+        black var(--fade-size-start,0),
+        black calc(100% - var(--fade-size-end,0)),
         hsl(0 0% 0% / var(--fade-end-opacity))
       );
       animation:
