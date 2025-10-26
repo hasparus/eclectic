@@ -30,9 +30,13 @@
   "license": "ISC",
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest"
   },
   "devDependencies": {
-    "tailwindcss": "^4.1.16"
+    "@vitest/utils": "^4.0.3",
+    "prettier": "^3.6.2",
+    "tailwindcss": "^4.1.16",
+    "vitest": "^4.0.3"
   }
 }
