@@ -1,6 +1,6 @@
 {
   "name": "@hasparus/tailwind",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "a very small collection of Tailwind plugins",
   "type": "module",
   "main": "dist/index.js",
@@ -45,5 +45,8 @@
     "prettier": "^3.6.2",
     "tailwindcss": "^4.1.16",
     "vitest": "^4.0.3"
+  },
+  "peerDependencies": {
+    "tailwindcss": ">=3.0.0"
   }
 }
