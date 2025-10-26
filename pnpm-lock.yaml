@@ -30,10 +30,6 @@ importers:
         version: 8.57.1
 
   packages/tailwind:
-    dependencies:
-      '@hasparus/tailwind':
-        specifier: ^1.1.0
-        version: 'link:'
     devDependencies:
       '@tailwindcss/cli':
         specifier: ^4.1.16
