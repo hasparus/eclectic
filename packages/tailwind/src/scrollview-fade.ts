@@ -10,12 +10,34 @@ export default plugin(function scrollviewFadePlugin({
     {
       "scrollview-fade-x": (value) => ({
         "--fade-angle": "90deg",
-        "--fade-size": value,
+        "--fade-size-start": value,
+        "--fade-size-end": value,
         "--fade-axis": "x",
       }),
       "scrollview-fade-y": (value) => ({
         "--fade-angle": "180deg",
-        "--fade-size": value,
+        "--fade-size-start": value,
+        "--fade-size-end": value,
+        "--fade-axis": "y",
+      }),
+      "scrollview-fade-left": (value) => ({
+        "--fade-angle": "90deg",
+        "--fade-size-start": value,
+        "--fade-axis": "x",
+      }),
+      "scrollview-fade-right": (value) => ({
+        "--fade-angle": "90deg",
+        "--fade-size-end": value,
+        "--fade-axis": "x",
+      }),
+      "scrollview-fade-top": (value) => ({
+        "--fade-angle": "180deg",
+        "--fade-size-start": value,
+        "--fade-axis": "y",
+      }),
+      "scrollview-fade-bottom": (value) => ({
+        "--fade-angle": "180deg",
+        "--fade-size-end": value,
         "--fade-axis": "y",
       }),
     },
@@ -48,16 +70,16 @@ export default plugin(function scrollviewFadePlugin({
       maskImage: `
           linear-gradient(var(--fade-angle), 
             hsl(0 0% 0% / var(--fade-start-opacity)), 
-            black var(--fade-size), 
-            black calc(100% - var(--fade-size)), 
+            black var(--fade-size-start), 
+            black calc(100% - var(--fade-size-end)), 
             hsl(0 0% 0% / var(--fade-end-opacity))
           )
         `,
       WebkitMaskImage: `
           linear-gradient(var(--fade-angle), 
             hsl(0 0% 0% / var(--fade-start-opacity)), 
-            black var(--fade-size), 
-            black calc(100% - var(--fade-size)), 
+            black var(--fade-size-start), 
+            black calc(100% - var(--fade-size-end)), 
             hsl(0 0% 0% / var(--fade-end-opacity))
           )
         `,

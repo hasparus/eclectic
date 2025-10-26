@@ -1,3 +1,4 @@
+/// <reference types="node" />p
 import { it, expect } from "vitest";
 import postcss from "postcss";
 import tailwindcss from "@tailwindcss/postcss";
@@ -90,15 +91,15 @@ it("generates base .scrollview-fade utility", async () => {
       mask-image: linear-gradient(
         var(--fade-angle),
         hsl(0 0% 0% / var(--fade-start-opacity)),
-        black var(--fade-size),
-        black calc(100% - var(--fade-size)),
+        black var(--fade-size-start),
+        black calc(100% - var(--fade-size-end)),
         hsl(0 0% 0% / var(--fade-end-opacity))
       );
       -webkit-mask-image: linear-gradient(
         var(--fade-angle),
         hsl(0 0% 0% / var(--fade-start-opacity)),
-        black var(--fade-size),
-        black calc(100% - var(--fade-size)),
+        black var(--fade-size-start),
+        black calc(100% - var(--fade-size-end)),
         hsl(0 0% 0% / var(--fade-end-opacity))
       );
       animation:
@@ -122,7 +123,8 @@ it("generates scrollview-fade-x utilities with spacing scale", async () => {
   await expect(result).toIncludeCss(css`
     .scrollview-fade-x-4 {
       --fade-angle: 90deg;
-      --fade-size: 1rem;
+      --fade-size-start: 1rem;
+      --fade-size-end: 1rem;
       --fade-axis: x;
     }
   `);
@@ -130,7 +132,8 @@ it("generates scrollview-fade-x utilities with spacing scale", async () => {
   await expect(result).toIncludeCss(css`
     .scrollview-fade-x-8 {
       --fade-angle: 90deg;
-      --fade-size: 2rem;
+      --fade-size-start: 2rem;
+      --fade-size-end: 2rem;
       --fade-axis: x;
     }
   `);
@@ -138,7 +141,8 @@ it("generates scrollview-fade-x utilities with spacing scale", async () => {
   await expect(result).toIncludeCss(css`
     .scrollview-fade-x-16 {
       --fade-angle: 90deg;
-      --fade-size: 4rem;
+      --fade-size-start: 4rem;
+      --fade-size-end: 4rem;
       --fade-axis: x;
     }
   `);
@@ -154,7 +158,8 @@ it("generates scrollview-fade-y utilities with spacing scale", async () => {
   await expect(result).toIncludeCss(css`
     .scrollview-fade-y-4 {
       --fade-angle: 180deg;
-      --fade-size: 1rem;
+      --fade-size-start: 1rem;
+      --fade-size-end: 1rem;
       --fade-axis: y;
     }
   `);
@@ -162,7 +167,8 @@ it("generates scrollview-fade-y utilities with spacing scale", async () => {
   await expect(result).toIncludeCss(css`
     .scrollview-fade-y-8 {
       --fade-angle: 180deg;
-      --fade-size: 2rem;
+      --fade-size-start: 2rem;
+      --fade-size-end: 2rem;
       --fade-axis: y;
     }
   `);
@@ -170,7 +176,8 @@ it("generates scrollview-fade-y utilities with spacing scale", async () => {
   await expect(result).toIncludeCss(css`
     .scrollview-fade-y-12 {
       --fade-angle: 180deg;
-      --fade-size: 3rem;
+      --fade-size-start: 3rem;
+      --fade-size-end: 3rem;
       --fade-axis: y;
     }
   `);
@@ -185,7 +192,8 @@ it("supports arbitrary values", async () => {
   await expect(result).toIncludeCss(css`
     .scrollview-fade-x-\[32px\] {
       --fade-angle: 90deg;
-      --fade-size: 32px;
+      --fade-size-start: 32px;
+      --fade-size-end: 32px;
       --fade-axis: x;
     }
   `);
@@ -193,7 +201,100 @@ it("supports arbitrary values", async () => {
   await expect(result).toIncludeCss(css`
     .scrollview-fade-y-\[10\%\] {
       --fade-angle: 180deg;
-      --fade-size: 10%;
+      --fade-size-start: 10%;
+      --fade-size-end: 10%;
+      --fade-axis: y;
+    }
+  `);
+});
+
+it("generates scrollview-fade-left utilities", async () => {
+  const result = await run(html`
+    <div class="scrollview-fade-left-4"></div>
+    <div class="scrollview-fade-left-8"></div>
+  `);
+
+  await expect(result).toIncludeCss(css`
+    .scrollview-fade-left-4 {
+      --fade-angle: 90deg;
+      --fade-size-start: 1rem;
+      --fade-axis: x;
+    }
+  `);
+
+  await expect(result).toIncludeCss(css`
+    .scrollview-fade-left-8 {
+      --fade-angle: 90deg;
+      --fade-size-start: 2rem;
+      --fade-axis: x;
+    }
+  `);
+});
+
+it("generates scrollview-fade-right utilities", async () => {
+  const result = await run(html`
+    <div class="scrollview-fade-right-4"></div>
+    <div class="scrollview-fade-right-8"></div>
+  `);
+
+  await expect(result).toIncludeCss(css`
+    .scrollview-fade-right-4 {
+      --fade-angle: 90deg;
+      --fade-size-end: 1rem;
+      --fade-axis: x;
+    }
+  `);
+
+  await expect(result).toIncludeCss(css`
+    .scrollview-fade-right-8 {
+      --fade-angle: 90deg;
+      --fade-size-end: 2rem;
+      --fade-axis: x;
+    }
+  `);
+});
+
+it("generates scrollview-fade-top utilities", async () => {
+  const result = await run(html`
+    <div class="scrollview-fade-top-4"></div>
+    <div class="scrollview-fade-top-8"></div>
+  `);
+
+  await expect(result).toIncludeCss(css`
+    .scrollview-fade-top-4 {
+      --fade-angle: 180deg;
+      --fade-size-start: 1rem;
+      --fade-axis: y;
+    }
+  `);
+
+  await expect(result).toIncludeCss(css`
+    .scrollview-fade-top-8 {
+      --fade-angle: 180deg;
+      --fade-size-start: 2rem;
+      --fade-axis: y;
+    }
+  `);
+});
+
+it("generates scrollview-fade-bottom utilities", async () => {
+  const result = await run(html`
+    <div class="scrollview-fade-bottom-4"></div>
+    <div class="scrollview-fade-bottom-8"></div>
+  `);
+
+  await expect(result).toIncludeCss(css`
+    .scrollview-fade-bottom-4 {
+      --fade-angle: 180deg;
+      --fade-size-end: 1rem;
+      --fade-axis: y;
+    }
+  `);
+
+  await expect(result).toIncludeCss(css`
+    .scrollview-fade-bottom-8 {
+      --fade-angle: 180deg;
+      --fade-size-end: 2rem;
       --fade-axis: y;
     }
   `);
