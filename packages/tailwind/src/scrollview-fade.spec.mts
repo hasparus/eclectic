@@ -84,7 +84,7 @@ it("generates base .scrollview-fade utility", async () => {
   await expect(result).toIncludeCss(css`
     .scrollview-fade {
       position: relative;
-      scroll-timeline: --scroll-timeline-x inline;
+      scroll-timeline: --scroll-timeline var(--fade-axis);
       --fade-start-opacity: 1;
       --fade-end-opacity: 1;
       mask-image: linear-gradient(
@@ -104,7 +104,7 @@ it("generates base .scrollview-fade utility", async () => {
       animation:
         scrollview-fade-start 10s ease-out both,
         scrollview-fade-end 10s ease-out both;
-      animation-timeline: --scroll-timeline-x, --scroll-timeline-x;
+      animation-timeline: --scroll-timeline, --scroll-timeline;
       animation-range:
         0 2em,
         calc(100% - 2em) 100%;
@@ -123,6 +123,7 @@ it("generates scrollview-fade-x utilities with spacing scale", async () => {
     .scrollview-fade-x-4 {
       --fade-angle: 90deg;
       --fade-size: 1rem;
+      --fade-axis: x;
     }
   `);
 
@@ -130,6 +131,7 @@ it("generates scrollview-fade-x utilities with spacing scale", async () => {
     .scrollview-fade-x-8 {
       --fade-angle: 90deg;
       --fade-size: 2rem;
+      --fade-axis: x;
     }
   `);
 
@@ -137,6 +139,7 @@ it("generates scrollview-fade-x utilities with spacing scale", async () => {
     .scrollview-fade-x-16 {
       --fade-angle: 90deg;
       --fade-size: 4rem;
+      --fade-axis: x;
     }
   `);
 });
@@ -152,6 +155,7 @@ it("generates scrollview-fade-y utilities with spacing scale", async () => {
     .scrollview-fade-y-4 {
       --fade-angle: 180deg;
       --fade-size: 1rem;
+      --fade-axis: y;
     }
   `);
 
@@ -159,6 +163,7 @@ it("generates scrollview-fade-y utilities with spacing scale", async () => {
     .scrollview-fade-y-8 {
       --fade-angle: 180deg;
       --fade-size: 2rem;
+      --fade-axis: y;
     }
   `);
 
@@ -166,6 +171,7 @@ it("generates scrollview-fade-y utilities with spacing scale", async () => {
     .scrollview-fade-y-12 {
       --fade-angle: 180deg;
       --fade-size: 3rem;
+      --fade-axis: y;
     }
   `);
 });
@@ -180,6 +186,7 @@ it("supports arbitrary values", async () => {
     .scrollview-fade-x-\[32px\] {
       --fade-angle: 90deg;
       --fade-size: 32px;
+      --fade-axis: x;
     }
   `);
 
@@ -187,6 +194,7 @@ it("supports arbitrary values", async () => {
     .scrollview-fade-y-\[10\%\] {
       --fade-angle: 180deg;
       --fade-size: 10%;
+      --fade-axis: y;
     }
   `);
 });
