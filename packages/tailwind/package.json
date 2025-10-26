@@ -1,12 +1,17 @@
 {
   "name": "@hasparus/tailwind",
-  "version": "1.1.0",
+  "version": "1.1.3",
   "description": "a very small collection of Tailwind plugins",
   "type": "module",
   "main": "dist/index.js",
   "publishConfig": {
     "access": "public"
   },
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.spec.mts"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/hasparus/eclectic.git",
@@ -14,10 +19,12 @@
   },
   "exports": {
     ".": {
-      "require": "./dist/index.js"
+      "require": "./dist/index.js",
+      "types": "./src/index.ts"
     },
     "./scrollview-fade": {
-      "require": "./dist/scrollview-fade.js"
+      "require": "./dist/scrollview-fade.js",
+      "types": "./src/scrollview-fade.ts"
     }
   },
   "keywords": [
@@ -43,5 +50,8 @@
     "prettier": "^3.6.2",
     "tailwindcss": "^4.1.16",
     "vitest": "^4.0.3"
+  },
+  "peerDependencies": {
+    "tailwindcss": ">=3.0.0"
   }
 }
