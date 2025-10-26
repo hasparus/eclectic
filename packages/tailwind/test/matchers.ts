@@ -165,9 +165,9 @@ expect.extend({
 });
 
 interface CustomMatchers<R = unknown> {
-  toMatchCss(expected: string): R;
-  toIncludeCss(expected: string): R;
-  toMatchFormattedCss(expected: string): R;
+  toMatchCss(expected: string): Promise<R>;
+  toIncludeCss(expected: string): Promise<R>;
+  toMatchFormattedCss(expected: string): Promise<R>;
 }
 
 declare module "vitest" {
