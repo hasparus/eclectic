@@ -43,7 +43,7 @@ const scrollviewFadePlugin = plugin(function scrollviewFadePlugin({
     },
     {
       supportsNegativeValues: false,
-      values: theme("spacing"),
+      values: theme("spacing") || {},
       type: ["length", "percentage"],
     }
   );

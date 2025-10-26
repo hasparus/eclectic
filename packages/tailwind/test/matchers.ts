@@ -40,7 +40,7 @@ expect.extend({
           const expected = format(argument);
 
           const diffString = diff(expected, actual, {
-            expand: this.expand,
+            expand: this.expand!,
           });
 
           return (
@@ -88,7 +88,7 @@ expect.extend({
         }
       : () => {
           const diffString = diff(expected, actual, {
-            expand: this.expand,
+            expand: this.expand!,
           });
 
           return (
@@ -142,7 +142,7 @@ expect.extend({
           const expected = formattedArgument;
 
           const diffString = diff(expected, actual, {
-            expand: this.expand,
+            expand: this.expand!,
           });
 
           return (
