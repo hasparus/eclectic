@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@hasparus/tailwind</title>
+    <meta name="description" content="scrollview-fade demo with scroll-timeline and mask image gradients" />
+    <link href="./output.css" rel="stylesheet" />
+    <style>
+      body {
+        background: oklch(92.3% 0.003 48.717);
+        color: oklch(21.6% 0.006 56.043);
+      }
+      .card {
+        background: oklch(97% 0.001 106.424);
+        border: 1px solid oklch(86.9% 0.005 56.366);
+        border-radius: 0.5rem;
+        width: 300px;
+        height: 200px;
+        flex-shrink: 0;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: oklch(14.7% 0.004 49.25);
+          color: oklch(98.5% 0.001 106.423);
+        }
+        .card {
+          background: oklch(21.6% 0.006 56.043);
+          border-color: oklch(26.8% 0.007 34.298);
+        }
+      }
+    </style>
+  </head>
+  <body class="p-8 container mx-auto font-mono">
+    <div class="space-y-16">
+      <header>
+        <h1 class="text-lg font-mono font-bold mb-2">scrollview-fade</h1>
+        <p>
+          scrollview-fade demo with scroll-timeline and mask image gradients
+        </p>
+      </header>
+
+      <section class="space-y-4 mt-8">
+        <h2 class="text-base">scrollview-fade scrollview-fade-x-16</h2>
+        <ul
+          class="scrollview-fade scrollview-fade-x-16 overflow-scroll flex gap-3"
+        >
+          <li class="card"></li>
+          <li class="card"></li>
+          <li class="card"></li>
+          <li class="card"></li>
+          <li class="card"></li>
+          <li class="card"></li>
+          <li class="card"></li>
+          <li class="card"></li>
+          <li class="card"></li>
+          <li class="card"></li>
+          <li class="card"></li>
+          <li class="card"></li>
+          <li class="card"></li>
+          <li class="card"></li>
+          <li class="card"></li>
+        </div>
+      </section>
+
+      <section class="space-y-4 mt-8">
+        <h2 class="text-base font-mono">scrollview-fade scrollview-fade-y-16</h2>
+        <div class="flex">
+          <ul
+            class="scrollview-fade scrollview-fade-y-16 overflow-scroll h-64 rounded-lg flex flex-col gap-3 pr-4"
+          >
+            <li class="card"></li>
+            <li class="card"></li>
+            <li class="card"></li>
+            <li class="card"></li>
+            <li class="card"></li>
+            <li class="card"></li>
+            <li class="card"></li>
+            <li class="card"></li>
+            <li class="card"></li>
+            <li class="card"></li>
+            <li class="card"></li>
+            <li class="card"></li>
+            <li class="card"></li>
+            <li class="card"></li>
+            <li class="card"></li>
+          </ul>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>

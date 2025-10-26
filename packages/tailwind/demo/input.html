@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@hasparus/tailwind - scrollview-fade demo</title>
+    <!-- CSS will be injected here -->
+  </head>
+  <body class="bg-gray-50 p-8">
+    <div class="max-w-4xl mx-auto space-y-8">
+      <header class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">scrollview-fade</h1>
+        <p class="text-gray-600">
+          Smooth fade effects at the edges of scrollable containers
+        </p>
+      </header>
+
+      <!-- Horizontal Scroll -->
+      <section class="space-y-2">
+        <h2 class="text-lg font-medium text-gray-800">Horizontal</h2>
+        <div
+          class="scrollview-fade scrollview-fade-x-8 overflow-x-auto whitespace-nowrap bg-white rounded-lg border border-gray-200 p-4 space-x-3"
+        >
+          <span class="inline-block bg-gray-900 text-white px-4 py-2 rounded"
+            >Item 1</span
+          >
+          <span class="inline-block bg-gray-900 text-white px-4 py-2 rounded"
+            >Item 2</span
+          >
+          <span class="inline-block bg-gray-900 text-white px-4 py-2 rounded"
+            >Item 3</span
+          >
+          <span class="inline-block bg-gray-900 text-white px-4 py-2 rounded"
+            >Item 4</span
+          >
+          <span class="inline-block bg-gray-900 text-white px-4 py-2 rounded"
+            >Item 5</span
+          >
+          <span class="inline-block bg-gray-900 text-white px-4 py-2 rounded"
+            >Item 6</span
+          >
+          <span class="inline-block bg-gray-900 text-white px-4 py-2 rounded"
+            >Item 7</span
+          >
+          <span class="inline-block bg-gray-900 text-white px-4 py-2 rounded"
+            >Item 8</span
+          >
+        </div>
+      </section>
+
+      <!-- Vertical Scroll -->
+      <section class="space-y-2">
+        <h2 class="text-lg font-medium text-gray-800">Vertical</h2>
+        <div
+          class="scrollview-fade scrollview-fade-y-8 overflow-y-auto h-64 bg-white rounded-lg border border-gray-200 p-4 space-y-2"
+        >
+          <div class="bg-gray-900 text-white px-4 py-2 rounded">Item 1</div>
+          <div class="bg-gray-900 text-white px-4 py-2 rounded">Item 2</div>
+          <div class="bg-gray-900 text-white px-4 py-2 rounded">Item 3</div>
+          <div class="bg-gray-900 text-white px-4 py-2 rounded">Item 4</div>
+          <div class="bg-gray-900 text-white px-4 py-2 rounded">Item 5</div>
+          <div class="bg-gray-900 text-white px-4 py-2 rounded">Item 6</div>
+          <div class="bg-gray-900 text-white px-4 py-2 rounded">Item 7</div>
+          <div class="bg-gray-900 text-white px-4 py-2 rounded">Item 8</div>
+          <div class="bg-gray-900 text-white px-4 py-2 rounded">Item 9</div>
+          <div class="bg-gray-900 text-white px-4 py-2 rounded">Item 10</div>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>

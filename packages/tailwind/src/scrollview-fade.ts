@@ -11,10 +11,12 @@ export default plugin(function scrollviewFadePlugin({
       "scrollview-fade-x": (value) => ({
         "--fade-angle": "90deg",
         "--fade-size": value,
+        "--fade-axis": "x",
       }),
       "scrollview-fade-y": (value) => ({
         "--fade-angle": "180deg",
         "--fade-size": value,
+        "--fade-axis": "y",
       }),
     },
     {
@@ -40,7 +42,7 @@ export default plugin(function scrollviewFadePlugin({
   addUtilities({
     ".scrollview-fade": {
       position: "relative",
-      scrollTimeline: "--scroll-timeline-x inline",
+      scrollTimeline: "--scroll-timeline var(--fade-axis)",
       "--fade-start-opacity": "1",
       "--fade-end-opacity": "1",
       maskImage: `
@@ -61,7 +63,7 @@ export default plugin(function scrollviewFadePlugin({
         `,
       animation:
         "scrollview-fade-start 10s ease-out both, scrollview-fade-end 10s ease-out both",
-      animationTimeline: "--scroll-timeline-x, --scroll-timeline-x",
+      animationTimeline: "--scroll-timeline, --scroll-timeline",
       animationRange: "0 2em, calc(100% - 2em) 100%",
     },
     "@keyframes scrollview-fade-start": {

@@ -30,10 +30,12 @@
   "license": "ISC",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "build:demo": "pnpm tailwindcss -i ./demo/input.css -o ./demo/output.css",
     "typecheck": "tsc --noEmit",
     "test": "vitest"
   },
   "devDependencies": {
+    "@tailwindcss/cli": "^4.1.16",
     "@tailwindcss/postcss": "^4.1.16",
     "@vitest/utils": "^4.0.3",
     "postcss": "^8.5.6",
