@@ -1,9 +1,10 @@
 import plugin from "tailwindcss/plugin";
 
-export = plugin(function scrollviewFadePlugin({
+export default plugin(function scrollviewFadePlugin({
   addUtilities,
   matchUtilities,
   theme,
+  addBase,
 }) {
   matchUtilities(
     {
@@ -22,6 +23,20 @@ export = plugin(function scrollviewFadePlugin({
       type: ["length", "percentage"],
     }
   );
+
+  addBase({
+    "@property --fade-start-opacity": {
+      syntax: '"<number>"',
+      initialValue: "1",
+      inherits: "false",
+    },
+    "@property --fade-end-opacity": {
+      syntax: '"<number>"',
+      initialValue: "1",
+      inherits: "false",
+    },
+  });
+
   addUtilities({
     ".scrollview-fade": {
       position: "relative",
@@ -56,16 +71,6 @@ export = plugin(function scrollviewFadePlugin({
     "@keyframes scrollview-fade-end": {
       from: { "--fade-end-opacity": "0" },
       to: { "--fade-end-opacity": "1" },
-    },
-    "@property --fade-start-opacity": {
-      syntax: '"<number>"',
-      initialValue: "1",
-      inherits: "false",
-    },
-    "@property --fade-end-opacity": {
-      syntax: '"<number>"',
-      initialValue: "1",
-      inherits: "false",
     },
   });
 });

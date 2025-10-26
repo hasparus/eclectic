@@ -1,3 +1,3 @@
-import scrollviewFade from "./scrollview-fade";
+import scrollviewFade from "./scrollview-fade.js";
 
 export { scrollviewFade };

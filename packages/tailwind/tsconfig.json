@@ -1,12 +1,9 @@
 {
+  "extends": "./tsconfig.build.json",
   "compilerOptions": {
-    "target": "es2022",
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "outDir": "dist"
-  }
+    "noEmit": true,
+    "rootDir": "/",
+    "module": "nodenext"
+  },
+  "include": ["src", "test"]
 }
