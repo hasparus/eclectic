@@ -1,6 +1,6 @@
 import plugin from "tailwindcss/plugin";
 
-export default plugin(function scrollviewFadePlugin({
+const scrollviewFadePlugin = plugin(function scrollviewFadePlugin({
   addUtilities,
   matchUtilities,
   theme,
@@ -98,3 +98,5 @@ export default plugin(function scrollviewFadePlugin({
     },
   });
 });
+
+export default scrollviewFadePlugin;
