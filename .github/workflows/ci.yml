@@ -8,6 +8,8 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,4 +35,4 @@ jobs:
         run: pnpm --filter='@hasparus/eslint-plugin' run lint
 
       - name: Test
-        run: pnpm --filter='@hasparus/tailwind' run test run
+        run: pnpm --filter='@hasparus/tailwind' run test
