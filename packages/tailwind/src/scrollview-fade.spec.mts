@@ -113,21 +113,27 @@ it("generates base .scrollview-fade utility", async () => {
 });
 
 it("generates scrollview-fade-x utilities with spacing scale", async () => {
-  expect(`<div class="scrollview-fade-x-4"></div>`).toIncludeCss(css`
+  const result = await run(html`
+    <div class="scrollview-fade-x-4"></div>
+    <div class="scrollview-fade-x-8"></div>
+    <div class="scrollview-fade-x-16"></div>
+  `);
+
+  await expect(result).toIncludeCss(css`
     .scrollview-fade-x-4 {
       --fade-angle: 90deg;
       --fade-size: 1rem;
     }
   `);
 
-  expect(`<div class="scrollview-fade-x-8"></div>`).toIncludeCss(css`
+  await expect(result).toIncludeCss(css`
     .scrollview-fade-x-8 {
       --fade-angle: 90deg;
       --fade-size: 2rem;
     }
   `);
 
-  expect(`<div class="scrollview-fade-x-16"></div>`).toIncludeCss(css`
+  await expect(result).toIncludeCss(css`
     .scrollview-fade-x-16 {
       --fade-angle: 90deg;
       --fade-size: 4rem;
@@ -136,21 +142,27 @@ it("generates scrollview-fade-x utilities with spacing scale", async () => {
 });
 
 it("generates scrollview-fade-y utilities with spacing scale", async () => {
-  await expect(`<div class="scrollview-fade-y-4"></div>`).toIncludeCss(css`
+  const result = await run(html`
+    <div class="scrollview-fade-y-4"></div>
+    <div class="scrollview-fade-y-8"></div>
+    <div class="scrollview-fade-y-12"></div>
+  `);
+
+  await expect(result).toIncludeCss(css`
     .scrollview-fade-y-4 {
       --fade-angle: 180deg;
       --fade-size: 1rem;
     }
   `);
 
-  await expect(`<div class="scrollview-fade-y-8"></div>`).toMatchCss(css`
+  await expect(result).toIncludeCss(css`
     .scrollview-fade-y-8 {
       --fade-angle: 180deg;
       --fade-size: 2rem;
     }
   `);
 
-  await expect(`<div class="scrollview-fade-y-12"></div>`).toIncludeCss(css`
+  await expect(result).toIncludeCss(css`
     .scrollview-fade-y-12 {
       --fade-angle: 180deg;
       --fade-size: 3rem;
