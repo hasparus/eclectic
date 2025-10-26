@@ -1,6 +1,6 @@
 {
   "name": "@hasparus/tailwind",
-  "version": "1.1.3",
+  "version": "1.1.5",
   "description": "a very small collection of Tailwind plugins",
   "type": "module",
   "main": "dist/index.js",
@@ -39,7 +39,8 @@
     "build": "tsc -p tsconfig.build.json",
     "build:demo": "pnpm tailwindcss -i ./demo/input.css -o ./demo/output.css",
     "typecheck": "tsc --noEmit",
-    "test": "vitest"
+    "test": "vitest",
+    "prepublishOnly": "pnpm build"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.16",
