@@ -1,5 +1,5 @@
 {
   "name": "eclectic",
   "description": "a repository of various small projects",
-  "packageManager": "pnpm@9.15.4"
+  "packageManager": "pnpm@10.19.0"
 }
