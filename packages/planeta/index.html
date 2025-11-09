@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>mercator image mask generator</title>
+    <style>
+      @media (prefers-color-scheme: dark) {
+        html {
+          color-scheme: dark;
+        }
+        canvas {
+          opacity: 0.07;
+        }
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: Canvas;
+        color: CanvasText;
+        font-family: monospace;
+      }
+      canvas {
+        display: block;
+        image-rendering: pixelated;
+        border: 1px solid #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      style="
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+      "
+    >
+      <canvas id="map"></canvas>
+    </div>
+    <script type="module">
+      import GUI from "https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm";
+      import * as topojson from "https://cdn.jsdelivr.net/npm/topojson-client@3/+esm";
+      import * as d3 from "https://cdn.jsdelivr.net/npm/d3-geo@3/+esm";
+
+      const canvas = document.getElementById("map");
+      const ctx = canvas.getContext("2d");
+
+      const settings = {
+        width: 1024,
+        aspectRatio: 1.65,
+        includeSouthPole: false,
+      };
+
+      const gui = new GUI();
+      gui.add(settings, "width", 256, 4096, 1).onChange(draw);
+      gui.add(settings, "aspectRatio", 0.5, 3, 0.01).onChange(draw);
+      gui
+        .add(settings, "includeSouthPole")
+        .name("Include South Pole")
+        .onChange(draw);
+
+      let land;
+
+      async function load() {
+        const res = await fetch(
+          "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"
+        );
+        const topo = await res.json();
+        land = topojson.feature(topo, topo.objects.countries);
+
+        draw();
+      }
+
+      function draw() {
+        if (!land) return;
+
+        const width = settings.width;
+        const height = Math.round(width / settings.aspectRatio);
+
+        canvas.width = width;
+        canvas.height = height;
+
+        drawMercator(land);
+      }
+
+      function drawMercator(land) {
+        const includeSouthPole = settings.includeSouthPole;
+
+        let clippedLand = land;
+        if (!includeSouthPole) {
+          clippedLand = {
+            type: "FeatureCollection",
+            features: land.features.filter((feature) => {
+              const bounds = d3.geoBounds(feature);
+              return bounds[1][1] > -60;
+            }),
+          };
+        }
+
+        const projection = d3.geoMercator().fitExtent(
+          [
+            [0, 0],
+            [canvas.width, canvas.height],
+          ],
+          clippedLand
+        );
+        const path = d3.geoPath(projection, ctx);
+
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = "black";
+        ctx.beginPath();
+        path(clippedLand);
+        ctx.fill();
+      }
+
+      load();
+    </script>
+  </body>
+</html>
