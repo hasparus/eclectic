@@ -5,14 +5,6 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>mercator image mask generator</title>
     <style>
-      @media (prefers-color-scheme: dark) {
-        html {
-          color-scheme: dark;
-        }
-        canvas {
-          opacity: 0.07;
-        }
-      }
       html,
       body {
         height: 100%;
@@ -25,6 +17,15 @@
         display: block;
         image-rendering: pixelated;
         border: 1px solid #ccc;
+      }
+      @media (prefers-color-scheme: dark) {
+        html {
+          color-scheme: dark;
+        }
+        canvas {
+          opacity: 0.07;
+          border: transparent;
+        }
       }
     </style>
   </head>
@@ -47,13 +48,14 @@
       const canvas = document.getElementById("map");
       const ctx = canvas.getContext("2d");
 
+      const aspectRatio = 1.5;
+
       const settings = {
         width: 1024,
-        aspectRatio: 1.65,
         includeSouthPole: false,
         download: function () {
-          const height = Math.round(settings.width / settings.aspectRatio);
           const link = document.createElement("a");
+          const height = Math.round(settings.width / aspectRatio);
           link.download = `mercator-${settings.width}x${height}.png`;
           link.href = canvas.toDataURL();
           link.click();
@@ -62,7 +64,6 @@
 
       const gui = new GUI();
       gui.add(settings, "width", 256, 4096, 1).onChange(draw);
-      gui.add(settings, "aspectRatio", 0.5, 3, 0.01).onChange(draw);
       gui
         .add(settings, "includeSouthPole")
         .name("Include South Pole")
@@ -84,10 +85,8 @@
       function draw() {
         if (!land) return;
 
-        const height = Math.round(settings.width / settings.aspectRatio);
-
         canvas.width = settings.width;
-        canvas.height = height;
+        canvas.height = Math.round(settings.width / aspectRatio);
 
         drawMercator(land);
       }
