@@ -1,0 +1,27 @@
+{
+  "name": "planeta",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "render": "bun ./src/render.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "canvas": "^3.2.0",
+    "d3-geo": "^3.1.1",
+    "lil-gui": "^0.21.0",
+    "topojson-client": "^3.1.0"
+  },
+  "devDependencies": {
+    "@types/geojson": "^7946.0.16",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.2"
+  }
+}

@@ -18,6 +18,33 @@
         image-rendering: pixelated;
         border: 1px solid #ccc;
       }
+      .canvas-wrapper {
+        position: relative;
+        display: inline-block;
+      }
+      #loading {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: CanvasText;
+        pointer-events: none;
+      }
+      #loading::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: Canvas;
+        opacity: 0.85;
+        border: 1px dashed currentColor;
+        border-radius: 10px;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+        z-index: -1;
+      }
+      #loading[hidden] {
+        display: none;
+      }
       @media (prefers-color-scheme: dark) {
         html {
           color-scheme: dark;
@@ -25,6 +52,9 @@
         canvas {
           opacity: 0.07;
           border: transparent;
+        }
+        #loading::before {
+          opacity: 0.55;
         }
       }
     </style>
@@ -38,7 +68,12 @@
         height: 100vh;
       "
     >
-      <canvas id="map"></canvas>
+      <div class="canvas-wrapper">
+        <canvas id="map"></canvas>
+        <div id="loading" role="status" aria-live="polite" hidden>
+          Loading map...
+        </div>
+      </div>
     </div>
     <script type="module">
       import GUI from "https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm";
@@ -47,11 +82,13 @@
 
       const canvas = document.getElementById("map");
       const ctx = canvas.getContext("2d");
+      const loadingIndicator = document.getElementById("loading");
 
       const aspectRatio = 1.5;
 
       const settings = {
         width: 1024,
+        detail: "110m",
         includeSouthPole: false,
         download: function () {
           const link = document.createElement("a");
@@ -62,24 +99,76 @@
         },
       };
 
+      function showLoading(message = "Loading map...") {
+        loadingIndicator.textContent = message;
+        loadingIndicator.hidden = false;
+      }
+
+      function hideLoading() {
+        loadingIndicator.hidden = true;
+      }
+
       const gui = new GUI();
       gui.add(settings, "width", 256, 4096, 1).onChange(draw);
       gui
+        .add(settings, "detail", ["110m", "50m", "10m"])
+        .name("map detail")
+        .onChange(load);
+      gui
         .add(settings, "includeSouthPole")
-        .name("Include South Pole")
+        .name("include South Pole")
         .onChange(draw);
-      gui.add(settings, "download").name("Download PNG");
+      gui.add(settings, "download").name("download .png");
 
+      const topoSources = {
+        "110m":
+          "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json",
+        "50m": "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json",
+        "10m": "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-10m.json",
+      };
+
+      const landCache = new Map();
       let land;
+      let loadToken = 0;
 
       async function load() {
-        const res = await fetch(
-          "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"
-        );
-        const topo = await res.json();
-        land = topojson.feature(topo, topo.objects.countries);
+        const detail = settings.detail;
+        const currentToken = ++loadToken;
 
-        draw();
+        const needsFetch = !landCache.has(detail);
+        if (needsFetch || !land) {
+          showLoading();
+        }
+
+        if (landCache.has(detail)) {
+          land = landCache.get(detail);
+          draw();
+          return;
+        }
+
+        try {
+          const res = await fetch(topoSources[detail]);
+          if (!res.ok) {
+            throw new Error(`Failed to load ${detail} dataset (${res.status})`);
+          }
+          const topo = await res.json();
+          const featureCollection = topojson.feature(
+            topo,
+            topo.objects.countries
+          );
+
+          // Prevent stale async responses from clobbering newer selections.
+          if (currentToken !== loadToken) return;
+
+          land = featureCollection;
+          landCache.set(detail, featureCollection);
+
+          draw();
+        } catch (error) {
+          if (currentToken !== loadToken) return;
+          console.error(error);
+          showLoading("Failed to load map data");
+        }
       }
 
       function draw() {
@@ -89,6 +178,7 @@
         canvas.height = Math.round(settings.width / aspectRatio);
 
         drawMercator(land);
+        hideLoading();
       }
 
       function drawMercator(land) {
