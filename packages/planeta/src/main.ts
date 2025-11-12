@@ -7,13 +7,23 @@ import {
   type Detail,
 } from "./lib/land";
 
-const canvas = document.getElementById("map") as HTMLCanvasElement;
-const ctx = canvas.getContext("2d");
-const loadingIndicator = document.getElementById("loading");
-
-if (!canvas || !ctx || !loadingIndicator) {
-  throw new Error("Missing required DOM elements");
+const canvasLookup = document.getElementById("map");
+if (!(canvasLookup instanceof HTMLCanvasElement)) {
+  throw new Error("Missing canvas element");
 }
+const canvasElement = canvasLookup;
+
+const ctxLookup = canvasElement.getContext("2d");
+if (!ctxLookup) {
+  throw new Error("Unable to obtain 2D context");
+}
+const ctx = ctxLookup;
+
+const loadingLookup = document.getElementById("loading");
+if (!(loadingLookup instanceof HTMLElement)) {
+  throw new Error("Missing loading indicator element");
+}
+const loadingIndicatorElement = loadingLookup;
 
 const aspectRatio = 1.5;
 
@@ -25,7 +35,7 @@ const settings = {
     const height = Math.round(settings.width / aspectRatio);
     const link = document.createElement("a");
     link.download = `mercator-${settings.detail}-${settings.width}x${height}.png`;
-    link.href = canvas.toDataURL();
+    link.href = canvasElement.toDataURL();
     link.click();
   },
 };
@@ -38,7 +48,7 @@ gui
   .onFinishChange(() => draw());
 
 gui
-  .add(settings, "detail", ["110m", "50m", "10m"])
+  .add(settings, "detail", ["110m", "50m"])
   .name("Map Detail")
   .onChange(() => load());
 
@@ -54,12 +64,12 @@ let land: FeatureCollection | null = null;
 let loadToken = 0;
 
 function showLoading(message = "Loading map...") {
-  loadingIndicator.textContent = message;
-  loadingIndicator.removeAttribute("hidden");
+  loadingIndicatorElement.textContent = message;
+  loadingIndicatorElement.removeAttribute("hidden");
 }
 
 function hideLoading() {
-  loadingIndicator.setAttribute("hidden", "hidden");
+  loadingIndicatorElement.setAttribute("hidden", "hidden");
 }
 
 async function load() {
@@ -92,8 +102,8 @@ async function load() {
 function draw() {
   if (!land) return;
 
-  canvas.width = settings.width;
-  canvas.height = Math.round(settings.width / aspectRatio);
+  canvasElement.width = settings.width;
+  canvasElement.height = Math.round(settings.width / aspectRatio);
 
   drawMercator(land);
   hideLoading();
@@ -101,19 +111,22 @@ function draw() {
 
 function drawMercator(source: FeatureCollection) {
   const clippedLand = clipSouthPole(source, settings.includeSouthPole);
-  const fitTarget = createBoundsGeometry(clippedLand);
+  const fitTarget = createBoundsGeometry(
+    clippedLand,
+    settings.includeSouthPole
+  );
 
   const projection = d3.geoMercator().fitExtent(
     [
       [0, 0],
-      [canvas.width, canvas.height],
+      [canvasElement.width, canvasElement.height],
     ],
     fitTarget
   );
   const path = d3.geoPath(projection, ctx);
 
   ctx.fillStyle = "white";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, canvasElement.width, canvasElement.height);
 
   ctx.fillStyle = "black";
   for (const feature of clippedLand.features) {
@@ -123,7 +136,10 @@ function drawMercator(source: FeatureCollection) {
   }
 }
 
-function createBoundsGeometry(collection: FeatureCollection) {
+function createBoundsGeometry(
+  collection: FeatureCollection,
+  includeSouthPole: boolean
+) {
   const bounds = {
     minLat: 90,
     maxLat: -90,
@@ -132,7 +148,7 @@ function createBoundsGeometry(collection: FeatureCollection) {
   };
 
   for (const feature of collection.features) {
-    updateBounds(bounds, feature.geometry);
+    updateBounds(bounds, feature.geometry, includeSouthPole);
   }
 
   if (bounds.minLat === 90) {
@@ -163,24 +179,27 @@ function updateBounds(
     minLon: number;
     maxLon: number;
   },
-  geometry: FeatureCollection["features"][number]["geometry"]
+  geometry: FeatureCollection["features"][number]["geometry"],
+  includeSouthPole: boolean
 ) {
   if (!geometry) return;
   switch (geometry.type) {
     case "Polygon":
       geometry.coordinates.forEach((ring) =>
-        ring.forEach(([lon, lat]) => accumulate(bounds, lon, lat))
+        ring.forEach(([lon, lat]) => accumulate(bounds, lon, lat, includeSouthPole))
       );
       break;
     case "MultiPolygon":
       geometry.coordinates.forEach((polygon) =>
         polygon.forEach((ring) =>
-          ring.forEach(([lon, lat]) => accumulate(bounds, lon, lat))
+          ring.forEach(([lon, lat]) => accumulate(bounds, lon, lat, includeSouthPole))
         )
       );
       break;
     case "GeometryCollection":
-      geometry.geometries.forEach((geom) => updateBounds(bounds, geom as any));
+      geometry.geometries.forEach((geom) =>
+        updateBounds(bounds, geom as any, includeSouthPole)
+      );
       break;
     default:
       break;
@@ -195,12 +214,18 @@ function accumulate(
     maxLon: number;
   },
   lon: number,
-  lat: number
+  lat: number,
+  includeSouthPole: boolean
 ) {
+  if (!includeSouthPole && lat < ANTARCTIC_LAT) {
+    lat = ANTARCTIC_LAT;
+  }
   if (lat < bounds.minLat) bounds.minLat = lat;
   if (lat > bounds.maxLat) bounds.maxLat = lat;
   if (lon < bounds.minLon) bounds.minLon = lon;
   if (lon > bounds.maxLon) bounds.maxLon = lon;
 }
+
+const ANTARCTIC_LAT = -60;
 
 load();

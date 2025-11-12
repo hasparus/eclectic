@@ -55,7 +55,7 @@ async function main() {
   context.fillStyle = "white";
   context.fillRect(0, 0, width, height);
 
-  const fitTarget = createBoundsGeometry(clipped);
+  const fitTarget = createBoundsGeometry(clipped, includeSouthPole);
   const projection = d3.geoMercator().fitExtent(
     [
       [0, 0],
@@ -82,7 +82,10 @@ async function main() {
   console.log(`Saved ${outPath} (${detail}, south pole: ${includeSouthPole})`);
 }
 
-function createBoundsGeometry(collection: FeatureCollection) {
+function createBoundsGeometry(
+  collection: FeatureCollection,
+  includeSouthPole: boolean
+) {
   const bounds = {
     minLat: 90,
     maxLat: -90,
@@ -91,7 +94,7 @@ function createBoundsGeometry(collection: FeatureCollection) {
   };
 
   for (const feature of collection.features) {
-    updateBounds(bounds, feature.geometry);
+    updateBounds(bounds, feature.geometry, includeSouthPole);
   }
 
   if (bounds.minLat === 90) {
@@ -122,24 +125,27 @@ function updateBounds(
     minLon: number;
     maxLon: number;
   },
-  geometry: Geometry | null
+  geometry: Geometry | null,
+  includeSouthPole: boolean
 ) {
   if (!geometry) return;
   switch (geometry.type) {
     case "Polygon":
       geometry.coordinates.forEach((ring) =>
-        ring.forEach(([lon, lat]) => accumulate(bounds, lon, lat))
+        ring.forEach(([lon, lat]) => accumulate(bounds, lon, lat, includeSouthPole))
       );
       break;
     case "MultiPolygon":
       geometry.coordinates.forEach((polygon) =>
         polygon.forEach((ring) =>
-          ring.forEach(([lon, lat]) => accumulate(bounds, lon, lat))
+          ring.forEach(([lon, lat]) => accumulate(bounds, lon, lat, includeSouthPole))
         )
       );
       break;
     case "GeometryCollection":
-      geometry.geometries.forEach((geom) => updateBounds(bounds, geom));
+      geometry.geometries.forEach((geom) =>
+        updateBounds(bounds, geom, includeSouthPole)
+      );
       break;
     default:
       break;
@@ -154,13 +160,19 @@ function accumulate(
     maxLon: number;
   },
   lon: number,
-  lat: number
+  lat: number,
+  includeSouthPole: boolean
 ) {
+  if (!includeSouthPole && lat < ANTARCTIC_LAT) {
+    lat = ANTARCTIC_LAT;
+  }
   if (lat < bounds.minLat) bounds.minLat = lat;
   if (lat > bounds.maxLat) bounds.maxLat = lat;
   if (lon < bounds.minLon) bounds.minLon = lon;
   if (lon > bounds.maxLon) bounds.maxLon = lon;
 }
+
+const ANTARCTIC_LAT = -60;
 
 function resolveOutputPath(outfile: string) {
   const sanitized = outfile.replace(/^(\.\/)+/, "");

@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "render": "bun ./src/render.ts"
+    "render": "bun ./src/render.ts",
+    "render:110": "bun ./src/render.ts --detail=110m --include-south-pole=false --out=110m-ns.png",
+    "render:50": "bun ./src/render.ts --detail=50m --include-south-pole=false --out=50m-ns.png",
+    "render:all": "bun run render:110 && bun run render:50"
   },
   "keywords": [],
   "author": "",
@@ -20,7 +23,10 @@
     "topojson-client": "^3.1.0"
   },
   "devDependencies": {
+    "@types/d3-geo": "^3.1.0",
     "@types/geojson": "^7946.0.16",
+    "@types/node": "^24.10.0",
+    "@types/topojson-client": "^3.1.5",
     "typescript": "^5.9.3",
     "vite": "^7.2.2"
   }
