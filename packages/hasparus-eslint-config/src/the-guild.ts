@@ -32,7 +32,6 @@ export const theGuild: ReturnType<typeof tseslint.config> = tseslint.config(
       import: importPlugin,
       promise: promisePlugin,
       n: nPlugin,
-      // @ts-expect-error -- plugin type compatibility issue
       sonarjs: sonarjsPlugin,
     },
     rules: {
