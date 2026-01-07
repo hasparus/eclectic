@@ -11,7 +11,6 @@ import promisePlugin from "eslint-plugin-promise";
 import nPlugin from "eslint-plugin-n";
 import sonarjsPlugin from "eslint-plugin-sonarjs";
 
-
 export const theGuild: ReturnType<typeof tseslint.config> = tseslint.config(
   {
     ignores: [
@@ -27,7 +26,7 @@ export const theGuild: ReturnType<typeof tseslint.config> = tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.strict,
   ...tseslint.configs.stylistic,
-  
+
   {
     plugins: {
       import: importPlugin,
@@ -51,9 +50,9 @@ export const theGuild: ReturnType<typeof tseslint.config> = tseslint.config(
         },
       ],
       "@typescript-eslint/consistent-type-definitions": "off",
-      
-      "simple-import-sort/imports": "off",
-      "simple-import-sort/exports": "off",
+
+      // TypeScript checks this
+      "import/extensions": "off",
     },
     languageOptions: {
       globals: {
@@ -150,7 +149,7 @@ export const theGuild: ReturnType<typeof tseslint.config> = tseslint.config(
       "next-sitemap.config.js",
       "vite.config.ts",
       "tsup.config.ts",
-      "prettier.config.js"
+      "prettier.config.js",
     ],
     rules: {
       "import/no-default-export": "off",
