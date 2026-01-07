@@ -6,7 +6,7 @@ Handles relative links, with and without `.mdx` extension, and treats `page.mdx`
 ## Install
 
 ```bash
-pnpm add -D validate-mdx-links
+bun add -D validate-mdx-links
 ```
 
 ## CLI

@@ -7,8 +7,8 @@ this directory contains a demo of the `scrollview-fade` plugin
 first, build the plugin:
 
 ```bash
-pnpm build
-pnpm build:demo
+bun run build
+bun run build:demo
 open dist.html
 ```
 

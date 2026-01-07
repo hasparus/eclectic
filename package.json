@@ -1,5 +1,6 @@
 {
   "name": "eclectic",
   "description": "a repository of various small projects",
-  "packageManager": "pnpm@10.19.0"
+  "packageManager": "bun@1.2.4",
+  "workspaces": ["packages/*"]
 }

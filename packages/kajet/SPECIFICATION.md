@@ -269,8 +269,8 @@ module.exports = {
 # src-tauri/tauri.conf.json
 {
   "build": {
-    "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build",
+    "beforeDevCommand": "bun dev",
+    "beforeBuildCommand": "bun run build",
     "devPath": "http://localhost:5173",
     "distDir": "../dist"
   }

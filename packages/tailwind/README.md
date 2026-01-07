@@ -5,7 +5,6 @@ a small collection of Tailwind CSS plugins (like, literally one plugin rn)
 ## innstallation
 
 ```bash
-pnpm add @hasparus/tailwind
 bun add @hasparus/tailwind
 ```
 
