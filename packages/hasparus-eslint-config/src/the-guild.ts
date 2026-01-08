@@ -130,15 +130,6 @@ export const theGuild = defineConfig(
   ...guildSubconfigs,
 
   {
-    rules: {
-      // I know `toSorted` exists, and I want to mutate stuff in place.
-      "unicorn/no-array-sort": "off",
-      // This is just a better extension and I don't wanna rename files depending on content.
-      "react/jsx-filename-extension": "off",
-    },
-  },
-
-  {
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -223,6 +214,7 @@ export const theGuild = defineConfig(
     rules: {
       "unicorn/filename-case": "off",
       "unicorn/import-style": "off",
+      "unicorn/no-array-sort": "off",
       "unicorn/no-null": "off",
       "unicorn/prefer-node-protocol": "warn",
       "unicorn/prefer-query-selector": "off",
@@ -239,32 +231,19 @@ export const theGuild = defineConfig(
     },
   },
   {
-    files: [
-      "**/*.d.ts",
-      "eslint.config.mjs",
-      "*.config.*",
-      "prettier.config.mts",
-    ],
+    files: ["**/*.d.ts", "**/*.config.*", "**/*.config.*"],
     rules: {
       "import/no-default-export": "off",
       "no-var": "off",
     },
   },
+
   {
-    files: [
-      "**/jest.config.js",
-      "**/webpack.config.js",
-      "**/bob.config.js",
-      "**/babel.config.js",
-      "**/postcss.config.{js,cjs}",
-      "**/rollup.config.js",
-      "**/next-sitemap.config.js",
-      "**/vite.config.ts",
-      "**/tsup.config.ts",
-      "**/prettier.config.js",
-    ],
     rules: {
-      "import/no-default-export": "off",
+      // I know `toSorted` exists, and I want to mutate stuff in place.
+      "unicorn/no-array-sort": "off",
+      // This is just a better extension and I don't wanna rename files depending on content.
+      "react/jsx-filename-extension": "off",
     },
   }
 );
