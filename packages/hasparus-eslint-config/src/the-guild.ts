@@ -239,7 +239,12 @@ export const theGuild = defineConfig(
     },
   },
   {
-    files: ["**/*.d.ts", "eslint.config.mjs", "*.config.*"],
+    files: [
+      "**/*.d.ts",
+      "eslint.config.mjs",
+      "*.config.*",
+      "prettier.config.mts",
+    ],
     rules: {
       "import/no-default-export": "off",
       "no-var": "off",
