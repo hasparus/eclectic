@@ -136,7 +136,9 @@ export const theGuild = defineConfig(
         ...globals.node,
       },
       parserOptions: {
-        projectService: true,
+        projectService: {
+          allowDefaultProject: ["*.js", "*.mjs"],
+        },
       },
     },
     plugins: {
