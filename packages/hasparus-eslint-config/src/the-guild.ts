@@ -1,3 +1,8 @@
+/**
+ * @file ESLint rules for projects where I'm the main/only dev at The Guild
+ * Note that all enabled rules here are set to "warn" apart from SonarJS.
+ * Only Sonar and TypeScript deserve red squiggles.
+ */
 import { FlatCompat } from "@eslint/eslintrc";
 import eslint from "@eslint/js";
 import { Linter } from "eslint";
@@ -37,19 +42,19 @@ const guildSubconfigs = compat
 
 // rules from @theguild/eslint-config/base (can't import directly — uses @rushstack/eslint-patch)
 const guildRules: Linter.Config["rules"] = {
-  eqeqeq: ["error", "always", { null: "ignore" }],
+  eqeqeq: ["warn", "always", { null: "ignore" }],
   "import/extensions": "off",
-  "import/first": "error",
-  "import/no-default-export": "error",
-  "import/no-duplicates": "error",
-  "import/no-useless-path-segments": "error",
+  "import/first": "warn",
+  "import/no-default-export": "warn",
+  "import/no-duplicates": "warn",
+  "import/no-useless-path-segments": "warn",
   "logical-assignment-operators": [
-    "error",
+    "warn",
     "always",
     { enforceForIfStatements: true },
   ],
   "n/no-restricted-import": [
-    "error",
+    "warn",
     [
       { message: "Use `fetch/node-fetch` instead.", name: "axios" },
       { message: "Use `dayjs/date-fns` instead.", name: "moment" },
@@ -59,27 +64,27 @@ const guildRules: Linter.Config["rules"] = {
       },
     ],
   ],
-  "no-console": "error",
-  "no-else-return": ["error", { allowElseIf: false }],
+  "no-console": "warn",
+  "no-else-return": ["warn", { allowElseIf: false }],
   "no-implicit-coercion": [
-    "error",
+    "warn",
     { boolean: false, disallowTemplateShorthand: true },
   ],
-  "no-lonely-if": "error",
+  "no-lonely-if": "warn",
   "no-restricted-globals": [
-    "error",
+    "warn",
     "stop",
     "close",
     { message: "Use Number.isNaN instead", name: "isNaN" },
   ],
-  "no-self-compare": "error",
-  "no-unreachable-loop": "error",
-  "object-shorthand": ["error", "always"],
-  "prefer-arrow-callback": ["error", { allowNamedFunctions: true }],
-  "prefer-const": ["error", { destructuring: "all" }],
-  "prefer-object-has-own": "error",
-  "promise/no-multiple-resolved": "error",
-  "promise/no-nesting": "error",
+  "no-self-compare": "warn",
+  "no-unreachable-loop": "warn",
+  "object-shorthand": ["warn", "always"],
+  "prefer-arrow-callback": ["warn", { allowNamedFunctions: true }],
+  "prefer-const": ["warn", { destructuring: "all" }],
+  "prefer-object-has-own": "warn",
+  "promise/no-multiple-resolved": "warn",
+  "promise/no-nesting": "warn",
   quotes: "off",
   "sonarjs/no-gratuitous-expressions": "error",
   "sonarjs/no-identical-conditions": "error",
@@ -87,23 +92,23 @@ const guildRules: Linter.Config["rules"] = {
   "sonarjs/no-one-iteration-loop": "off",
   "sonarjs/no-unused-collection": "error",
   "sonarjs/no-use-of-empty-return-value": "error",
-  "unicorn/filename-case": "off",
-  "unicorn/no-array-for-each": "error",
-  "unicorn/no-array-push-push": "error",
-  "unicorn/no-empty-file": "error",
-  "unicorn/no-instanceof-array": "error",
-  "unicorn/no-lonely-if": "error",
-  "unicorn/no-negated-condition": "error",
-  "unicorn/no-useless-fallback-in-spread": "error",
-  "unicorn/no-useless-spread": "error",
-  "unicorn/numeric-separators-style": "error",
-  "unicorn/prefer-array-find": "error",
-  "unicorn/prefer-export-from": ["error", { ignoreUsedVariables: true }],
-  "unicorn/prefer-includes": "error",
-  "unicorn/prefer-logical-operator-over-ternary": "error",
-  "unicorn/prefer-node-protocol": "error",
-  "unicorn/prefer-string-trim-start-end": "error",
-  yoda: "error",
+  "unicorn/filename-case": "warn",
+  "unicorn/no-array-for-each": "warn",
+  "unicorn/no-array-push-push": "warn",
+  "unicorn/no-empty-file": "warn",
+  "unicorn/no-instanceof-array": "warn",
+  "unicorn/no-lonely-if": "warn",
+  "unicorn/no-negated-condition": "warn",
+  "unicorn/no-useless-fallback-in-spread": "warn",
+  "unicorn/no-useless-spread": "warn",
+  "unicorn/numeric-separators-style": "warn",
+  "unicorn/prefer-array-find": "warn",
+  "unicorn/prefer-export-from": ["warn", { ignoreUsedVariables: true }],
+  "unicorn/prefer-includes": "warn",
+  "unicorn/prefer-logical-operator-over-ternary": "warn",
+  "unicorn/prefer-node-protocol": "warn",
+  "unicorn/prefer-string-trim-start-end": "warn",
+  yoda: "warn",
 };
 
 export const theGuild = defineConfig(
@@ -128,6 +133,8 @@ export const theGuild = defineConfig(
     rules: {
       // I know `toSorted` exists, and I want to mutate stuff in place.
       "unicorn/no-array-sort": "off",
+      // This is just a better extension and I don't wanna rename files depending on content.
+      "react/jsx-filename-extension": "off",
     },
   },
 
@@ -217,7 +224,7 @@ export const theGuild = defineConfig(
       "unicorn/filename-case": "off",
       "unicorn/import-style": "off",
       "unicorn/no-null": "off",
-      "unicorn/prefer-node-protocol": "error",
+      "unicorn/prefer-node-protocol": "warn",
       "unicorn/prefer-query-selector": "off",
       "unicorn/prevent-abbreviations": "off",
       "unicorn/switch-case-braces": "off",
@@ -227,12 +234,12 @@ export const theGuild = defineConfig(
   {
     files: ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
     rules: {
-      "@typescript-eslint/consistent-type-assertions": "error",
+      "@typescript-eslint/consistent-type-assertions": "warn",
       "no-undef": "off",
     },
   },
   {
-    files: ["**/*.d.ts"],
+    files: ["**/*.d.ts", "eslint.config.mjs", "*.config.*"],
     rules: {
       "import/no-default-export": "off",
       "no-var": "off",
