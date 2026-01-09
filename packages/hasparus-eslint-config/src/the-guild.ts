@@ -233,7 +233,7 @@ export const theGuild = defineConfig(
     },
   },
   {
-    files: ["**/*.d.ts", "**/*.config.*", "**/*.config.*"],
+    files: ["**/*.d.ts", "**/*.config.*", "*.config.*"],
     rules: {
       "import/no-default-export": "off",
       "no-var": "off",
