@@ -121,7 +121,6 @@ export const theGuild = defineConfig(
       "**/.wrangler/tmp/**/*",
       "**/.cache/**/*",
       ".git",
-      "eslint.config.*",
     ],
   },
   eslint.configs.recommended,
