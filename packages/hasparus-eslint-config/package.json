@@ -1,6 +1,6 @@
 {
   "name": "@hasparus/eslint-config",
-  "version": "2.0.10",
+  "version": "2.0.11",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -11,8 +11,8 @@
       "default": "./dist/index.js"
     },
     "./the-guild": {
-      "types": "./dist/src/the-guild.d.ts",
-      "default": "./dist/src/the-guild.js"
+      "types": "./dist/the-guild.d.ts",
+      "default": "./dist/the-guild.js"
     }
   },
   "files": [
