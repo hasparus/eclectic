@@ -111,7 +111,7 @@ const guildRules: Linter.Config["rules"] = {
   yoda: "warn",
 };
 
-export const theGuild = defineConfig(
+const theGuild = defineConfig(
   {
     ignores: [
       "dist",
@@ -248,3 +248,6 @@ export const theGuild = defineConfig(
     },
   }
 );
+
+// eslint-disable-next-line import/no-default-export
+export default theGuild;
