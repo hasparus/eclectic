@@ -99,6 +99,8 @@ const guildRules: Linter.Config["rules"] = {
   "unicorn/no-instanceof-array": "warn",
   "unicorn/no-lonely-if": "warn",
   "unicorn/no-negated-condition": "warn",
+  // conflicts with Prettier
+  "unicorn/no-nested-ternary": "off",
   "unicorn/no-useless-fallback-in-spread": "warn",
   "unicorn/no-useless-spread": "warn",
   "unicorn/numeric-separators-style": "warn",
