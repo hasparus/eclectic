@@ -138,7 +138,7 @@ const theGuild: Linter.Config[] = defineConfig(
       },
       parserOptions: {
         projectService: {
-          allowDefaultProject: ["*.js", "*.mjs"],
+          allowDefaultProject: ["*.js", "*.mjs", "*.config.ts"],
         },
       },
     },
