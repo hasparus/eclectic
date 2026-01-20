@@ -149,7 +149,6 @@ const theGuild = defineConfig(
       sonarjs: sonarjsPlugin,
     },
     rules: {
-      ...guildRules,
       "@typescript-eslint/consistent-type-definitions": "off",
       "@typescript-eslint/no-empty-object-type": "off",
       "@typescript-eslint/no-non-null-assertion": "off",
@@ -243,10 +242,13 @@ const theGuild = defineConfig(
 
   {
     rules: {
+      ...guildRules,
       // I know `toSorted` exists, and I want to mutate stuff in place.
       "unicorn/no-array-sort": "off",
       // This is just a better extension and I don't wanna rename files depending on content.
       "react/jsx-filename-extension": "off",
+      // TypeScript should suffice here, and if not, I'd assume we have tests
+      "unicorn/no-array-callback-reference": "off",
     },
   }
 );
