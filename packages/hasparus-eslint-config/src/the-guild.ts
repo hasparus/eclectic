@@ -113,7 +113,7 @@ const guildRules: Linter.Config["rules"] = {
   yoda: "warn",
 };
 
-const theGuild = defineConfig(
+const theGuild: Linter.Config[] = defineConfig(
   {
     ignores: [
       "dist",
@@ -233,14 +233,6 @@ const theGuild = defineConfig(
     },
   },
   {
-    files: ["**/*.d.ts", "**/*.config.*", "*.config.*"],
-    rules: {
-      "import/no-default-export": "off",
-      "no-var": "off",
-    },
-  },
-
-  {
     rules: {
       ...guildRules,
       // I know `toSorted` exists, and I want to mutate stuff in place.
@@ -249,6 +241,14 @@ const theGuild = defineConfig(
       "react/jsx-filename-extension": "off",
       // TypeScript should suffice here, and if not, I'd assume we have tests
       "unicorn/no-array-callback-reference": "off",
+    },
+  },
+
+  {
+    files: ["**/*.d.ts", "**/*.config.*", "*.config.*"],
+    rules: {
+      "import/no-default-export": "off",
+      "no-var": "off",
     },
   }
 );
