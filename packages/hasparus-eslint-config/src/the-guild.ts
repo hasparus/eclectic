@@ -6,6 +6,7 @@
 import { FlatCompat } from "@eslint/eslintrc";
 import eslint from "@eslint/js";
 import { Linter } from "eslint";
+import tailwindcssPlugin from "eslint-plugin-better-tailwindcss";
 import importPlugin from "eslint-plugin-import";
 import nPlugin from "eslint-plugin-n";
 import perfectionistPlugin from "eslint-plugin-perfectionist";
@@ -92,7 +93,7 @@ const guildRules: Linter.Config["rules"] = {
   "sonarjs/no-one-iteration-loop": "off",
   "sonarjs/no-unused-collection": "error",
   "sonarjs/no-use-of-empty-return-value": "error",
-  "unicorn/filename-case": "warn",
+  // "unicorn/filename-case": "warn",
   "unicorn/no-array-for-each": "warn",
   "unicorn/no-array-push-push": "warn",
   "unicorn/no-empty-file": "warn",
@@ -138,7 +139,7 @@ const theGuild: Linter.Config[] = defineConfig(
       },
       parserOptions: {
         projectService: {
-          allowDefaultProject: true,
+          allowDefaultProject: ["*.config.*", "*.mjs", "*.js"],
         },
       },
     },
@@ -212,6 +213,7 @@ const theGuild: Linter.Config[] = defineConfig(
   },
 
   eslintPluginUnicorn.configs["recommended"],
+
   {
     rules: {
       "unicorn/filename-case": "off",
@@ -250,7 +252,22 @@ const theGuild: Linter.Config[] = defineConfig(
       "import/no-default-export": "off",
       "no-var": "off",
     },
-  }
+  },
+
+  {
+    files: ["**/*.tsx", "**/*.jsx"],
+    plugins: {
+      "better-tailwindcss": tailwindcssPlugin,
+    },
+    rules: {
+      "better-tailwindcss/enforce-canonical-classes": "warn",
+      "better-tailwindcss/no-conflicting-classes": "warn",
+      "better-tailwindcss/no-deprecated-classes": "warn",
+      "better-tailwindcss/no-duplicate-classes": "warn",
+      "better-tailwindcss/no-unknown-classes": "warn",
+      "better-tailwindcss/no-unnecessary-whitespace": "warn",
+    },
+  },
 );
 
 // eslint-disable-next-line import/no-default-export
