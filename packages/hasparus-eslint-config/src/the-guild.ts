@@ -14,6 +14,7 @@ import perfectionistPlugin from "eslint-plugin-perfectionist";
 import promisePlugin from "eslint-plugin-promise";
 import sonarjsPlugin from "eslint-plugin-sonarjs";
 import eslintPluginUnicorn from "eslint-plugin-unicorn";
+import ymlPlugin from "eslint-plugin-yml";
 import { defineConfig } from "eslint/config";
 import globals from "globals";
 import path from "node:path";
@@ -31,7 +32,7 @@ const guildSubconfigs = compat
     extends: [
       "@theguild/eslint-config/react",
       "@theguild/eslint-config/json",
-      "@theguild/eslint-config/yml",
+      // yml removed - using eslint-plugin-yml flat config directly
       "@theguild/eslint-config/mdx",
     ],
   })
@@ -130,6 +131,23 @@ const theGuild: Linter.Config[] = defineConfig(
   ...tseslint.configs.strict,
   ...tseslint.configs.stylistic,
   ...guildSubconfigs,
+  // yml configs with file patterns and ignores
+  ...ymlPlugin.configs["flat/standard"].map((config) => ({
+    ...config,
+    files: ["*.yaml", "**/*.yaml", "*.yml", "**/*.yml"],
+    ignores: ["pnpm-lock.yaml", ".github/FUNDING.yml", "**/*.md{,x}/*"],
+  })),
+  ...ymlPlugin.configs["flat/prettier"].map((config) => ({
+    ...config,
+    files: ["*.yaml", "**/*.yaml", "*.yml", "**/*.yml"],
+    ignores: ["pnpm-lock.yaml", ".github/FUNDING.yml", "**/*.md{,x}/*"],
+  })),
+  {
+    files: ["*.yaml", "**/*.yaml", "*.yml", "**/*.yml"],
+    rules: {
+      "unicorn/filename-case": "off",
+    },
+  },
 
   {
     languageOptions: {
