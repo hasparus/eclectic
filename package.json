@@ -2,5 +2,10 @@
   "name": "eclectic",
   "description": "a repository of various small projects",
   "packageManager": "bun@1.2.4",
-  "workspaces": ["packages/*"]
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "bun --filter '*' build",
+    "lint": "bun --filter '*' lint",
+    "test": "bun --filter '*' test"
+  }
 }
