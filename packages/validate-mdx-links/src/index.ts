@@ -203,6 +203,15 @@ function scanRoutes(
   }
 }
 
+function contentPathToUrl(filePath: string, contentDir: string): string {
+  let urlPath = "/" + relative(contentDir, filePath);
+  urlPath = urlPath.replace(/\.mdx$/, "");
+  if (urlPath.endsWith("/index")) {
+    urlPath = urlPath.slice(0, -"/index".length) || "/";
+  }
+  return urlPath;
+}
+
 function buildContentScanResult(
   contentDir: string,
   cwd: string,
@@ -214,16 +223,7 @@ function buildContentScanResult(
   const mdxFiles = globSync(`${contentDir}/**/*.mdx`, { cwd });
 
   for (const file of mdxFiles) {
-    let urlPath = "/" + relative(contentDir, file);
-
-    // strip .mdx extension
-    urlPath = urlPath.replace(/\.mdx$/, "");
-
-    // index → parent directory
-    if (urlPath.endsWith("/index")) {
-      urlPath = urlPath.slice(0, -"/index".length) || "/";
-    }
-
+    const urlPath = contentPathToUrl(file, contentDir);
     const content = readFileSync(resolve(cwd, file), "utf-8");
     const hashes = extractHashes(content);
 
@@ -275,6 +275,7 @@ export async function validateMdxLinks({
   }
 
   let scanned: ScanResult;
+  let effectiveContentDir: string | undefined = contentDir;
   const deps = readDeps(cwd);
 
   if (contentDir) {
@@ -282,6 +283,7 @@ export async function validateMdxLinks({
   } else {
     const framework = detectFramework(cwd, deps);
     if (framework.type === "content") {
+      effectiveContentDir = framework.contentDir;
       scanned = buildContentScanResult(framework.contentDir, cwd, verbose, deps);
     } else {
       scanned = await scanURLs();
@@ -301,7 +303,11 @@ export async function validateMdxLinks({
     }
   }
 
-  const validations = await validateFiles(files, { scanned });
+  const pathToUrl = effectiveContentDir
+    ? (filePath: string) => contentPathToUrl(filePath, effectiveContentDir!)
+    : undefined;
+
+  const validations = await validateFiles(files, { scanned, pathToUrl });
 
   const withoutFalsePositives = await Promise.all(
     validations.map(async ({ file, detected }) => {
