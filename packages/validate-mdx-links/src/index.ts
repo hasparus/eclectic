@@ -94,12 +94,124 @@ function extractHashes(content: string): string[] {
   return hashes;
 }
 
+/**
+ * Convert a TanStack Router file path to a URL path.
+ * - Strips `_prefix` layout segments (pathless routes)
+ * - `index.tsx` → parent path
+ * - `$.tsx` → null (handled as fallbackUrl)
+ * - `[.]` → literal dot
+ * - Strips extensions
+ * Returns null for splat routes (caller handles as fallbackUrl),
+ * or undefined for files that shouldn't produce routes (layouts, tests, api).
+ */
+function tanstackRouteToUrl(
+  filePath: string,
+  routesDir: string
+): string | null | undefined {
+  const rel = relative(routesDir, filePath);
+
+  // Skip root layout, test files, api routes
+  if (
+    rel.startsWith("__") ||
+    rel.includes(".test.") ||
+    rel.startsWith("api/") ||
+    rel.startsWith("api\\")
+  ) {
+    return undefined;
+  }
+
+  // Strip extension
+  const withoutExt = rel.replace(/\.(tsx?|jsx?)$/, "");
+
+  const segments = withoutExt.split(/[/\\]/);
+  const urlSegments: string[] = [];
+  let isSplat = false;
+
+  for (const seg of segments) {
+    // Layout files (e.g. _landing.tsx) — skip as a route themselves
+    // but as directories they wrap children
+    if (seg.startsWith("_")) {
+      continue;
+    }
+
+    // Splat route
+    if (seg === "$") {
+      isSplat = true;
+      continue;
+    }
+
+    // Dynamic param like $slug — skip, produces fallback
+    if (seg.startsWith("$")) {
+      isSplat = true;
+      continue;
+    }
+
+    // index → parent
+    if (seg === "index") {
+      continue;
+    }
+
+    // [.] → literal dot
+    let processed = seg.replace(/\[\.\]/g, ".");
+
+    urlSegments.push(processed);
+  }
+
+  if (isSplat) {
+    return null; // caller creates fallbackUrl regex
+  }
+
+  return "/" + urlSegments.join("/") || "/";
+}
+
+function scanRoutes(
+  routesDir: string,
+  cwd: string,
+  urls: Map<string, UrlMeta>,
+  fallbackUrls: { url: RegExp; meta: UrlMeta }[]
+): void {
+  const absRoutesDir = resolve(cwd, routesDir);
+  if (!existsSync(absRoutesDir)) return;
+
+  const routeFiles = globSync(`${routesDir}/**/*.{tsx,ts,jsx,js}`, { cwd });
+
+  for (const file of routeFiles) {
+    const result = tanstackRouteToUrl(file, routesDir);
+
+    if (result === undefined) {
+      // Skip (layout, test, api)
+      continue;
+    }
+
+    if (result === null) {
+      // Splat route — build a regex fallback from the non-splat prefix
+      const rel = relative(routesDir, file).replace(/\.(tsx?|jsx?)$/, "");
+      const segments = rel.split(/[/\\]/);
+      const prefixSegments: string[] = [];
+      for (const seg of segments) {
+        if (seg.startsWith("_")) continue;
+        if (seg === "$" || seg.startsWith("$") || seg === "index") break;
+        prefixSegments.push(seg.replace(/\[\.\]/g, "."));
+      }
+      const prefix = "/" + prefixSegments.join("/");
+      const pattern = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(/.*)?$`);
+      fallbackUrls.push({ url: pattern, meta: {} });
+      continue;
+    }
+
+    if (!urls.has(result)) {
+      urls.set(result, {});
+    }
+  }
+}
+
 function buildContentScanResult(
   contentDir: string,
   cwd: string,
   verbose?: boolean
 ): ScanResult {
   const urls = new Map<string, UrlMeta>();
+  const fallbackUrls: { url: RegExp; meta: UrlMeta }[] = [];
   const mdxFiles = globSync(`${contentDir}/**/*.mdx`, { cwd });
 
   for (const file of mdxFiles) {
@@ -119,16 +231,25 @@ function buildContentScanResult(
     urls.set(urlPath, { hashes: hashes.length > 0 ? hashes : undefined });
   }
 
+  // Also scan TanStack Router routes if present
+  for (const routesDir of ["src/routes", "app/routes"]) {
+    scanRoutes(routesDir, cwd, urls, fallbackUrls);
+  }
+
   if (verbose) {
     console.log(
       "\n" +
         "Scanned content routes:\n" +
         [...urls.keys()].map((x) => `"${x}"`).join(", ") +
+        (fallbackUrls.length > 0
+          ? "\nFallback patterns:\n" +
+            fallbackUrls.map((x) => `${x.url}`).join(", ")
+          : "") +
         "\n"
     );
   }
 
-  return { urls, fallbackUrls: [] };
+  return { urls, fallbackUrls };
 }
 
 export async function validateMdxLinks({
