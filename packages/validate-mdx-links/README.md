@@ -13,7 +13,7 @@ Detection reads `package.json` dependencies first, then falls back to directory 
 ## Install
 
 ```bash
-npm add -D validate-mdx-links
+bun add -D validate-mdx-links
 ```
 
 ## CLI
