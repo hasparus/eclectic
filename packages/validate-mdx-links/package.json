@@ -22,7 +22,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "prepublishOnly": "pnpm build"
+    "prepublishOnly": "tsc"
   },
   "dependencies": {
     "github-slugger": "^2.0.0",
