@@ -1,11 +1,17 @@
-import { globSync } from "node:fs";
+import { existsSync, globSync, readFileSync } from "node:fs";
 import { stat } from "node:fs/promises";
-import { dirname, resolve, basename } from "node:path";
+import { dirname, resolve, basename, relative } from "node:path";
 import {
   scanURLs,
   validateFiles,
   type DetectedError,
+  type ScanResult,
 } from "next-validate-link";
+
+type UrlMeta = {
+  hashes?: string[];
+  queries?: Record<string, string>[];
+};
 
 export { printErrors } from "next-validate-link";
 
@@ -18,12 +24,93 @@ export interface ValidateMdxLinksOptions {
   cwd?: string;
   files: string;
   verbose?: boolean;
+  contentDir?: string;
+}
+
+type FrameworkKind =
+  | { type: "nextjs" }
+  | { type: "content"; contentDir: string };
+
+function detectFramework(cwd: string): FrameworkKind {
+  const nextDirs = ["app", "src/app", "pages", "src/pages"];
+  for (const dir of nextDirs) {
+    if (existsSync(resolve(cwd, dir))) {
+      return { type: "nextjs" };
+    }
+  }
+
+  if (existsSync(resolve(cwd, "content"))) {
+    const mdxFiles = globSync("content/**/*.mdx", { cwd });
+    if (mdxFiles.length > 0) {
+      return { type: "content", contentDir: "content" };
+    }
+  }
+
+  return { type: "nextjs" };
+}
+
+const HEADING_REGEX = /^#{1,6}\s+(.+)$/gm;
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/<[^>]*>/g, "") // strip HTML tags
+    .replace(/[^\w\s-]/g, "") // strip non-alphanumeric (keep spaces and dashes)
+    .trim()
+    .replace(/\s+/g, "-");
+}
+
+function extractHashes(content: string): string[] {
+  const hashes: string[] = [];
+  let match;
+  while ((match = HEADING_REGEX.exec(content)) !== null) {
+    hashes.push(slugify(match[1]!));
+  }
+  return hashes;
+}
+
+function buildContentScanResult(
+  contentDir: string,
+  cwd: string,
+  verbose?: boolean
+): ScanResult {
+  const urls = new Map<string, UrlMeta>();
+  const mdxFiles = globSync(`${contentDir}/**/*.mdx`, { cwd });
+
+  for (const file of mdxFiles) {
+    let urlPath = "/" + relative(contentDir, file);
+
+    // strip .mdx extension
+    urlPath = urlPath.replace(/\.mdx$/, "");
+
+    // index → parent directory
+    if (urlPath.endsWith("/index")) {
+      urlPath = urlPath.slice(0, -"/index".length) || "/";
+    }
+
+    const content = readFileSync(resolve(cwd, file), "utf-8");
+    const hashes = extractHashes(content);
+
+    urls.set(urlPath, { hashes: hashes.length > 0 ? hashes : undefined });
+  }
+
+  if (verbose) {
+    console.log(
+      "\n" +
+        "Scanned content routes:\n" +
+        [...urls.keys()].map((x) => `"${x}"`).join(", ") +
+        "\n"
+    );
+  }
+
+  return { urls, fallbackUrls: [] };
 }
 
 export async function validateMdxLinks({
   cwd = process.cwd(),
   files: filesGlob,
   verbose = false,
+  contentDir,
 }: ValidateMdxLinksOptions): Promise<ValidationResult[]> {
   const originalCwd = process.cwd();
   process.chdir(cwd);
@@ -36,17 +123,30 @@ export async function validateMdxLinks({
     console.log(`Found ${files.length} markdown files to validate.\n`);
   }
 
-  const scanned = await scanURLs();
+  let scanned: ScanResult;
 
-  if (verbose) {
-    console.log(
-      "\n" +
-        "Scanned routes from the file system:\n" +
-        [...scanned.urls.keys(), ...scanned.fallbackUrls.map((x) => x.url)]
-          .map((x) => `"${x}"`)
-          .join(", ") +
-        "\n"
-    );
+  if (contentDir) {
+    scanned = buildContentScanResult(contentDir, cwd, verbose);
+  } else {
+    const framework = detectFramework(cwd);
+    if (framework.type === "content") {
+      scanned = buildContentScanResult(framework.contentDir, cwd, verbose);
+    } else {
+      scanned = await scanURLs();
+      if (verbose) {
+        console.log(
+          "\n" +
+            "Scanned routes from the file system:\n" +
+            [
+              ...scanned.urls.keys(),
+              ...scanned.fallbackUrls.map((x) => x.url),
+            ]
+              .map((x) => `"${x}"`)
+              .join(", ") +
+            "\n"
+        );
+      }
+    }
   }
 
   const validations = await validateFiles(files, { scanned });

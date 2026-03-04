@@ -9,6 +9,7 @@
  *
  * Usage:
  * validate-mdx-links --cwd <path> --files "content/**\/*.mdx" --verbose
+ * validate-mdx-links --files "content/docs/**\/*.mdx" --content-dir content
  */
 import { parseArgs } from "node:util";
 import { validateMdxLinks, printErrors } from "./index.js";
@@ -20,6 +21,7 @@ const args = (() => {
         cwd: { type: "string", default: process.cwd() },
         files: { type: "string" },
         verbose: { type: "boolean", default: false, allowNegative: true },
+        "content-dir": { type: "string" },
         help: { type: "boolean", default: false },
       },
       strict: true,
@@ -33,12 +35,12 @@ const args = (() => {
 })();
 
 const {
-  values: { help, cwd, verbose, files },
+  values: { help, cwd, verbose, files, "content-dir": contentDir },
 } = args;
 
 if (help) {
   console.log(
-    'Usage: validate-mdx-links --cwd <path> --files "content/**/*.mdx" --verbose'
+    'Usage: validate-mdx-links --cwd <path> --files "content/**/*.mdx" [--content-dir content] --verbose'
   );
   process.exit(0);
 }
@@ -53,6 +55,7 @@ try {
     cwd,
     files,
     verbose,
+    contentDir,
   });
 
   if (errors.length > 0) {
