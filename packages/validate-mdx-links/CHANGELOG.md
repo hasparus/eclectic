@@ -9,7 +9,8 @@
 - `--files` defaults to `${contentDir}/**/*.mdx` when `--content-dir` is provided without `--files`.
 - Framework detection reads `package.json` dependencies (`fumadocs-core`, `fumadocs-mdx`, `fumadocs-ui`, `next`) before falling back to directory heuristics.
 - Heading extraction for `#id` fragment validation using `github-slugger` — matches Fumadocs/GitHub heading ID generation (duplicate tracking, non-ASCII preservation).
-- TanStack Router route scanning — `src/routes/` files are parsed using TanStack conventions (`_prefix` layout segments stripped, `$` splat routes become fallback regex patterns, `[.]` literal dots).
+- TanStack Router route scanning — `src/routes/` files are parsed using TanStack conventions (`_prefix` layout segments stripped, `$` splat routes become fallback regex patterns, `[.]` literal dots). Gated on `@tanstack/react-start`, `@tanstack/start`, or `@tanstack/react-router` in `package.json`.
+- Relative link resolution (`./sibling-post`, `../other-dir/page`) now works in content-based projects via `pathToUrl`.
 
 ### API Changes
 
