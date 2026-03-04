@@ -5,11 +5,11 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "validate-mdx-links": "./dist/bin.js"
+    "validate-mdx-links": "dist/bin.js"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/hasparus/eclectic.git",
+    "url": "git+https://github.com/hasparus/eclectic.git",
     "directory": "packages/validate-mdx-links"
   },
   "exports": {
