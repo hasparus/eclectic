@@ -1,5 +1,9 @@
 # validate-mdx-links
 
+## 1.2.1
+
+- Fix install command in README (use `bun`, not `npm`).
+
 ## 1.2.0
 
 ### Features
