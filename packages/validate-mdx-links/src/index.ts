@@ -44,9 +44,7 @@ function readDeps(cwd: string): Set<string> {
   }
 }
 
-function detectFramework(cwd: string): FrameworkKind {
-  const deps = readDeps(cwd);
-
+function detectFramework(cwd: string, deps: Set<string>): FrameworkKind {
   const isFumadocs =
     deps.has("fumadocs-core") || deps.has("fumadocs-mdx") || deps.has("fumadocs-ui");
 
@@ -208,7 +206,8 @@ function scanRoutes(
 function buildContentScanResult(
   contentDir: string,
   cwd: string,
-  verbose?: boolean
+  verbose?: boolean,
+  deps?: Set<string>
 ): ScanResult {
   const urls = new Map<string, UrlMeta>();
   const fallbackUrls: { url: RegExp; meta: UrlMeta }[] = [];
@@ -231,9 +230,15 @@ function buildContentScanResult(
     urls.set(urlPath, { hashes: hashes.length > 0 ? hashes : undefined });
   }
 
-  // Also scan TanStack Router routes if present
-  for (const routesDir of ["src/routes", "app/routes"]) {
-    scanRoutes(routesDir, cwd, urls, fallbackUrls);
+  // Scan TanStack Router routes if TanStack Start is a dependency
+  const isTanStack =
+    deps?.has("@tanstack/react-start") ||
+    deps?.has("@tanstack/start") ||
+    deps?.has("@tanstack/react-router");
+  if (isTanStack) {
+    for (const routesDir of ["src/routes", "app/routes"]) {
+      scanRoutes(routesDir, cwd, urls, fallbackUrls);
+    }
   }
 
   if (verbose) {
@@ -270,13 +275,14 @@ export async function validateMdxLinks({
   }
 
   let scanned: ScanResult;
+  const deps = readDeps(cwd);
 
   if (contentDir) {
-    scanned = buildContentScanResult(contentDir, cwd, verbose);
+    scanned = buildContentScanResult(contentDir, cwd, verbose, deps);
   } else {
-    const framework = detectFramework(cwd);
+    const framework = detectFramework(cwd, deps);
     if (framework.type === "content") {
-      scanned = buildContentScanResult(framework.contentDir, cwd, verbose);
+      scanned = buildContentScanResult(framework.contentDir, cwd, verbose, deps);
     } else {
       scanned = await scanURLs();
       if (verbose) {
