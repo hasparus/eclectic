@@ -263,6 +263,7 @@ export async function validateMdxLinks({
   verbose = false,
   contentDir,
 }: ValidateMdxLinksOptions): Promise<ValidationResult[]> {
+  cwd = resolve(cwd);
   const originalCwd = process.cwd();
   process.chdir(cwd);
 
