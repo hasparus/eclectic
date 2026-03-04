@@ -25,6 +25,7 @@
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
+    "github-slugger": "^2.0.0",
     "next-validate-link": "1.4.0"
   },
   "devDependencies": {

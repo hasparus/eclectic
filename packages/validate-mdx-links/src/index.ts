@@ -1,6 +1,7 @@
 import { existsSync, globSync, readFileSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { dirname, resolve, basename, relative } from "node:path";
+import GithubSlugger from "github-slugger";
 import {
   scanURLs,
   validateFiles,
@@ -31,7 +32,39 @@ type FrameworkKind =
   | { type: "nextjs" }
   | { type: "content"; contentDir: string };
 
+function readDeps(cwd: string): Set<string> {
+  try {
+    const pkg = JSON.parse(readFileSync(resolve(cwd, "package.json"), "utf-8"));
+    return new Set([
+      ...Object.keys(pkg.dependencies ?? {}),
+      ...Object.keys(pkg.devDependencies ?? {}),
+    ]);
+  } catch {
+    return new Set();
+  }
+}
+
 function detectFramework(cwd: string): FrameworkKind {
+  const deps = readDeps(cwd);
+
+  const isFumadocs =
+    deps.has("fumadocs-core") || deps.has("fumadocs-mdx") || deps.has("fumadocs-ui");
+  const isNext = deps.has("next");
+
+  // If fumadocs is present, prefer content-based scanning
+  if (isFumadocs) {
+    // Find content dir: check common locations
+    for (const dir of ["content", "content/docs"]) {
+      if (existsSync(resolve(cwd, dir))) {
+        const mdxFiles = globSync(`${dir}/**/*.mdx`, { cwd });
+        if (mdxFiles.length > 0) {
+          return { type: "content", contentDir: dir };
+        }
+      }
+    }
+  }
+
+  // Check for Next.js dirs (also validates against package.json if available)
   const nextDirs = ["app", "src/app", "pages", "src/pages"];
   for (const dir of nextDirs) {
     if (existsSync(resolve(cwd, dir))) {
@@ -39,6 +72,7 @@ function detectFramework(cwd: string): FrameworkKind {
     }
   }
 
+  // Fallback: content dir with MDX files
   if (existsSync(resolve(cwd, "content"))) {
     const mdxFiles = globSync("content/**/*.mdx", { cwd });
     if (mdxFiles.length > 0) {
@@ -46,25 +80,22 @@ function detectFramework(cwd: string): FrameworkKind {
     }
   }
 
+  // If next is in deps but no app/pages dir found, still try Next.js scanner
+  if (isNext) {
+    return { type: "nextjs" };
+  }
+
   return { type: "nextjs" };
 }
 
 const HEADING_REGEX = /^#{1,6}\s+(.+)$/gm;
 
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/<[^>]*>/g, "") // strip HTML tags
-    .replace(/[^\w\s-]/g, "") // strip non-alphanumeric (keep spaces and dashes)
-    .trim()
-    .replace(/\s+/g, "-");
-}
-
 function extractHashes(content: string): string[] {
+  const slugger = new GithubSlugger();
   const hashes: string[] = [];
   let match;
   while ((match = HEADING_REGEX.exec(content)) !== null) {
-    hashes.push(slugify(match[1]!));
+    hashes.push(slugger.slug(match[1]!));
   }
   return hashes;
 }
