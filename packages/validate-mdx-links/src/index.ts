@@ -49,7 +49,6 @@ function detectFramework(cwd: string): FrameworkKind {
 
   const isFumadocs =
     deps.has("fumadocs-core") || deps.has("fumadocs-mdx") || deps.has("fumadocs-ui");
-  const isNext = deps.has("next");
 
   // If fumadocs is present, prefer content-based scanning
   if (isFumadocs) {
@@ -72,17 +71,12 @@ function detectFramework(cwd: string): FrameworkKind {
     }
   }
 
-  // Fallback: content dir with MDX files
+  // Fallback: content dir with MDX files (no fumadocs dep but has content)
   if (existsSync(resolve(cwd, "content"))) {
     const mdxFiles = globSync("content/**/*.mdx", { cwd });
     if (mdxFiles.length > 0) {
       return { type: "content", contentDir: "content" };
     }
-  }
-
-  // If next is in deps but no app/pages dir found, still try Next.js scanner
-  if (isNext) {
-    return { type: "nextjs" };
   }
 
   return { type: "nextjs" };

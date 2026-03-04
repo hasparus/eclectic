@@ -45,15 +45,17 @@ if (help) {
   process.exit(0);
 }
 
-if (!files) {
-  console.error("No files passed. Please pass the --files option.");
+const resolvedFiles = files ?? (contentDir ? `${contentDir}/**/*.mdx` : undefined);
+
+if (!resolvedFiles) {
+  console.error("No files passed. Please pass --files or --content-dir.");
   process.exit(1);
 }
 
 try {
   const errors = await validateMdxLinks({
     cwd,
-    files,
+    files: resolvedFiles,
     verbose,
     contentDir,
   });
