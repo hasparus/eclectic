@@ -1,0 +1,92 @@
+diff --git a/packages/documentation/src/routes/docs/-$.test.ts b/packages/documentation/src/routes/docs/-$.test.ts
+index 561b9a0..a041b55 100644
+--- a/packages/documentation/src/routes/docs/-$.test.ts
++++ b/packages/documentation/src/routes/docs/-$.test.ts
+@@ -240,6 +240,27 @@ describe("Accept header negotiation", () => {
+     const text = await res.text();
+     expect(text).toContain("<!DOCTYPE html>");
+   });
++
++  test("Accept: text/markdown works with base-path prefix", async () => {
++    const res = await fetch(`${BASE_URL}/graphql/hive/docs/gateway`, {
++      headers: { Accept: "text/markdown" },
++      redirect: "follow",
++    });
++    expect(res.status).toBe(200);
++    expect(res.headers.get("content-type")).toBe("text/markdown");
++    const text = await res.text();
++    expect(text).toContain("---");
++    expect(text).toContain("title:");
++  });
++
++  test("Accept: text/plain works with base-path prefix", async () => {
++    const res = await fetch(`${BASE_URL}/graphql/hive/docs`, {
++      headers: { Accept: "text/plain" },
++      redirect: "follow",
++    });
++    expect(res.status).toBe(200);
++    expect(res.headers.get("content-type")).toBe("text/markdown");
++  });
+ });
+ 
+ describe("prerendered HTML routing", () => {
+diff --git a/packages/documentation/src/server/cloudflare-entry.ts b/packages/documentation/src/server/cloudflare-entry.ts
+index 3929469..21cf4a5 100644
+--- a/packages/documentation/src/server/cloudflare-entry.ts
++++ b/packages/documentation/src/server/cloudflare-entry.ts
+@@ -230,7 +230,23 @@ function aliasRequest(
+   env: CloudflareEnv,
+   context: CloudflareContext,
+ ) {
+-  if (!baseURL || hasBasePath(url.pathname)) {
++  if (!baseURL) {
++    return request;
++  }
++
++  if (hasBasePath(url.pathname)) {
++    // For base-path requests that prefer markdown, rewrite to the llms.mdx
++    // route so the request doesn't get served as prerendered HTML by nitro.
++    const strippedPathname = stripBasePath(url.pathname);
++    if (shouldAliasMarkdownDocs(request, strippedPathname)) {
++      const nextURL = new URL(request.url);
++      nextURL.pathname = withBasePath(
++        `/llms.mdx${normalizeDocsPathname(strippedPathname)}`,
++      );
++      const aliasedRequest = new Request(nextURL, request);
++      augmentReq(aliasedRequest, { context, env });
++      return aliasedRequest;
++    }
+     return request;
+   }
+ 
+@@ -332,10 +348,8 @@ async function tryServeAsset(
+   env: CloudflareEnv,
+   context: CloudflareContext,
+   requestURL: URL,
+-  isAliasedRequest: boolean,
+ ): Promise<Response | undefined> {
+   if (
+-    !isAliasedRequest ||
+     !env.ASSETS ||
+     !shouldTryAssetRequest({
+       baseURL,
+@@ -409,7 +423,6 @@ export default createHandler({
+       env,
+       context,
+       requestURL,
+-      isAliasedRequest,
+     );
+     if (assetResponse) {
+       return rewriteAliasedResponse(
+diff --git a/packages/documentation/vite.config.ts b/packages/documentation/vite.config.ts
+index 597d125..63d22a1 100644
+--- a/packages/documentation/vite.config.ts
++++ b/packages/documentation/vite.config.ts
+@@ -46,6 +46,7 @@ export default defineConfig(async ({ command }) => ({
+               wrangler: {
+                 assets: {
+                   html_handling: "drop-trailing-slash",
++                  run_worker_first: true,
+                 },
+               },
+             }
