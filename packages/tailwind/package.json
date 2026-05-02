@@ -42,7 +42,7 @@
     "build:demo": "pnpm tailwindcss -i ./demo/input.css -o ./demo/output.css",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
-    "prepublishOnly": "pnpm build"
+    "prepublishOnly": "bun run build"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.16",
