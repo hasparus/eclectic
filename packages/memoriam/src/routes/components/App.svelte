@@ -6,7 +6,7 @@
 	import Toolbar from './Toolbar.svelte';
 	import SaveProgressModal from './SaveProgressModal.svelte';
 
-	import { create_session } from '../create_session.js';
+	import { createSession } from '../create_session.js';
 	import { create_page_browser, set_page_browser } from './page_browser_context.svelte.js';
 
 	import { demo_doc } from '$lib/demo_doc.js';
@@ -261,7 +261,7 @@
 				return;
 			}
 
-			session = create_session(JSON.parse(initial_doc_json));
+			session = createSession(JSON.parse(initial_doc_json));
 			this.context.editable = false;
 		}
 	}
@@ -462,7 +462,7 @@
 	});
 	key_mapper.push_scope(app_key_map);
 
-	let session = $derived.by(() => create_session(initial_doc));
+	let session = $derived.by(() => createSession(initial_doc));
 	let loaded_document_id = $derived(initial_doc.document_id);
 
 	$effect(() => {

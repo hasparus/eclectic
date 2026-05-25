@@ -1,10 +1,10 @@
 import { env } from '$env/dynamic/private';
+import type { LayoutServerLoad } from './$types';
 
-/** @type {import('./$types').LayoutServerLoad} */
-export function load({ locals }) {
+export const load: LayoutServerLoad = ({ locals }) => {
 	return {
 		has_backend: !env.VERCEL,
 		is_admin: !!locals.isAdmin,
 		origin: env.ORIGIN ?? ''
 	};
-}
+};

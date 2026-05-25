@@ -1,5 +1,5 @@
 import { Command, is_selection_collapsed } from 'svedit';
-import { get_closest_switchable_layout, get_colorset_node, get_closest_switchable_type } from './app_utils.js';
+import { getClosestSwitchableLayout, getColorsetNode, getClosestSwitchableType } from './app_utils.js';
 
 
 /**
@@ -7,7 +7,7 @@ import { get_closest_switchable_layout, get_colorset_node, get_closest_switchabl
  * Direction can be 'next' or 'previous'.
  */
 export class CycleLayoutCommand extends Command {
-	closest_switchable_layout = $derived(get_closest_switchable_layout(this.context.session, this.context.session.config));
+	closest_switchable_layout = $derived(getClosestSwitchableLayout(this.context.session, this.context.session.config));
 
 	constructor(direction, context) {
 		super(context);
@@ -48,7 +48,7 @@ export class CycleLayoutCommand extends Command {
  * Direction can be 'next' or 'previous'.
  */
 export class CycleNodeTypeCommand extends Command {
-	closest_switchable_type = $derived(get_closest_switchable_type(this.context.session));
+	closest_switchable_type = $derived(getClosestSwitchableType(this.context.session));
 
 	constructor(direction, context) {
 		super(context);
@@ -93,7 +93,7 @@ export class CycleNodeTypeCommand extends Command {
  * Finds the nearest ancestor with a colorset property and cycles it.
  */
 export class CycleColorsetCommand extends Command {
-	colorset_node = $derived(get_colorset_node(this.context.session));
+	colorset_node = $derived(getColorsetNode(this.context.session));
 
 	is_enabled() {
 		return this.context.editable && this.colorset_node !== null;

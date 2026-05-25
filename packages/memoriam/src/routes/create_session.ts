@@ -58,22 +58,21 @@ import { MEDIA_DEFAULTS } from '$lib/config.js';
 import { set_properties } from 'svedit';
 import { getMediaDimensions } from '$lib/client/media_dimensions.js';
 
-/** @returns {'image' | 'video'} */
-function get_media_type(file) {
+function get_media_type(file: File): 'image' | 'video' {
 	if (file.type.startsWith('video/')) return 'video';
 	return 'image';
 }
 
 /**
- * Replace a media node at the given path with a new file.
- * Reused by handle_media_paste and the toolbar's replace-image button.
- *
- * @param {import('svedit').Session} session
- * @param {any[]} path - path to the media node (image/video)
- * @param {File} file
- * @param {string} blob_url - a blob: or data: URL for immediate display
+ * Replace a media node at the given path with a new file. Reused by
+ * handle_media_paste and the toolbar's replace-image button.
  */
-async function replace_media(session, path, file, blob_url) {
+async function replace_media(
+	session: any,
+	path: (string | number)[],
+	file: File,
+	blob_url: string
+): Promise<void> {
 	const node = session.get(path);
 	if (node.type !== 'image' && node.type !== 'video') return;
 
@@ -668,7 +667,7 @@ const session_config = {
 	}
 };
 
-export function create_session(doc) {
+export function createSession(doc) {
 	const session = new Session(documentSchema, doc, session_config);
 	return session;
 }

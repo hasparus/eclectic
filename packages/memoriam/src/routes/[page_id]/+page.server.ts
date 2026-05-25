@@ -1,13 +1,13 @@
 import { error, redirect } from '@sveltejs/kit';
-import { get_document } from '$lib/api.remote.js';
+import { getDocument } from '$lib/api.remote.js';
+import type { PageServerLoad } from './$types';
 
-/** @type {import('./$types').PageServerLoad} */
-export async function load({ params, parent }) {
-	const parent_data = await parent();
-	const is_admin = parent_data.is_admin ?? false;
+export const load: PageServerLoad = async ({ params, parent }) => {
+	const parentData = await parent();
+	const isAdmin = parentData.is_admin ?? false;
 
 	try {
-		const result = await get_document(params.page_id);
+		const result = await getDocument(params.page_id);
 
 		if (result.redirect_to_slug) {
 			throw redirect(301, `/${result.redirect_to_slug}`);
@@ -16,7 +16,7 @@ export async function load({ params, parent }) {
 		return {
 			document: result.document,
 			slug: result.slug,
-			is_admin
+			is_admin: isAdmin
 		};
 	} catch (err) {
 		if (err && typeof err === 'object' && 'status' in err) {
@@ -24,4 +24,4 @@ export async function load({ params, parent }) {
 		}
 		throw error(404, 'Page not found');
 	}
-}
+};
