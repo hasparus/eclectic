@@ -18,12 +18,21 @@ writing fork code.
    `site_members`, `domains`, `invites`, `sessions`. Per-site `sessions`
    and `ADMIN_PASSWORD` from the upstream are deleted; auth becomes
    platform-level.
-2. **CRDT-first document model** via Yjs. One Y.Doc per page, one shared
-   Y.Doc for nav+footer per site, conventional SQLite for the site index
-   (page list, slugs, cross-page refs). Public visitors never load Yjs —
-   they get SSR'd HTML.
-3. **Local-first storage** via `y-indexeddb` on the editor client. The
-   server is a sync relay + persistence, not the source of truth at edit
+2. **CRDT-first document model** via Automerge 2.x. One Automerge doc
+   per page, one shared Automerge doc for nav+footer per site,
+   conventional SQLite for the site index (page list, slugs,
+   cross-page refs). Public visitors never load Automerge — they get
+   SSR'd HTML. Automerge's mark-based RichText handles the
+   `annotated_text` annotation-as-reference problem natively (marks
+   can carry structured values like `{ href, target }`), avoiding the
+   awkward side-array dance a Yjs binding would require. Trade: ~250
+   KB gzipped bundle for editors (acceptable for this read-heavy
+   product), no built-in awareness primitive (presence ships on a
+   separate websocket channel).
+3. **Local-first storage** via `@automerge/automerge-repo` with
+   `automerge-repo-storage-indexeddb` on the client. The server is
+   a sync relay + persistence (`automerge-repo-storage-nodefs` or
+   per-site SQLite blob storage), not the source of truth at edit
    time. Explicit "save" goes away; deltas flow continuously.
 4. **Fork, don't depend.** The svedit + editable-website license is
    unresolved and the upstream is a one-person project. Vendor both,
@@ -38,12 +47,16 @@ writing fork code.
 Two weekend spikes to de-risk before committing to phase 1. If either
 fails the plan changes shape.
 
-- **Spike A — Svedit + Yjs binding.** Bind a single `prose` block (text
-  with `strong`/`emphasis` annotations, no links yet). Measure: does the
-  Svedit selection model survive concurrent inserts from a peer? How
-  ugly is the `annotated_text` ↔ Y.Text mapping? Bail criterion: if the
-  binding requires forking svedit core, fall back to Tiptap + Yjs and
-  rebuild the block library.
+- **Spike A — Svedit + Automerge binding.** Bind a single `prose` block
+  (text with `strong`/`emphasis` annotations, then add `link` to test
+  the mark-with-value path). Measure: does the Svedit selection model
+  survive concurrent inserts from a peer? How clean is mapping
+  `annotated_text` → Automerge RichText with marks? Bail criterion:
+  if the binding requires forking svedit core, the fallback is **not**
+  Tiptap+Yjs (would force abandoning Automerge — `automerge-prosemirror`
+  exists but is less mature than y-prosemirror) but rather building
+  the block editor directly on Automerge primitives ourselves. That's
+  a bigger lift; weight it carefully before bailing.
 - **Spike B — Per-site SQLite at scale.** Open 1,000 SQLite files via a
   LRU connection cache. Measure: cold-open latency, memory per
   connection, LRU eviction behavior, file-descriptor pressure under
@@ -126,40 +139,64 @@ tenant routing.
 The architectural switch. This is the largest single chunk of work and
 the highest-risk one.
 
-- [ ] Write the Svedit ↔ Yjs binding. Per-page Y.Doc structure:
-      `Y.Map<id, Y.Map>` for nodes, `Y.Array<string>` for node_array
-      properties, `Y.Text` for `annotated_text.text` with relative-
-      position-tracked annotations as a side Y.Array.
-- [ ] Replace Svedit's transaction `apply` with a CRDT-mutating
-      version. Svedit's session state becomes a mirror of the Y.Doc.
-- [ ] Replace Svedit's undo stack with `Y.UndoManager` (scoped to
-      origin = local edits, so peer changes don't enter undo).
+- [ ] Write the Svedit ↔ Automerge binding. Per-page doc shape:
+      a top-level map with `nodes` (map of id → node map), node_array
+      properties as Automerge lists of string ids, scalars as plain
+      properties, `annotated_text` as Automerge RichText with marks
+      (`{ name: 'strong' }`, `{ name: 'emphasis' }`,
+      `{ name: 'link', value: { href, target } }`). The mark-value
+      approach replaces the upstream's "annotation references a link
+      node" indirection — link annotations no longer need a separate
+      node in the node map. Note this schema simplification in the
+      migration code.
+- [ ] Replace Svedit's transaction `apply` with an
+      `Automerge.change(doc, d => ...)` call. Svedit's session state
+      mirrors the materialized Automerge doc; subscribe to repo
+      changes to push patches back into Svedit's reactive state.
+- [ ] Replace Svedit's undo stack with Automerge's history-based
+      undo (track per-actor change heads; "undo" = applying the
+      inverse of the last local change set). Less mature than
+      `Y.UndoManager` — budget extra time here, or accept simpler
+      "undo last local change" semantics for v1.
 - [ ] Post-merge schema GC pass: walks the graph, prunes dangling
-      `node` / `node_array` references, repairs annotations pointing
-      to deleted nodes, enforces schema arity.
-- [ ] `y-indexeddb` for offline cache per page.
-- [ ] Sync server: `y-websocket` server, mounted as a SvelteKit
-      `/ws/[site_id]/[page_id]` endpoint. Persist updates to disk
-      every N seconds (or on socket close) as binary blobs in the
-      per-site SQLite (`page_updates` table, append-only log; periodic
-      compaction).
+      `node` / `node_array` references, enforces schema arity. Less
+      relevant for annotations now that they're mark-values, but
+      still needed for node_array deletes that strand referenced
+      nodes.
+- [ ] `automerge-repo-storage-indexeddb` adapter on the client.
+- [ ] Sync server: mount `automerge-repo` with the websocket network
+      adapter as a SvelteKit `/ws/[site_id]/[page_id]` endpoint. For
+      storage, either `automerge-repo-storage-nodefs` writing to
+      `data/<site_id>/automerge/` or a custom adapter that stores
+      doc binaries as BLOBs in the per-site SQLite (`page_docs`
+      table). SQLite-backed storage keeps the "everything for a site
+      lives in one directory + one DB" invariant; nodefs is simpler.
+      Decide during this phase based on backup ergonomics.
 - [ ] Replace explicit "save" with continuous sync. The save button
-      goes away. `SaveProgressModal` becomes a sync status indicator.
+      goes away. `SaveProgressModal` becomes a sync status indicator
+      (connected / syncing / offline / conflicts).
 - [ ] Asset upload flow rewrite: hash + dedupe + upload happens
       immediately on paste/drop, the resulting `asset_id` is written
-      into the Y.Doc, blob URL is the optimistic local-only render
-      until upload completes. No more "swap blob → asset on save."
-- [ ] Sync conflict tests: multi-client fuzz harness that opens N
-      Y.Docs against a sync server, performs random ops, verifies
-      convergence. CRDT bugs are nasty — test infrastructure is
-      half the work.
+      into the Automerge doc, blob URL is the optimistic local-only
+      render until upload completes. No more "swap blob → asset on
+      save."
+- [ ] Sync conflict tests: multi-client fuzz harness that creates N
+      Automerge repos against a sync server, performs random ops with
+      simulated partitions and reconnects, verifies convergence and
+      schema invariants post-merge. CRDT bugs are nasty — test
+      infrastructure is half the work.
 
 ## Phase 4 — Collaboration UX (1-2 weeks)
 
 Building on the CRDT foundation to make co-editing feel right.
 
-- [ ] Multiplayer cursors via `y-awareness`. Show peer presence
-      (name, color, current selection range). Disable in view mode.
+- [ ] Multiplayer cursors via a side-channel presence protocol —
+      Automerge has no built-in awareness primitive. Reuse the
+      websocket connection that `automerge-repo` already holds open
+      and multiplex a presence channel alongside the sync channel.
+      Broadcast `{ user_id, name, color, selection }` on selection
+      changes; ephemeral, never persisted, dropped on disconnect.
+      Disable in view mode.
 - [ ] "X is here" indicators in the page list.
 - [ ] Optimistic edit attribution: show who last touched each block
       (stored in CRDT alongside content, not as separate metadata).
@@ -274,9 +311,16 @@ Worth writing down so we don't drift.
 - **Svedit license uncertainty** (HIGH). Need a conversation with the
   author before launch. Worst case: maintain a permanent fork.
 - **CRDT binding effort overrun** (HIGH). Spike A is the load-bearing
-  de-risk. If Spike A bails out, the whole CRDT phase shifts to
-  "rebuild on Tiptap + Yjs" which is a different shape of work
-  (less binding, more block library).
+  de-risk. If Spike A bails out, the fallback is building the block
+  editor directly on Automerge primitives (we keep the CRDT choice,
+  lose the editor head-start). Switching CRDTs at this point would
+  also bail on the `annotated_text` mark-value mapping that was a
+  reason to pick Automerge — don't fall back to Yjs without
+  re-litigating the whole decision.
+- **Automerge undo maturity** (LOW-MEDIUM). The history-based undo
+  story is less polished than `Y.UndoManager`. Worst case: v1 ships
+  with simple "undo last local change" semantics and richer undo
+  comes later. Acceptable degradation.
 - **Per-site SQLite file-descriptor pressure** (MEDIUM). Spike B
   measures it. Mitigation: aggressive LRU eviction, smaller default
   cache size, monitoring on ulimit headroom.
