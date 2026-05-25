@@ -1,140 +1,67 @@
-# Editable Website v2
+# Memoriam
 
-The next generation of Editable Website — a complete rewrite designed to make Svelte developers happy.
+Memorial sites with a collaborative family-tree layer. Family
+members co-edit pages live (or offline, syncing later). Each
+person can have a fully editable memorial page. Trees link across
+families.
 
-> **NOTE:** v2 is a complete rewrite using [Svedit](https://github.com/michael/svedit). It's under active development — feel free to explore locally, but hold off on production deployments for now.
+Forked from [michael/editable-website](https://github.com/michael/editable-website)
+at commit `35e3b65` (2026-05-06) and being reshaped into a
+multi-tenant SaaS. See [PLAN.md](./PLAN.md) for the roadmap and
+[CLAUDE.md](./CLAUDE.md) for working notes.
 
-## Who is Editable Website for?
+## Status
 
-For anyone who enjoys creating websites using Svelte and wants to allow their clients to make edits directly in the layout as they browse their site.
+Early. Phase 1 (foundation refactor) lands the multi-tenant
+backend. The editor still depends on the upstream `svedit`
+package; the Automerge + local-first switch is Phase 3.
 
-For your next website project, you might not need a Content Management System (CMS) anymore. Start from a fully functional, user-editable website that supports common content types: prose, heroes, features, galleries, and listings.
+## Architecture (brief)
 
-Adapt colors and fonts to deploy a beautiful site within minutes — or customize the entire layout and model your own content types using the [Svedit APIs](https://github.com/michael/svedit).
+- **One memorial = one SQLite database.** Per-site DBs live under
+  `data/sites/<site_id>/`, each with its own `db.sqlite3` and
+  `assets/` directory. A separate platform DB (planned, Phase 2)
+  holds users, sites, sessions, short codes, and the cross-site
+  genealogy registry (people, relationships).
+- **Page content as a node graph.** Inherited from svedit:
+  `{ id → node }` map with typed properties (`annotated_text`,
+  `node`, `node_array`, etc.). Pages, nav, and footer are
+  separate documents stitched together for editing.
+- **Asset pipeline.** Images resized client-side via canvas +
+  WebP encoded with `@jsquash/webp` in a worker;
+  SHA-256-keyed deduplication; server verifies the streamed
+  body matches the claimed hash before storing.
+- **Auth (current).** Single admin password per request session.
+  Will be replaced in Phase 2 with platform-level users +
+  per-site roles.
+- **Sync (planned, Phase 3).** Automerge per page, with
+  `automerge-repo` doing offline-first storage in IndexedDB and
+  WebSocket sync to a server-side relay. Explicit "save" goes
+  away; deltas flow continuously.
 
-## Getting started
-
-Clone the repository:
-
-```sh
-git clone https://github.com/michael/editable-website.git
-cd editable-website
-```
-
-Install dependencies:
-
-```sh
-npm install
-```
-
-Copy `.env.example` to `.env` and set an admin password for local development:
-
-```sh
-cp .env.example .env
-```
-
-Then set `ADMIN_PASSWORD` in `.env`:
-
-```sh
-ADMIN_PASSWORD='change-me'
-```
-
-`ADMIN_PASSWORD` is required for admin login and save-capable editing.
-
-And run the development server:
+## Running locally
 
 ```sh
-npm run dev
+bun install
+cp .env.example .env  # set ADMIN_PASSWORD
+bun --filter memoriam run dev
 ```
 
-To re-seed the database with the initial demo content, use:
+Re-seed the demo data:
 
 ```sh
-npm run dev:seed
+bun --filter memoriam run dev:seed
 ```
 
-Next, you probably want to adjust the colors and fonts in [app.css](./src/app.css) to match your style.
+Run tests:
 
-```css
-:root {
-	--background: oklch(0.98 0 0);
-	--foreground: oklch(0 0 0);
-	--accent: oklch(0.21 0.034 264);
-	--accent-foreground: oklch(0.98 0 0);
-}
-
-@theme {
-	--font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-	--font-serif: 'Libertinos Serif Display', ui-serif, Georgia, serif;
-	--font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-}
+```sh
+cd packages/memoriam && bun run test
 ```
-
-However, likely you'll want to customize more than that. E.g. edit [Button.svelte](./src/routes/components/Button.svelte) to create your very own distinct button style. Anything in [src/routes](./src/routes/) is meant to be customized by you for your project.
-
-<!--**Note:** After `git pull`, delete `data/site.sqlite3` to pick up schema changes.-->
-
-## Manual
-
-For detailed documentation on building with Editable Website see [MANUAL.md](./MANUAL.md).
 
 ## Deploy
 
-```
-fly apps create my-editable-website
-```
-
-```
-fly secrets set -a my-editable-website \
-  ORIGIN='https://my-editable-website.fly.dev' \
-  BODY_SIZE_LIMIT='30000000' \
-  ADMIN_PASSWORD='change-me'
-```
-
-```
-fly deploy -a my-editable-website --primary-region fra --vm-size shared-cpu-1x --vm-memory 256 --volume-initial-size 1
-```
-
-You now probably want to watch the logs as the app is booting up.
-
-```
-fly logs -a my-editable-website
-```
-
-## FAQs
-
-### How is this different to using a CMS?
-
-The editing infrastructure (Svedit) becomes an integral part of your website (at runtime). As a developer, all you do is define content types (e.g. Figure) and implement components (e.g. Figure.svelte) — they are editable by default.
-
-### Is mobile editing supported?
-
-There is experimental support for mobile editing — it works in principle. The current focus is on desktop UX, but mobile editing will improve over time.
-
-### Where is the data stored?
-
-All content lives in a single `data/` directory — an SQLite database (`db.sqlite3`) and uploaded assets (`assets/`). Locally this defaults to `./data`. On Fly.io it's a persistent volume at `/data`. To back up your site, copy this directory.
-
-### How about AI?
-
-Editable Website is a foundational, AI-agnostic tool. That said, it makes perfect sense to utilize AI workflows to help building your custom site. Think prompts like "Create a hero block type with title + description and optional CTA buttons" and "Implement Hero.svelte with 5 distinct layout variations".
-
-### Plugins?
-
-Editable Website is modular and you can and should reuse code across projects. However, I purposely don't want to establish a community maintained plugin repository. I want to encourage you to own all your code, for the benefit of simplicity, safety, and control. Share code snippets, not plugins.
-
-### Hosting?
-
-Editable Website runs on any VPS. All you need is Node.js and SQLite. The repository includes a `Dockerfile` and `fly.toml` for one-command deployment to [Fly.io](https://fly.io) — see [Deploying to Fly.io](#deploying-to-flyio) above. The same Dockerfile works with any platform that supports Docker.
-
-### Static builds?
-
-There's no point for static builds with Editable Website. The whole idea is that users edit content live, without having to wait for a rebuild to finish. SQLite is fast. Very fast. Web-optimized images are generated client-side before upload: resizing happens in the browser via canvas and `toBlob()`, and WebP encoding is done with `@jsquash/webp`. It still makes sense to enable a proxy for images, so they can be delivered from a CDN.
-
-### License?
-
-Editable Website will at least be source-available. There will likely be an affordable one-time registration fee (per domain) for personal use, and a fair fee for commercial projects. I'm still working on the details. If you’re open to discussion, join the [technical preview](https://docs.google.com/forms/d/e/1FAIpQLSfkL9e9X3Lcn6oBDIG-gU4yrfSenh8fndupbIX7zkyxX3X9ZQ/viewform).
-
-## Looking for v1?
-
-Find it [here](https://github.com/michael/editable-website/tree/v1).
+Deferred until we pick a target. The current code assumes a
+Node.js runtime with a persistent filesystem (VPS or Fly.io).
+See [PLAN.md § Deploy target](./PLAN.md#deploy-target) for the
+trade-off analysis.

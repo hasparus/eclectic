@@ -52,8 +52,17 @@ writing fork code.
    accept the maintenance cost, contribute back only what's mutually
    useful.
 5. **TypeScript, strict.** Drop the JSDoc-with-`strict:false` middle
-   ground. Convert during the fork phase while the code is still small
-   and we're touching everything anyway.
+   ground. Convert during the fork phase while the code is still
+   small and we're touching everything anyway. Same pass flips the
+   inherited snake_case identifiers to idiomatic camelCase
+   (functions, variables) / PascalCase (types, components) — the
+   upstream's snake_case convention is not idiomatic in
+   TypeScript or Svelte and was never a good fit.
+6. **Deploy target: undecided.** See § Deploy target below. The
+   current code (per-site SQLite on a persistent filesystem) is
+   shaped for a VPS or Fly.io. Cloudflare and Vercel are real
+   options but require deeper rework; pick before Phase 3 because
+   the Automerge sync server's shape depends on it.
 
 ## Phase 0 — Spikes (1 week, throwaway)
 
@@ -85,7 +94,11 @@ Get the vendored code into a shape we can build on. No new features.
 - [ ] Vendor `svedit` into `packages/svedit-vendored/` and re-point the
       memoriam import.
 - [ ] TypeScript migration. `strict: true`. Start with `src/lib/server/`
-      and `src/lib/*.js`, then routes, then components last.
+      and `src/lib/*.js`, then routes, then components last. Same
+      pass renames snake_case identifiers to camelCase / PascalCase
+      to match TS / Svelte idiom. Mechanical but invasive; do it as
+      one coordinated commit per directory to keep the diff
+      reviewable.
 - [ ] Kill `src/lib/server/db.js` singleton. Replace with
       `get_db(site_id)` backed by an LRU cache (key: site_id, value:
       `DatabaseSync` instance + last-access timestamp, eviction at e.g.
@@ -359,6 +372,106 @@ Not a phase you "do" — checklist that gates production launch.
 - [ ] Pricing / quota enforcement: free tier (1 site, 500 MB), paid
       tier (unlimited sites, 10 GB each, custom domain). Hook into
       Stripe.
+
+## Deploy target
+
+Decision needed before Phase 3 (Automerge sync server). The sync
+server's shape, the asset storage model, and the per-site SQLite
+strategy all hinge on this. Three live options, each with a
+distinct architectural pull:
+
+### Option A — VPS or Fly.io (current code's natural fit)
+
+- **Compute**: a Node.js process with a persistent volume (Fly's
+  managed volume, Hetzner / DigitalOcean disk).
+- **Per-site DB**: `node:sqlite` on disk under
+  `data/sites/<site_id>/db.sqlite3`. WAL mode, LRU connection
+  cache. Already implemented in Phase 1.
+- **Assets**: filesystem under `data/sites/<site_id>/assets/`.
+  Already implemented.
+- **Sync server**: `automerge-repo` with the WebSocket network
+  adapter mounted as a SvelteKit endpoint, `automerge-repo-storage-nodefs`
+  writing to the same per-site directory.
+- **Backups**: `cp -r data/<site_id>/` per site on a cron. Off-box
+  to S3 / R2 / Backblaze.
+- **Pros**: Zero rework from Phase 1. Cheapest at low/medium
+  scale. One process owns everything. Easy local dev. SQLite is
+  fast and the dataset stays small per site.
+- **Cons**: Single region (latency for far-away families).
+  We own the box (patches, monitoring, scaling). Cold start
+  semantics if we ever go serverless later.
+
+### Option B — Cloudflare (Workers + D1 + R2 + Durable Objects)
+
+- **Compute**: Workers (stateless edge functions) for HTTP
+  routes; Durable Objects (one per active page) for live editing
+  sessions holding Automerge state.
+- **Per-site DB**: Cloudflare D1, one D1 database per site (D1
+  supports per-tenant sharding cleanly). Migrate from
+  `node:sqlite` query surface to D1's HTTP/wrangler client —
+  similar SQL, different invocation. Substantial code touch but
+  mechanical.
+- **Assets**: R2 (S3-compatible). The current
+  `asset_storage.js` filesystem ops become R2 PUT/GET. Streaming
+  upload + SHA-256 verification still works.
+- **Sync server**: Durable Objects hold Automerge state in
+  memory + their built-in storage. WebSocket lives inside the DO
+  ("WebSocket hibernation API" is well-suited). Each page = one
+  DO instance. This is actually a very clean fit for our
+  per-page Automerge model.
+- **Pros**: Multi-region by default (low latency globally).
+  Cheap at scale because pricing is per-request, not per-CPU-hour.
+  Durable Objects are conceptually right for our model. No
+  ops on our side.
+- **Cons**: Significant rework — `node:sqlite` →
+  D1, filesystem → R2, sync server → DO. Phase 1's filesystem
+  and `node:sqlite` work has to be re-skinned (the architectural
+  shape stays; the API changes). Vendor lock-in. DO pricing can
+  bite at very high write volume.
+
+### Option C — Vercel (Functions + Turso + external sync server)
+
+- **Compute**: Vercel Serverless Functions for HTTP routes.
+  Ephemeral, short-lived, no persistent state.
+- **Per-site DB**: Turso (libSQL, SQLite-compatible) with
+  per-site databases. `@libsql/client` is a near-drop-in for
+  `node:sqlite`. Pricing is per-DB beyond the free tier.
+- **Assets**: Vercel Blob or external R2/S3. Vercel Blob is
+  pricey at scale.
+- **Sync server**: Vercel's WebSocket support is limited.
+  Need a separate process (small VPS, Fly machine, or
+  Cloudflare DO) just for the Automerge sync — at which point
+  we're already running infra outside Vercel.
+- **Pros**: Excellent Svelte/SvelteKit DX. Easy preview deploys.
+  Edge functions are fast for the read path.
+- **Cons**: Worst architectural fit. Multi-region per-site DBs
+  (Turso) cost more than DO storage. Need a second host for the
+  sync server. Per-function pricing punishes us under load
+  (memorial sites are read-heavy — lots of Function calls).
+  Effectively a hybrid Vercel-plus-something, which means we
+  manage two platforms.
+
+### Recommendation
+
+If shipping fast matters, **Option A (Fly.io)** is the path of
+least resistance — current code runs essentially unchanged, ops
+load is low for a single-region product, costs are predictable
+and tiny at MVP scale. Defer multi-region until there's evidence
+families across continents are co-editing.
+
+If betting on the architecture long-term, **Option B (Cloudflare)**
+is the most elegant — per-site D1, per-page Durable Objects, R2
+for assets, multi-region by default. But it's ~2-4 weeks of
+rework on top of Phase 1, much of it dragging the asset and DB
+abstractions through API changes. Better as a v2 migration once
+Option A has validated the product.
+
+**Option C (Vercel)** is hard to recommend for this product. The
+read-heavy + WebSocket-sync + asset-heavy profile fights Vercel's
+strengths. Skip unless there's a specific reason (existing Vercel
+contract, team familiarity).
+
+Decision: pending. Will be made before Phase 3 starts.
 
 ## What we explicitly will not do
 
