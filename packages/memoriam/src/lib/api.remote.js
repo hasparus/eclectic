@@ -2,12 +2,12 @@ import { getRequestEvent, query, command } from '$app/server';
 import * as v from 'valibot';
 import slugify from 'slugify';
 import crypto from 'node:crypto';
-import { document_schema } from '$lib/document_schema.js';
-import { collect_node_ids_in_order } from '$lib/document_graph.js';
+import { documentSchema } from '$lib/document_schema.js';
+import { collectNodeIdsInOrder } from '$lib/document_graph.js';
 import {
-	extract_page_metadata,
-	extract_plain_text,
-	collect_page_body_node_ids
+	extractPageMetadata,
+	extractPlainText,
+	collectPageBodyNodeIds
 } from '$lib/page_metadata.js';
 import {
 	adminSessionCookieName,
@@ -162,7 +162,7 @@ function collect_node_ids(root_id, nodes, exclude_roots) {
 		const node = nodes[id];
 		if (!node) continue;
 
-		const type_schema = document_schema[node.type];
+		const type_schema = documentSchema[node.type];
 		if (!type_schema) continue;
 
 		for (const [prop_name, prop_def] of Object.entries(type_schema.properties)) {
@@ -405,7 +405,7 @@ function collect_document_refs(nodes, node_ids, source_document_id) {
 			}
 		}
 
-		const type_schema = document_schema[node.type];
+		const type_schema = documentSchema[node.type];
 		if (!type_schema) continue;
 
 		for (const [prop_name, prop_def] of Object.entries(type_schema.properties)) {
@@ -520,7 +520,7 @@ function get_combined_document(document_id) {
  * @returns {PageSummary}
  */
 function summarize_page_document(page_doc) {
-	const metadata = extract_page_metadata({
+	const metadata = extractPageMetadata({
 		document_id: page_doc.document_id,
 		nodes: page_doc.nodes
 	});
@@ -657,7 +657,7 @@ function build_page_browser_data() {
 
 	const body_refs_by_page_id = new Map();
 	for (const page_doc of page_docs) {
-		const body_node_ids = collect_page_body_node_ids(page_doc);
+		const body_node_ids = collectPageBodyNodeIds(page_doc);
 		body_refs_by_page_id.set(
 			page_doc.document_id,
 			collect_document_refs(page_doc.nodes, body_node_ids, page_doc.document_id)
@@ -952,7 +952,7 @@ export const get_internal_link_preview = query(v.string(), async (href) => {
 	}
 
 	const page_doc = /** @type {DocumentData} */ (JSON.parse(doc_row.data));
-	const metadata = extract_page_metadata(page_doc);
+	const metadata = extractPageMetadata(page_doc);
 
 	return /** @type {InternalLinkPreview} */ ({
 		document_id: resolved.document_id,
@@ -983,7 +983,7 @@ function rewrite_internal_page_hrefs(nodes, target_document_id, new_slug) {
 			node.href = rewrite_internal_page_href(node.href, target_document_id, new_slug);
 		}
 
-		const type_schema = document_schema[node.type];
+		const type_schema = documentSchema[node.type];
 		if (!type_schema) continue;
 
 		for (const [prop_name, prop_def] of Object.entries(type_schema.properties)) {
@@ -1047,9 +1047,9 @@ export const save_document = command(save_document_input_schema, async (combined
 	const nav_root_id = page_node.nav;
 	const footer_root_id = page_node.footer;
 
-	const nav_node_ids = nav_root_id ? new Set(collect_node_ids_in_order(nav_root_id, all_nodes)) : new Set();
+	const nav_node_ids = nav_root_id ? new Set(collectNodeIdsInOrder(nav_root_id, all_nodes)) : new Set();
 	const footer_node_ids = footer_root_id
-		? new Set(collect_node_ids_in_order(footer_root_id, all_nodes))
+		? new Set(collectNodeIdsInOrder(footer_root_id, all_nodes))
 		: new Set();
 
 	const exclude_roots = new Set();
@@ -1148,7 +1148,7 @@ export const save_document = command(save_document_input_schema, async (combined
 		let active_slug = get_active_slug_for_document_id(combined_doc.document_id);
 
 		if (combined_doc.create && !active_slug && !is_home_page_document_id(combined_doc.document_id)) {
-			const metadata = extract_page_metadata(page_doc);
+			const metadata = extractPageMetadata(page_doc);
 			const base_slug = create_slug_candidate(metadata.title, combined_doc.document_id);
 			active_slug = create_unique_slug(base_slug);
 			insert_active_slug(combined_doc.document_id, active_slug, insert_slug, deactivate_active_slug);

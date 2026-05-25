@@ -3,7 +3,7 @@ import { define_document_schema } from 'svedit';
 const ALL_ANNOTATIONS = ['strong', 'emphasis', 'highlight', 'link'];
 const MINIMAL_ANNOTATIONS = ['emphasis', 'highlight'];
 
-export const document_schema = define_document_schema({
+export const documentSchema = define_document_schema({
 	page: {
 		kind: 'document',
 		properties: {

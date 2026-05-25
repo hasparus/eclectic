@@ -3,7 +3,7 @@
 // NAV_1, FOOTER_1, PAGE_1 are extracted automatically using svedit's traverse utility.
 
 import { traverse } from 'svedit';
-import { document_schema } from '$lib/document_schema.js';
+import { documentSchema } from '$lib/document_schema.js';
 
 const FULL_DOC = {
     "document_id": "page_1",
@@ -1327,36 +1327,36 @@ const FULL_DOC = {
 // ---------------------------------------------------------------------------
 
 /**
- * Extract a sub-document: traverse from root_id collecting all reachable nodes.
+ * Extract a sub-document: traverse from rootId collecting all reachable nodes.
  */
-function extract_document(nodes, root_id) {
-    const node_list = traverse(root_id, document_schema, nodes);
-    const sub_nodes = {};
-    for (const node of node_list) {
-        sub_nodes[node.id] = node;
+function extractDocument(nodes: Record<string, any>, rootId: string) {
+    const nodeList = traverse(rootId, documentSchema, nodes);
+    const subNodes: Record<string, any> = {};
+    for (const node of nodeList) {
+        subNodes[node.id] = node;
     }
-    return { document_id: root_id, nodes: sub_nodes };
+    return { document_id: rootId, nodes: subNodes };
 }
 
-const page_node = FULL_DOC.nodes['page_1'];
-const nav_root_id = page_node.nav;       // "nav_1"
-const footer_root_id = page_node.footer; // "footer_1"
+const pageNode = FULL_DOC.nodes['page_1'];
+const navRootId = pageNode.nav;       // "nav_1"
+const footerRootId = pageNode.footer; // "footer_1"
 
-export const NAV_1 = extract_document(FULL_DOC.nodes, nav_root_id);
-export const FOOTER_1 = extract_document(FULL_DOC.nodes, footer_root_id);
+export const NAV_1 = extractDocument(FULL_DOC.nodes, navRootId);
+export const FOOTER_1 = extractDocument(FULL_DOC.nodes, footerRootId);
 
 // PAGE_1 gets everything reachable from page_1, minus nav/footer subtrees
-const nav_ids = new Set(Object.keys(NAV_1.nodes));
-const footer_ids = new Set(Object.keys(FOOTER_1.nodes));
-const exclude = new Set([...nav_ids, ...footer_ids]);
-const page_nodes_list = traverse('page_1', document_schema, FULL_DOC.nodes);
-const page_nodes = {};
-for (const node of page_nodes_list) {
+const navIds = new Set(Object.keys(NAV_1.nodes));
+const footerIds = new Set(Object.keys(FOOTER_1.nodes));
+const exclude = new Set([...navIds, ...footerIds]);
+const pageNodesList = traverse('page_1', documentSchema, FULL_DOC.nodes);
+const pageNodes: Record<string, any> = {};
+for (const node of pageNodesList) {
     if (!exclude.has(node.id)) {
-        page_nodes[node.id] = node;
+        pageNodes[node.id] = node;
     }
 }
-export const PAGE_1 = { document_id: 'page_1', nodes: page_nodes };
+export const PAGE_1 = { document_id: 'page_1', nodes: pageNodes };
 
 // Merged document for static deployment (Vercel demo)
 export const demo_doc = {

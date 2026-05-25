@@ -52,7 +52,7 @@ import Emphasis from './components/Emphasis.svelte';
 import Highlight from './components/Highlight.svelte';
 import Link from './components/Link.svelte';
 
-import { document_schema } from '$lib/document_schema.js';
+import { documentSchema } from '$lib/document_schema.js';
 import { start_processing } from '$lib/client/asset_upload.js';
 import { MEDIA_DEFAULTS } from '$lib/config.js';
 import { set_properties } from 'svedit';
@@ -669,6 +669,6 @@ const session_config = {
 };
 
 export function create_session(doc) {
-	const session = new Session(document_schema, doc, session_config);
+	const session = new Session(documentSchema, doc, session_config);
 	return session;
 }
