@@ -14,6 +14,7 @@ decisions live in [PLAN.md](./PLAN.md).
 - Tailwind first; custom CSS only for things Tailwind can't
   express.
 - Sentence case for comments and commit messages.
+- Sacrifice grammar for concision.
 
 ## Server
 
