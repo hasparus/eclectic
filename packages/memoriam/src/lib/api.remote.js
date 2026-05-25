@@ -10,14 +10,14 @@ import {
 	collect_page_body_node_ids
 } from '$lib/page_metadata.js';
 import {
-	admin_session_cookie_name,
-	get_required_admin_password,
-	get_session_expires_at,
-	delete_session,
-	clear_admin_session_cookie,
-	set_admin_session_cookie,
-	require_admin_session,
-	constant_time_equal
+	adminSessionCookieName,
+	getRequiredAdminPassword,
+	getSessionExpiresAt,
+	deleteSession,
+	clearAdminSessionCookie,
+	setAdminSessionCookie,
+	requireAdminSession,
+	constantTimeEqual
 } from '$lib/server/auth.js';
 
 /**
@@ -825,24 +825,24 @@ export const get_auth_status = query(v.void(), async () => {
 	const { locals } = getRequestEvent();
 
 	return {
-		is_admin: !!locals.is_admin
+		is_admin: !!locals.isAdmin
 	};
 });
 
 export const login_admin = command(admin_login_input_schema, async ({ password }) => {
 	const { cookies } = getRequestEvent();
-	const admin_password = get_required_admin_password();
+	const adminPassword = getRequiredAdminPassword();
 
-	if (!constant_time_equal(password, admin_password)) {
+	if (!constantTimeEqual(password, adminPassword)) {
 		return create_auth_error_result('invalid_password', 'Incorrect admin password.');
 	}
 
-	const session_id = crypto.randomUUID();
+	const sessionId = crypto.randomUUID();
 	db().prepare('INSERT INTO sessions (session_id, expires) VALUES (?, ?)').run(
-		session_id,
-		get_session_expires_at()
+		sessionId,
+		getSessionExpiresAt()
 	);
-	set_admin_session_cookie(cookies, session_id);
+	setAdminSessionCookie(cookies, sessionId);
 
 	return {
 		ok: true
@@ -851,13 +851,13 @@ export const login_admin = command(admin_login_input_schema, async ({ password }
 
 export const logout_admin = command(v.void(), async () => {
 	const { cookies } = getRequestEvent();
-	const session_id = cookies.get(admin_session_cookie_name);
+	const sessionId = cookies.get(adminSessionCookieName);
 
-	if (session_id) {
-		delete_session(db(), session_id);
+	if (sessionId) {
+		deleteSession(db(), sessionId);
 	}
 
-	clear_admin_session_cookie(cookies);
+	clearAdminSessionCookie(cookies);
 
 	return {
 		ok: true
@@ -868,7 +868,7 @@ export const logout_admin = command(v.void(), async () => {
  * Return page browser data for the pages drawer.
  */
 export const get_page_browser_data = query(v.void(), async () => {
-	require_admin_session(getRequestEvent().locals);
+	requireAdminSession(getRequestEvent().locals);
 	return build_page_browser_data();
 });
 
@@ -876,7 +876,7 @@ export const get_page_browser_data = query(v.void(), async () => {
  * Delete a page document and its related refs.
  */
 export const delete_page = command(delete_page_input_schema, async ({ document_id }) => {
-	require_admin_session(getRequestEvent().locals);
+	requireAdminSession(getRequestEvent().locals);
 
 	const home_page_id = get_home_page_id_from_db();
 
@@ -1028,7 +1028,7 @@ function assign_active_slug(document_id, slug, insert_slug_stmt, deactivate_slug
 }
 
 export const save_document = command(save_document_input_schema, async (combined_doc) => {
-	require_admin_session(getRequestEvent().locals);
+	requireAdminSession(getRequestEvent().locals);
 
 	const all_nodes = structuredClone(combined_doc.nodes);
 	const page_node = all_nodes[combined_doc.document_id];
@@ -1180,7 +1180,7 @@ export const save_document = command(save_document_input_schema, async (combined
 });
 
 export const update_page_slug = command(update_page_slug_input_schema, async (input) => {
-	require_admin_session(getRequestEvent().locals);
+	requireAdminSession(getRequestEvent().locals);
 
 	const normalized_slug = slugify(input.slug, { lower: true, strict: true, trim: true });
 

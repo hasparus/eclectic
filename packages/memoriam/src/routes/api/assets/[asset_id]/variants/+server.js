@@ -1,35 +1,35 @@
 import { error, json } from '@sveltejs/kit';
 import { VARIANT_WIDTHS_SET } from '$lib/config.js';
-import { asset_exists, write_variant } from '$lib/server/asset_storage.js';
+import { assetExists, writeVariant } from '$lib/server/asset_storage.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function POST({ params, request, locals }) {
-	if (!locals.is_admin) {
+	if (!locals.isAdmin) {
 		error(401, 'Authentication required');
 	}
 
-	const site_id = locals.site_id;
-	const { asset_id } = params;
+	const siteId = locals.siteId;
+	const { asset_id: assetId } = params;
 
-	if (!asset_id || asset_id.includes('..') || asset_id.includes('/')) {
+	if (!assetId || assetId.includes('..') || assetId.includes('/')) {
 		error(400, 'Invalid asset id');
 	}
 
-	if (!asset_exists(site_id, asset_id)) {
+	if (!assetExists(siteId, assetId)) {
 		error(404, 'Asset not found');
 	}
 
-	const content_type = (request.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
-	if (content_type !== 'image/webp') {
+	const contentType = (request.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+	if (contentType !== 'image/webp') {
 		error(400, 'Variant must be image/webp');
 	}
 
-	const width_str = request.headers.get('x-variant-width');
-	if (!width_str) {
+	const widthStr = request.headers.get('x-variant-width');
+	if (!widthStr) {
 		error(400, 'Missing X-Variant-Width header');
 	}
 
-	const width = parseInt(width_str, 10);
+	const width = parseInt(widthStr, 10);
 	if (!Number.isFinite(width) || width <= 0) {
 		error(400, 'Invalid X-Variant-Width value');
 	}
@@ -42,16 +42,16 @@ export async function POST({ params, request, locals }) {
 		error(400, 'Empty request body');
 	}
 
-	let bytes_written = 0;
+	let bytesWritten = 0;
 	try {
-		const result = await write_variant(site_id, asset_id, width, request.body);
-		bytes_written = result.bytes_written;
+		const result = await writeVariant(siteId, assetId, width, request.body);
+		bytesWritten = result.bytesWritten;
 	} catch (err) {
 		console.error('Failed to write variant to disk:', err);
 		error(500, 'Failed to store variant');
 	}
 
-	if (bytes_written === 0) {
+	if (bytesWritten === 0) {
 		error(400, 'Empty variant data');
 	}
 

@@ -3,11 +3,11 @@ import { Readable } from 'node:stream';
 import { existsSync } from 'node:fs';
 import { extname } from 'node:path';
 import {
-	asset_exists,
-	asset_size,
-	create_asset_read_stream,
-	create_variant_read_stream,
-	variant_path
+	assetExists,
+	assetSize,
+	createAssetReadStream,
+	createVariantReadStream,
+	variantPath
 } from '$lib/server/asset_storage.js';
 
 /** Map file extensions to MIME types */
@@ -24,21 +24,21 @@ const EXT_TO_MIME = /** @type {Record<string, string>} */ ({
 
 /**
  * Convert a Node.js Readable stream to a Web ReadableStream.
- * @param {import('node:stream').Readable} node_stream
+ * @param {import('node:stream').Readable} nodeStream
  * @returns {ReadableStream<Uint8Array>}
  */
-function to_web_stream(node_stream) {
-	return /** @type {ReadableStream<Uint8Array>} */ (Readable.toWeb(node_stream));
+function toWebStream(nodeStream) {
+	return /** @type {ReadableStream<Uint8Array>} */ (Readable.toWeb(nodeStream));
 }
 
 /**
  * Extract the first 8 hex characters from an asset id for Content-Disposition filename.
- * @param {string} asset_id
+ * @param {string} assetId
  * @param {string} ext
  * @returns {string}
  */
-function short_filename(asset_id, ext) {
-	return `${asset_id.slice(0, 8)}${ext}`;
+function shortFilename(assetId, ext) {
+	return `${assetId.slice(0, 8)}${ext}`;
 }
 
 /**
@@ -53,30 +53,30 @@ function short_filename(asset_id, ext) {
  * @param {number} size
  * @returns {RangeResult}
  */
-function parse_range(header, size) {
+function parseRange(header, size) {
 	if (!header) return { kind: 'none' };
 
 	const match = header.match(/^bytes=(\d*)-(\d*)$/);
 	if (!match) return { kind: 'none' };
 
-	const start_str = match[1];
-	const end_str = match[2];
+	const startStr = match[1];
+	const endStr = match[2];
 
 	let start;
 	let end;
 
-	if (start_str === '' && end_str !== '') {
+	if (startStr === '' && endStr !== '') {
 		// Suffix range: last N bytes.
-		const suffix = parseInt(end_str, 10);
+		const suffix = parseInt(endStr, 10);
 		if (!Number.isFinite(suffix) || suffix <= 0) return { kind: 'none' };
 		start = Math.max(0, size - suffix);
 		end = size - 1;
-	} else if (start_str !== '' && end_str === '') {
-		start = parseInt(start_str, 10);
+	} else if (startStr !== '' && endStr === '') {
+		start = parseInt(startStr, 10);
 		end = size - 1;
-	} else if (start_str !== '' && end_str !== '') {
-		start = parseInt(start_str, 10);
-		end = parseInt(end_str, 10);
+	} else if (startStr !== '' && endStr !== '') {
+		start = parseInt(startStr, 10);
+		end = parseInt(endStr, 10);
 	} else {
 		return { kind: 'none' };
 	}
@@ -91,7 +91,7 @@ function parse_range(header, size) {
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ params, request, locals }) {
-	const site_id = locals.site_id;
+	const siteId = locals.siteId;
 	const path = params.path;
 
 	if (!path) {
@@ -99,73 +99,73 @@ export async function GET({ params, request, locals }) {
 	}
 
 	// Variant request: {stem}/w{width}.webp
-	const variant_match = path.match(/^([a-f0-9]{64})\/w(\d+)\.webp$/);
-	if (variant_match) {
-		const asset_stem = variant_match[1];
-		const width = parseInt(variant_match[2], 10);
+	const variantMatch = path.match(/^([a-f0-9]{64})\/w(\d+)\.webp$/);
+	if (variantMatch) {
+		const assetStem = variantMatch[1];
+		const width = parseInt(variantMatch[2], 10);
 
-		let original_id = null;
+		let originalId = null;
 		for (const ext of ['.webp', '.gif', '.svg', '.png', '.jpg', '.jpeg']) {
-			if (asset_exists(site_id, `${asset_stem}${ext}`)) {
-				original_id = `${asset_stem}${ext}`;
+			if (assetExists(siteId, `${assetStem}${ext}`)) {
+				originalId = `${assetStem}${ext}`;
 				break;
 			}
 		}
 
-		if (!original_id) {
+		if (!originalId) {
 			error(404, 'Asset not found');
 		}
 
-		const vp = variant_path(site_id, original_id, width);
+		const vp = variantPath(siteId, originalId, width);
 		if (!existsSync(vp)) {
 			error(404, 'Variant not found');
 		}
 
-		const stream = create_variant_read_stream(site_id, original_id, width);
-		return new Response(to_web_stream(stream), {
+		const stream = createVariantReadStream(siteId, originalId, width);
+		return new Response(toWebStream(stream), {
 			headers: {
 				'Content-Type': 'image/webp',
 				'Cache-Control': 'public, max-age=31536000, immutable',
-				'Content-Disposition': `inline; filename="${short_filename(asset_stem, '.webp')}"`
+				'Content-Disposition': `inline; filename="${shortFilename(assetStem, '.webp')}"`
 			}
 		});
 	}
 
 	// Original request: {hash}.{ext}
-	const original_match = path.match(/^([a-f0-9]{64}\.\w+)$/);
-	if (!original_match) {
+	const originalMatch = path.match(/^([a-f0-9]{64}\.\w+)$/);
+	if (!originalMatch) {
 		error(400, 'Invalid asset path');
 	}
 
-	const asset_id = original_match[1];
+	const assetId = originalMatch[1];
 
-	if (!asset_exists(site_id, asset_id)) {
+	if (!assetExists(siteId, assetId)) {
 		error(404, 'Asset not found');
 	}
 
-	const ext = extname(asset_id);
-	const mime_type = EXT_TO_MIME[ext] || 'application/octet-stream';
-	const size = await asset_size(site_id, asset_id);
+	const ext = extname(assetId);
+	const mimeType = EXT_TO_MIME[ext] || 'application/octet-stream';
+	const size = await assetSize(siteId, assetId);
 
 	/** @type {Record<string, string>} */
-	const base_headers = {
-		'Content-Type': mime_type,
+	const baseHeaders = {
+		'Content-Type': mimeType,
 		'Cache-Control': 'public, max-age=31536000, immutable',
-		'Content-Disposition': `inline; filename="${short_filename(asset_id, ext)}"`
+		'Content-Disposition': `inline; filename="${shortFilename(assetId, ext)}"`
 	};
 
-	const is_video = mime_type.startsWith('video/');
+	const isVideo = mimeType.startsWith('video/');
 
-	if (is_video) {
-		base_headers['Accept-Ranges'] = 'bytes';
+	if (isVideo) {
+		baseHeaders['Accept-Ranges'] = 'bytes';
 
-		const range = parse_range(request.headers.get('range'), size);
+		const range = parseRange(request.headers.get('range'), size);
 
 		if (range.kind === 'unsatisfiable') {
 			return new Response(null, {
 				status: 416,
 				headers: {
-					...base_headers,
+					...baseHeaders,
 					'Content-Range': `bytes */${size}`
 				}
 			});
@@ -173,14 +173,14 @@ export async function GET({ params, request, locals }) {
 
 		if (range.kind === 'ok') {
 			const length = range.end - range.start + 1;
-			const stream = create_asset_read_stream(site_id, asset_id, {
+			const stream = createAssetReadStream(siteId, assetId, {
 				start: range.start,
 				end: range.end
 			});
-			return new Response(to_web_stream(stream), {
+			return new Response(toWebStream(stream), {
 				status: 206,
 				headers: {
-					...base_headers,
+					...baseHeaders,
 					'Content-Length': String(length),
 					'Content-Range': `bytes ${range.start}-${range.end}/${size}`
 				}
@@ -188,10 +188,10 @@ export async function GET({ params, request, locals }) {
 		}
 	}
 
-	const stream = create_asset_read_stream(site_id, asset_id);
-	return new Response(to_web_stream(stream), {
+	const stream = createAssetReadStream(siteId, assetId);
+	return new Response(toWebStream(stream), {
 		headers: {
-			...base_headers,
+			...baseHeaders,
 			'Content-Length': String(size)
 		}
 	});

@@ -1,23 +1,23 @@
 import { json, error } from '@sveltejs/kit';
-import { delete_asset, asset_exists } from '$lib/server/asset_storage.js';
+import { deleteAsset, assetExists } from '$lib/server/asset_storage.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function DELETE({ params, locals }) {
-	if (!locals.is_admin) {
+	if (!locals.isAdmin) {
 		error(401, 'Authentication required');
 	}
 
-	const site_id = locals.site_id;
-	const { asset_id } = params;
+	const siteId = locals.siteId;
+	const { asset_id: assetId } = params;
 
-	if (!asset_id || asset_id.includes('..') || asset_id.includes('/')) {
+	if (!assetId || assetId.includes('..') || assetId.includes('/')) {
 		error(400, 'Invalid asset id');
 	}
 
-	if (!asset_exists(site_id, asset_id)) {
+	if (!assetExists(siteId, assetId)) {
 		error(404, 'Asset not found');
 	}
 
-	await delete_asset(site_id, asset_id);
+	await deleteAsset(siteId, assetId);
 	return json({ ok: true });
 }

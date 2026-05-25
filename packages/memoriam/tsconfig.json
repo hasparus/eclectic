@@ -8,8 +8,8 @@
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
 		"sourceMap": false,
-		"strict": false,
-		"moduleResolution": "bundler",
+		"strict": true,
+		"noUncheckedIndexedAccess": false,
 		"declarationMap": true,
 		"declaration": true
 	}

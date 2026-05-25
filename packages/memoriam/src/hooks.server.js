@@ -1,11 +1,11 @@
 import { env } from '$env/dynamic/private';
 import {
-	admin_session_cookie_name,
-	clear_admin_session_cookie,
-	get_session_expires_at,
-	set_admin_session_cookie
+	adminSessionCookieName,
+	clearAdminSessionCookie,
+	getSessionExpiresAt,
+	setAdminSessionCookie
 } from '$lib/server/auth.js';
-import { resolve_site_id } from '$lib/server_config.js';
+import { resolveSiteId } from '$lib/server_config.js';
 
 /** @type {import('@sveltejs/kit').ServerInit} */
 export async function init() {
@@ -13,45 +13,45 @@ export async function init() {
 		throw new Error('ADMIN_PASSWORD must be set');
 	}
 
-	// Migrations run lazily on first get_db(site_id) per site (see
-	// $lib/server/db.js). No eager migration here — there is no longer a
+	// Migrations run lazily on first getDb(siteId) per site (see
+	// $lib/server/db.ts). No eager migration here — there is no longer a
 	// single application database to migrate up front.
 }
 
 /** @type {import('@sveltejs/kit').Handle} */
 export const handle = async ({ event, resolve }) => {
-	event.locals.is_admin = false;
+	event.locals.isAdmin = false;
 
 	if (env.VERCEL) {
 		return resolve(event);
 	}
 
-	const site_id = resolve_site_id(event.url);
-	event.locals.site_id = site_id;
+	const siteId = resolveSiteId(event.url);
+	event.locals.siteId = siteId;
 
-	const { get_db } = await import('$lib/server/db.js');
-	const db = get_db(site_id);
+	const { getDb } = await import('$lib/server/db.js');
+	const db = getDb(siteId);
 	event.locals.db = db;
 
-	const session_id = event.cookies.get(admin_session_cookie_name);
+	const sessionId = event.cookies.get(adminSessionCookieName);
 
-	if (session_id) {
-		const row = /** @type {{ expires: number } | undefined } */ (
-			db.prepare('SELECT expires FROM sessions WHERE session_id = ?').get(session_id)
+	if (sessionId) {
+		const row = /** @type {{ expires: number } | undefined} */ (
+			db.prepare('SELECT expires FROM sessions WHERE session_id = ?').get(sessionId)
 		);
 
 		if (!row) {
-			clear_admin_session_cookie(event.cookies);
+			clearAdminSessionCookie(event.cookies);
 		} else if (row.expires <= Math.floor(Date.now() / 1000)) {
-			db.prepare('DELETE FROM sessions WHERE session_id = ?').run(session_id);
-			clear_admin_session_cookie(event.cookies);
+			db.prepare('DELETE FROM sessions WHERE session_id = ?').run(sessionId);
+			clearAdminSessionCookie(event.cookies);
 		} else {
 			db.prepare('UPDATE sessions SET expires = ? WHERE session_id = ?').run(
-				get_session_expires_at(),
-				session_id
+				getSessionExpiresAt(),
+				sessionId
 			);
-			set_admin_session_cookie(event.cookies, session_id);
-			event.locals.is_admin = true;
+			setAdminSessionCookie(event.cookies, sessionId);
+			event.locals.isAdmin = true;
 		}
 	}
 

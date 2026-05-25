@@ -6,9 +6,9 @@ declare global {
 	namespace App {
 		// interface Error {}
 		interface Locals {
-			site_id: string;
+			siteId: string;
 			db: DatabaseSync;
-			is_admin: boolean;
+			isAdmin: boolean;
 		}
 		// interface PageData {}
 		// interface PageState {}
