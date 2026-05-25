@@ -6,9 +6,12 @@ decisions live in [PLAN.md](./PLAN.md).
 ## Code
 
 - **camelCase** for variables and functions, **PascalCase** for
-  types and Svelte components. The vendored code is snake_case;
-  flip it during the TS migration (PLAN.md Phase 1), not as
-  drive-by renames.
+  types and Svelte components, **camelCase** for SQL columns /
+  tables and our own JSON document keys too. Exception: svedit's
+  schema-metadata keys (`kind`, `properties`, `node_types`,
+  `default_node_type`, `allow_newlines`) stay as svedit dictates.
+  The vendored code is mid-flip; do it during the TS migration
+  (PLAN.md Phase 1), not as drive-by renames.
 - Files using Svelte runes (`$state`, `$derived`, `$effect`)
   must use `.svelte.js` / `.svelte.ts`.
 - Tailwind first; custom CSS only for things Tailwind can't

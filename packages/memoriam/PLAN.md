@@ -51,13 +51,20 @@ writing fork code.
    unresolved and the upstream is a one-person project. Vendor both,
    accept the maintenance cost, contribute back only what's mutually
    useful.
-5. **TypeScript, strict.** Drop the JSDoc-with-`strict:false` middle
-   ground. Convert during the fork phase while the code is still
-   small and we're touching everything anyway. Same pass flips the
-   inherited snake_case identifiers to idiomatic camelCase
-   (functions, variables) / PascalCase (types, components) — the
-   upstream's snake_case convention is not idiomatic in
-   TypeScript or Svelte and was never a good fit.
+5. **TypeScript, strict, camelCase everywhere.** Drop the
+   JSDoc-with-`strict:false` middle ground. Convert during the fork
+   phase while the code is still small. Same pass flips identifiers
+   to idiomatic camelCase (functions, variables) / PascalCase
+   (types, components). **camelCase also applies to SQL column /
+   table names and our own JSON document keys** (`focalPointX`,
+   `mimeType`, `documentId`, `createdAt`, etc.) — fighting SQL
+   convention is a small cost vs. the consistency win for a solo
+   product. Exceptions, in both code and storage:
+   - Svedit's own schema-metadata keys (`kind`, `properties`,
+     `node_types`, `default_node_type`, `allow_newlines`, `type`)
+     are svedit's contract — we can't rename them.
+   - Migration function names (used as IDs in the `_migrations`
+     table) stay as-written for compatibility across deploys.
 6. **Deploy target: undecided.** See § Deploy target below. The
    current code (per-site SQLite on a persistent filesystem) is
    shaped for a VPS or Fly.io. Cloudflare and Vercel are real
@@ -99,6 +106,18 @@ Get the vendored code into a shape we can build on. No new features.
       to match TS / Svelte idiom. Mechanical but invasive; do it as
       one coordinated commit per directory to keep the diff
       reviewable.
+- [ ] **SQL + JSON document key rename to camelCase.** Follow-up
+      to the TS migration above. One SQL migration that
+      `ALTER TABLE RENAME COLUMN`s every `*_id`, `*_at`,
+      `is_active`, etc., to camelCase. One data migration that
+      walks the `documents.data` JSON and rewrites our own keys
+      (`focal_point_x` → `focalPointX`, `mime_type` → `mimeType`,
+      `object_fit` → `objectFit`, the `node_id` annotation ref,
+      etc.). Update `documentSchema`, `MEDIA_DEFAULTS`, the demo
+      seed, every SQL query string, and every component that
+      reads these node properties (Toolbar, MediaProperty, etc.).
+      Svedit's own contract keys (`kind`, `properties`, `type`,
+      `node_types`, `default_node_type`, `allow_newlines`) stay.
 - [ ] Kill `src/lib/server/db.js` singleton. Replace with
       `get_db(site_id)` backed by an LRU cache (key: site_id, value:
       `DatabaseSync` instance + last-access timestamp, eviction at e.g.
@@ -177,10 +196,16 @@ tenant routing.
       (phase 5 QR feature). Get this table right *now* — every code
       issued is a permanent commitment.
 
-## Phase 3 — CRDT + local-first (3-4 weeks)
+## Phase 3 — Multiplayer + local-first via Automerge (3-4 weeks)
 
-The architectural switch. This is the largest single chunk of work and
-the highest-risk one.
+The biggest *addition*, not a migration — there is no existing
+multiplayer or sync layer to migrate from. Adding Automerge brings
+two things at once: a CRDT-backed multi-user editing model and a
+local-first sync story (IndexedDB cache, WebSocket relay, offline
+edits that converge on reconnect). A consequence: the current
+explicit-save flow goes away, because once edits are streaming
+deltas to peers there's nothing to "save" — but that's downstream
+of the addition, not the goal.
 
 - [ ] Write the Svedit ↔ Automerge binding. Per-page doc shape:
       a top-level map with `nodes` (map of id → node map), node_array
