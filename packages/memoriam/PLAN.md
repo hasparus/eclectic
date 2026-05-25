@@ -1,11 +1,20 @@
 # Memoriam — technical plan
 
-Memorial sites where multiple family members co-edit, often asynchronously,
-across time zones, devices, and patchy connections. Read-heavy (mourners
-visit, family edits). One memorial = one site = one SQLite database.
+Memorial sites where multiple family members co-edit, often
+asynchronously, across time zones, devices, and patchy connections.
+Read-heavy (mourners visit, family edits). One memorial = one site =
+one SQLite database.
 
-This document plans the path from the vendored `editable-website` fork
-(commit `35e3b65`) toward a production multi-tenant SaaS.
+**Product surface** (expanded scope): rich memorial pages *plus* a
+collaborative family-tree layer competing with Geni and MyHeritage.
+The wedge vs. those incumbents is that each person in the tree can
+have a fully editable memorial page (live, multiplayer, local-first)
+rather than a database row with a sad photo slot. The wedge vs.
+generic site builders is the genealogy graph: cross-family linking,
+GEDCOM import, tree visualization, smart-merge suggestions.
+
+This document plans the path from the vendored `editable-website`
+fork (commit `35e3b65`) toward production.
 
 ## Architectural decisions (the forks)
 
@@ -15,9 +24,13 @@ writing fork code.
 1. **DB-per-site SQLite**, not per-tenant column. Each memorial gets
    `data/<site_id>/db.sqlite3` + `data/<site_id>/assets/`. A separate
    platform DB (`data/_platform.sqlite3`) holds `users`, `sites`,
-   `site_members`, `domains`, `invites`, `sessions`. Per-site `sessions`
-   and `ADMIN_PASSWORD` from the upstream are deleted; auth becomes
-   platform-level.
+   `site_members`, `domains`, `invites`, `sessions`, `short_codes`,
+   and the **genealogy registry** (`people`, `person_aliases`,
+   `relationships`, `person_memorials`, `person_access`). Per-site
+   `sessions` and `ADMIN_PASSWORD` from the upstream are deleted;
+   auth becomes platform-level. The cross-cutting genealogy data
+   lives in the platform DB because it is intrinsically cross-site —
+   one person can be linked from many memorials.
 2. **CRDT-first document model** via Automerge 2.x. One Automerge doc
    per page, one shared Automerge doc for nav+footer per site,
    conventional SQLite for the site index (page list, slugs,
@@ -103,9 +116,26 @@ Get the vendored code into a shape we can build on. No new features.
 The piece that doesn't exist upstream. Multi-user, multi-site, with
 tenant routing.
 
-- [ ] Platform DB schema: `users`, `sites`, `site_members` (user_id,
-      site_id, role: owner/editor/viewer), `domains` (custom domain →
-      site_id), `invites`, `platform_sessions`.
+- [ ] Platform DB schema:
+      - `users`, `sites`, `site_members` (user_id, site_id, role:
+        owner/editor/viewer), `domains` (custom domain → site_id),
+        `invites`, `platform_sessions`.
+      - Genealogy registry: `people` (person_id, display_name,
+        given_names, surname, birth_year, death_year, is_living,
+        privacy_level, owner_user_id, created_at, updated_at),
+        `person_aliases` (person_id, alias, source) for maiden names
+        and alternate spellings, `relationships` (parent_id, child_id,
+        relation_type, certainty, source_note) — modeled as directed
+        parent→child edges; spouses derived from shared-child queries
+        or stored explicitly as relation_type='spouse',
+        `person_memorials` (person_id, site_id) linking platform
+        people to per-site memorial pages, `person_access` for
+        per-person ACLs (who can edit a person record, who can see
+        them if `is_living=1`).
+      - Person records are platform-level because they cross sites
+        (your grandmother appears on your memorial and your cousin's).
+        The memorial *content* stays in the per-site DB; only the
+        identity + relationship graph lives in the platform DB.
 - [ ] Auth: email magic link (lowest friction for grieving families,
       no password to forget). `nodemailer` + Resend or Postmark for
       transactional. Optional Google OAuth as second method.
@@ -215,10 +245,49 @@ Sequence loosely; each is independent.
 - [ ] **Timeline / life events block.** Schema: array of `{ date,
       title, description, media }`. Renders as a vertical timeline
       with year markers. Common ask for memorials.
-- [ ] **Family tree block.** Lightweight tree of `{ name, relation,
-      link_to_their_memorial? }`. Cross-memorial links are a network
-      effect — if Grandma's memorial links to Grandpa's memorial,
-      both pages benefit.
+- [ ] **Family tree — first-class product surface, not a block.**
+      Replaces the lightweight "family tree block" idea. Each user
+      has one or more trees (rooted views into the platform person
+      graph); memorials are pages that *belong to* a person in a
+      tree, not vice versa. Sub-features, sequenced:
+      - **Person editor.** CRUD for `people` rows, alias management,
+        privacy controls, link/unlink to a memorial site.
+      - **Relationship editor.** Add parent/child/spouse edges with
+        certainty (`certain` / `probable` / `unverified`) and an
+        optional source note (the document that backs the claim).
+      - **Tree visualization.** SVG-based for trees up to ~500 people
+        (Cytoscape.js or a custom layout), WebGL fallback above that
+        (Sigma.js). Pan, zoom, click-to-focus, expand/collapse
+        branches. Render relation certainty as edge styling.
+      - **GEDCOM 5.5.1 import.** Industry-standard format —
+        non-negotiable for adoption against Geni/MyHeritage. Parse
+        INDI and FAM records, fuzzy-match against existing platform
+        people (offer merge candidates rather than blind creating).
+        Handle source citations as best-effort.
+      - **GEDCOM export.** Round-trip support. Critical for "your
+        data is yours" credibility.
+      - **Cross-tree linking.** When two users' trees overlap on the
+        same person (great-aunt on tree A = grandmother on tree B),
+        either user can propose a merge; the other must accept.
+        Merged person records share an underlying `person_id`; each
+        side keeps a tree-specific view (root, alias, custom notes).
+        Geni-style "global tree" emergent behavior.
+      - **Smart matching.** Suggest "is this the same person?" on
+        new person creation based on fuzzy name + dates + place +
+        relationship context. v1 ships heuristic; v2 could use an
+        embedding model.
+      - **Tree-specific privacy.** Default rule: living people
+        visible only to authenticated tree members. Deceased people
+        default to "visible to anyone with the tree link." Owner
+        can override per-person.
+      - **Source documents.** Attach photos, scanned certificates,
+        census records to a person. Stored as platform-level assets
+        (separate from per-site memorial assets) since they belong
+        to the person, not a memorial.
+      - **Explicitly out of scope for v1:** DNA matching (different
+        industry, regulatory complications — GDPR, HIPAA-adjacent),
+        ethnicity estimates, historical record databases (we don't
+        license census/birth-record corpora — partner if needed).
 - [ ] **Guestbook / condolences.** Append-only, moderated by site
       owners. Can be a separate Y.Doc or just a SQLite table —
       condolences don't need rich co-editing.
@@ -301,10 +370,16 @@ Worth writing down so we don't drift.
 - **No realtime video calls / live streams.** Memorial sites are
   async by nature. Real-time video is a different product.
 - **No social network features.** No follows, no feed, no
-  recommendations. Each memorial is its own thing.
+  recommendations. Trees are explicitly linked, not algorithmically
+  surfaced.
 - **No federated identity.** Magic link + Google. No "sign in with
   Apple/Facebook/Twitter," no SAML/SSO.
 - **No public API in v1.** Add when a partner needs it.
+- **No DNA matching, no ethnicity estimates, no licensed historical
+  record databases.** That's where Ancestry / MyHeritage make their
+  margin; it's a different industry with different costs and
+  regulatory exposure. Compete on UX, collaboration quality, and
+  the memorial-page differentiator, not on data corpus.
 
 ## Risk register
 
@@ -321,6 +396,15 @@ Worth writing down so we don't drift.
   story is less polished than `Y.UndoManager`. Worst case: v1 ships
   with simple "undo last local change" semantics and richer undo
   comes later. Acceptable degradation.
+- **Genealogy expands surface area substantially** (HIGH).
+  Tree visualization at scale, GEDCOM round-tripping, cross-tree
+  merging, and per-person privacy all add up to ~2-3 months of
+  focused work on top of the memorial editor itself. Risk is
+  building a mediocre tree feature that loses to Geni rather than
+  shipping a great memorial feature and adding the tree later. Plan
+  the sequencing carefully — memorials need to feel done before
+  the tree opens, or the product reads as "yet another family-tree
+  startup."
 - **Per-site SQLite file-descriptor pressure** (MEDIUM). Spike B
   measures it. Mitigation: aggressive LRU eviction, smaller default
   cache size, monitoring on ulimit headroom.
