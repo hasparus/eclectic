@@ -42,20 +42,22 @@ function short_filename(asset_id, ext) {
 }
 
 /**
- * Parse an HTTP Range header for a single byte range. Returns null when
- * the header is absent, malformed, or specifies multiple ranges (which we
- * do not support). Returns null with `unsatisfiable: true` when the range
- * is outside the file. Otherwise returns the resolved byte range.
+ * Parse an HTTP Range header for a single byte range. Returns a tagged
+ * union so callers can distinguish "no range" (serve whole file),
+ * "unsatisfiable" (respond 416), and "ok" (respond 206 with the byte
+ * window).
+ *
+ * @typedef {{ kind: 'none' } | { kind: 'unsatisfiable' } | { kind: 'ok', start: number, end: number }} RangeResult
  *
  * @param {string | null} header
  * @param {number} size
- * @returns {{ start: number, end: number } | null | { unsatisfiable: true }}
+ * @returns {RangeResult}
  */
 function parse_range(header, size) {
-	if (!header) return null;
+	if (!header) return { kind: 'none' };
 
 	const match = header.match(/^bytes=(\d*)-(\d*)$/);
-	if (!match) return null;
+	if (!match) return { kind: 'none' };
 
 	const start_str = match[1];
 	const end_str = match[2];
@@ -66,7 +68,7 @@ function parse_range(header, size) {
 	if (start_str === '' && end_str !== '') {
 		// Suffix range: last N bytes.
 		const suffix = parseInt(end_str, 10);
-		if (!Number.isFinite(suffix) || suffix <= 0) return null;
+		if (!Number.isFinite(suffix) || suffix <= 0) return { kind: 'none' };
 		start = Math.max(0, size - suffix);
 		end = size - 1;
 	} else if (start_str !== '' && end_str === '') {
@@ -76,15 +78,15 @@ function parse_range(header, size) {
 		start = parseInt(start_str, 10);
 		end = parseInt(end_str, 10);
 	} else {
-		return null;
+		return { kind: 'none' };
 	}
 
-	if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
-	if (start > end) return null;
-	if (start >= size) return { unsatisfiable: true };
+	if (!Number.isFinite(start) || !Number.isFinite(end)) return { kind: 'none' };
+	if (start > end) return { kind: 'none' };
+	if (start >= size) return { kind: 'unsatisfiable' };
 	if (end >= size) end = size - 1;
 
-	return { start, end };
+	return { kind: 'ok', start, end };
 }
 
 /** @type {import('./$types').RequestHandler} */
@@ -159,7 +161,7 @@ export async function GET({ params, request, locals }) {
 
 		const range = parse_range(request.headers.get('range'), size);
 
-		if (range && 'unsatisfiable' in range) {
+		if (range.kind === 'unsatisfiable') {
 			return new Response(null, {
 				status: 416,
 				headers: {
@@ -169,7 +171,7 @@ export async function GET({ params, request, locals }) {
 			});
 		}
 
-		if (range) {
+		if (range.kind === 'ok') {
 			const length = range.end - range.start + 1;
 			const stream = create_asset_read_stream(site_id, asset_id, {
 				start: range.start,
