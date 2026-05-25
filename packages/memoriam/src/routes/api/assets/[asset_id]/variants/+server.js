@@ -3,21 +3,27 @@ import { VARIANT_WIDTHS_SET } from '$lib/config.js';
 import { asset_exists, write_variant } from '$lib/server/asset_storage.js';
 
 /** @type {import('./$types').RequestHandler} */
-export async function POST({ params, request }) {
+export async function POST({ params, request, locals }) {
+	if (!locals.is_admin) {
+		error(401, 'Authentication required');
+	}
+
+	const site_id = locals.site_id;
 	const { asset_id } = params;
 
-	// Validate the original asset exists on disk
-	if (!asset_exists(asset_id)) {
+	if (!asset_id || asset_id.includes('..') || asset_id.includes('/')) {
+		error(400, 'Invalid asset id');
+	}
+
+	if (!asset_exists(site_id, asset_id)) {
 		error(404, 'Asset not found');
 	}
 
-	// Validate content type
 	const content_type = (request.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
 	if (content_type !== 'image/webp') {
 		error(400, 'Variant must be image/webp');
 	}
 
-	// Validate variant width from header
 	const width_str = request.headers.get('x-variant-width');
 	if (!width_str) {
 		error(400, 'Missing X-Variant-Width header');
@@ -36,10 +42,10 @@ export async function POST({ params, request }) {
 		error(400, 'Empty request body');
 	}
 
-	// Stream the variant directly to disk
-	let bytes_written;
+	let bytes_written = 0;
 	try {
-		bytes_written = await write_variant(asset_id, width, request.body);
+		const result = await write_variant(site_id, asset_id, width, request.body);
+		bytes_written = result.bytes_written;
 	} catch (err) {
 		console.error('Failed to write variant to disk:', err);
 		error(500, 'Failed to store variant');

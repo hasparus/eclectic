@@ -13,7 +13,9 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",
 		"format": "prettier --write .",
-		"lint": "prettier --check . && eslint ."
+		"lint": "prettier --check . && eslint .",
+		"test": "vitest run",
+		"test:watch": "vitest"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^2.0.3",
@@ -35,10 +37,10 @@
 		"svelte-check": "^4.4.5",
 		"tailwindcss": "^4.2.2",
 		"typescript": "^5.9.3",
-		"vite": "^8.0.1"
+		"vite": "^8.0.1",
+		"vitest": "^3.0.0"
 	},
 	"dependencies": {
-
 		"@jsquash/webp": "^1.5.0",
 		"@sveltejs/adapter-node": "^5.5.4",
 		"nanoid": "^5.1.6",

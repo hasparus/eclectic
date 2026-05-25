@@ -2,7 +2,6 @@ import { getRequestEvent, query, command } from '$app/server';
 import * as v from 'valibot';
 import slugify from 'slugify';
 import crypto from 'node:crypto';
-import db from '$lib/server/db.js';
 import { document_schema } from '$lib/document_schema.js';
 import { collect_node_ids_in_order } from '$lib/document_graph.js';
 import {
@@ -17,8 +16,22 @@ import {
 	delete_session,
 	clear_admin_session_cookie,
 	set_admin_session_cookie,
-	require_admin_session
+	require_admin_session,
+	constant_time_equal
 } from '$lib/server/auth.js';
+
+/**
+ * Per-site database accessor. Always resolves to the database for the
+ * site that owns the current request (set by `hooks.server.js`). Helper
+ * functions in this file call `db()` instead of holding a closure-scoped
+ * reference, so the same code path works for any site without explicit
+ * site_id threading.
+ *
+ * @returns {import('node:sqlite').DatabaseSync}
+ */
+function db() {
+	return getRequestEvent().locals.db;
+}
 
 const admin_login_input_schema = v.object({
 	password: v.string()
@@ -199,7 +212,7 @@ function extract_document(document_id, node_ids, all_nodes) {
  */
 function get_doc_from_db(document_id) {
 	const doc_row = /** @type {DocumentRow | undefined} */ (
-		db.prepare('SELECT * FROM documents WHERE document_id = ?').get(document_id)
+		db().prepare('SELECT * FROM documents WHERE document_id = ?').get(document_id)
 	);
 
 	if (!doc_row) {
@@ -215,7 +228,7 @@ function get_doc_from_db(document_id) {
  */
 function get_optional_doc_from_db(document_id) {
 	const doc_row = /** @type {DocumentRow | undefined} */ (
-		db.prepare('SELECT * FROM documents WHERE document_id = ?').get(document_id)
+		db().prepare('SELECT * FROM documents WHERE document_id = ?').get(document_id)
 	);
 
 	if (!doc_row) return null;
@@ -227,7 +240,7 @@ function get_optional_doc_from_db(document_id) {
  */
 function get_home_page_id_from_db() {
 	const row = /** @type {{ value: string } | undefined } */ (
-		db.prepare('SELECT value FROM site_settings WHERE key = ?').get('home_page_id')
+		db().prepare('SELECT value FROM site_settings WHERE key = ?').get('home_page_id')
 	);
 
 	return row?.value ?? null;
@@ -249,7 +262,7 @@ function is_home_page_document_id(document_id) {
  */
 function get_active_slug_for_document_id(document_id) {
 	const row = /** @type {{ slug: string } | undefined } */ (
-		db.prepare('SELECT slug FROM document_slugs WHERE document_id = ? AND is_active = 1').get(
+		db().prepare('SELECT slug FROM document_slugs WHERE document_id = ? AND is_active = 1').get(
 			document_id
 		)
 	);
@@ -263,7 +276,7 @@ function get_active_slug_for_document_id(document_id) {
  */
 function resolve_slug(slug) {
 	const row = /** @type {{ document_id: string, is_active: number } | undefined } */ (
-		db.prepare('SELECT document_id, is_active FROM document_slugs WHERE slug = ?').get(slug)
+		db().prepare('SELECT document_id, is_active FROM document_slugs WHERE slug = ?').get(slug)
 	);
 
 	if (!row) return null;
@@ -285,7 +298,7 @@ function resolve_slug(slug) {
  */
 function list_page_documents() {
 	const rows = /** @type {DocumentRow[]} */ (
-		db.prepare('SELECT * FROM documents WHERE type = ? ORDER BY document_id').all('page')
+		db().prepare('SELECT * FROM documents WHERE type = ? ORDER BY document_id').all('page')
 	);
 
 	return rows.map((row) => {
@@ -314,7 +327,7 @@ function create_slug_candidate(title, document_id) {
  * @returns {string}
  */
 function create_unique_slug(base_slug) {
-	const slug_exists_stmt = db.prepare(
+	const slug_exists_stmt = db().prepare(
 		'SELECT document_id FROM document_slugs WHERE slug = ?'
 	);
 
@@ -533,7 +546,7 @@ function summarize_page_document(page_doc) {
  */
 function get_outgoing_refs(source_document_id) {
 	const rows = /** @type {Array<{ target_document_id: string }>} */ (
-		db.prepare(
+		db().prepare(
 			'SELECT target_document_id FROM document_refs WHERE source_document_id = ? ORDER BY ref_order, rowid'
 		).all(source_document_id)
 	);
@@ -820,12 +833,12 @@ export const login_admin = command(admin_login_input_schema, async ({ password }
 	const { cookies } = getRequestEvent();
 	const admin_password = get_required_admin_password();
 
-	if (password !== admin_password) {
+	if (!constant_time_equal(password, admin_password)) {
 		return create_auth_error_result('invalid_password', 'Incorrect admin password.');
 	}
 
 	const session_id = crypto.randomUUID();
-	db.prepare('INSERT INTO sessions (session_id, expires) VALUES (?, ?)').run(
+	db().prepare('INSERT INTO sessions (session_id, expires) VALUES (?, ?)').run(
 		session_id,
 		get_session_expires_at()
 	);
@@ -841,7 +854,7 @@ export const logout_admin = command(v.void(), async () => {
 	const session_id = cookies.get(admin_session_cookie_name);
 
 	if (session_id) {
-		await delete_session(session_id);
+		delete_session(db(), session_id);
 	}
 
 	clear_admin_session_cookie(cookies);
@@ -880,17 +893,17 @@ export const delete_page = command(delete_page_input_schema, async ({ document_i
 		throw new Error(`Document not found: ${document_id}`);
 	}
 
-	const delete_document = db.prepare('DELETE FROM documents WHERE document_id = ? AND type = ?');
-	const delete_asset_refs = db.prepare('DELETE FROM asset_refs WHERE document_id = ?');
-	const delete_outgoing_document_refs = db.prepare(
+	const delete_document = db().prepare('DELETE FROM documents WHERE document_id = ? AND type = ?');
+	const delete_asset_refs = db().prepare('DELETE FROM asset_refs WHERE document_id = ?');
+	const delete_outgoing_document_refs = db().prepare(
 		'DELETE FROM document_refs WHERE source_document_id = ?'
 	);
-	const delete_incoming_document_refs = db.prepare(
+	const delete_incoming_document_refs = db().prepare(
 		'DELETE FROM document_refs WHERE target_document_id = ?'
 	);
-	const delete_document_slugs = db.prepare('DELETE FROM document_slugs WHERE document_id = ?');
+	const delete_document_slugs = db().prepare('DELETE FROM document_slugs WHERE document_id = ?');
 
-	db.exec(sql`
+	db().exec(sql`
 		BEGIN IMMEDIATE
 	`);
 
@@ -901,11 +914,11 @@ export const delete_page = command(delete_page_input_schema, async ({ document_i
 		delete_document_slugs.run(document_id);
 		delete_document.run(document_id, 'page');
 
-		db.exec(sql`
+		db().exec(sql`
 			COMMIT
 		`);
 	} catch (err) {
-		db.exec(sql`
+		db().exec(sql`
 			ROLLBACK
 		`);
 		throw err;
@@ -932,7 +945,7 @@ export const get_internal_link_preview = query(v.string(), async (href) => {
 	}
 
 	const doc_row = /** @type {DocumentRow | undefined} */ (
-		db.prepare('SELECT type, data FROM documents WHERE document_id = ?').get(resolved.document_id)
+		db().prepare('SELECT type, data FROM documents WHERE document_id = ?').get(resolved.document_id)
 	);
 	if (!doc_row || doc_row.type !== 'page') {
 		return null;
@@ -1046,35 +1059,35 @@ export const save_document = command(save_document_input_schema, async (combined
 	const page_node_ids = collect_node_ids(combined_doc.document_id, all_nodes, exclude_roots);
 	const page_doc = extract_document(combined_doc.document_id, page_node_ids, all_nodes);
 
-	const upsert = db.prepare(
+	const upsert = db().prepare(
 		'INSERT INTO documents (document_id, type, data, created_at, updated_at) VALUES(?, ?, ?, ?, ?) ON CONFLICT(document_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at'
 	);
 
-	const delete_asset_refs = db.prepare('DELETE FROM asset_refs WHERE document_id = ?');
-	const insert_asset_ref = db.prepare(
+	const delete_asset_refs = db().prepare('DELETE FROM asset_refs WHERE document_id = ?');
+	const insert_asset_ref = db().prepare(
 		'INSERT OR IGNORE INTO asset_refs (asset_id, document_id) VALUES (?, ?)'
 	);
 
-	const delete_document_refs = db.prepare('DELETE FROM document_refs WHERE source_document_id = ?');
-	const insert_document_ref = db.prepare(
+	const delete_document_refs = db().prepare('DELETE FROM document_refs WHERE source_document_id = ?');
+	const insert_document_ref = db().prepare(
 		'INSERT OR REPLACE INTO document_refs (target_document_id, source_document_id, ref_order) VALUES (?, ?, ?)'
 	);
 
-	const delete_slug = db.prepare('DELETE FROM document_slugs WHERE slug = ?');
-	const deactivate_active_slug = db.prepare(
+	const delete_slug = db().prepare('DELETE FROM document_slugs WHERE slug = ?');
+	const deactivate_active_slug = db().prepare(
 		'UPDATE document_slugs SET is_active = 0 WHERE document_id = ? AND is_active = 1'
 	);
-	const insert_slug = db.prepare(
+	const insert_slug = db().prepare(
 		'INSERT INTO document_slugs (slug, document_id, is_active, created_at) VALUES (?, ?, ?, ?)'
 	);
 
-	db.exec(sql`
+	db().exec(sql`
 		BEGIN IMMEDIATE
 	`);
 
 	try {
 		const existing_page_row = /** @type {DocumentRow | undefined} */ (
-			db.prepare('SELECT created_at FROM documents WHERE document_id = ?').get(combined_doc.document_id)
+			db().prepare('SELECT created_at FROM documents WHERE document_id = ?').get(combined_doc.document_id)
 		);
 		const now_iso = new Date().toISOString();
 		const created_at = existing_page_row?.created_at ?? now_iso;
@@ -1097,7 +1110,7 @@ export const save_document = command(save_document_input_schema, async (combined
 		if (nav_root_id && nav_node_ids.size > 0) {
 			const nav_doc = extract_document(nav_root_id, nav_node_ids, all_nodes);
 			const existing_nav_row = /** @type {DocumentRow | undefined} */ (
-				db.prepare('SELECT created_at FROM documents WHERE document_id = ?').get(nav_root_id)
+				db().prepare('SELECT created_at FROM documents WHERE document_id = ?').get(nav_root_id)
 			);
 			const nav_created_at = existing_nav_row?.created_at ?? now_iso;
 			upsert.run(nav_root_id, 'nav', JSON.stringify(nav_doc), nav_created_at, now_iso);
@@ -1113,7 +1126,7 @@ export const save_document = command(save_document_input_schema, async (combined
 		if (footer_root_id && footer_node_ids.size > 0) {
 			const footer_doc = extract_document(footer_root_id, footer_node_ids, all_nodes);
 			const existing_footer_row = /** @type {DocumentRow | undefined} */ (
-				db.prepare('SELECT created_at FROM documents WHERE document_id = ?').get(footer_root_id)
+				db().prepare('SELECT created_at FROM documents WHERE document_id = ?').get(footer_root_id)
 			);
 			const footer_created_at = existing_footer_row?.created_at ?? now_iso;
 			upsert.run(footer_root_id, 'footer', JSON.stringify(footer_doc), footer_created_at, now_iso);
@@ -1146,11 +1159,11 @@ export const save_document = command(save_document_input_schema, async (combined
 			throw new Error(`Failed to persist page document: ${combined_doc.document_id}`);
 		}
 
-		db.exec(sql`
+		db().exec(sql`
 			COMMIT
 		`);
 	} catch (err) {
-		db.exec(sql`
+		db().exec(sql`
 			ROLLBACK
 		`);
 		throw err;
@@ -1201,7 +1214,7 @@ export const update_page_slug = command(update_page_slug_input_schema, async (in
 	}
 
 	const existing_slug = /** @type {{ document_id: string, is_active: number } | undefined} */ (
-		db.prepare('SELECT document_id, is_active FROM document_slugs WHERE slug = ?').get(normalized_slug)
+		db().prepare('SELECT document_id, is_active FROM document_slugs WHERE slug = ?').get(normalized_slug)
 	);
 
 	if (existing_slug && existing_slug.document_id !== input.document_id && existing_slug.is_active === 1) {
@@ -1211,15 +1224,15 @@ export const update_page_slug = command(update_page_slug_input_schema, async (in
 		);
 	}
 
-	const delete_slug = db.prepare('DELETE FROM document_slugs WHERE slug = ?');
-	const deactivate_active_slug = db.prepare(
+	const delete_slug = db().prepare('DELETE FROM document_slugs WHERE slug = ?');
+	const deactivate_active_slug = db().prepare(
 		'UPDATE document_slugs SET is_active = 0 WHERE document_id = ? AND is_active = 1'
 	);
-	const insert_slug = db.prepare(
+	const insert_slug = db().prepare(
 		'INSERT INTO document_slugs (slug, document_id, is_active, created_at) VALUES (?, ?, ?, ?)'
 	);
 
-	db.exec(sql`
+	db().exec(sql`
 		BEGIN IMMEDIATE
 	`);
 
@@ -1246,18 +1259,18 @@ export const update_page_slug = command(update_page_slug_input_schema, async (in
 		}
 
 		const page_rows = /** @type {DocumentRow[]} */ (
-			db.prepare('SELECT * FROM documents WHERE type IN (?, ?, ?) ORDER BY document_id').all(
+			db().prepare('SELECT * FROM documents WHERE type IN (?, ?, ?) ORDER BY document_id').all(
 				'page',
 				'nav',
 				'footer'
 			)
 		);
 
-		const upsert = db.prepare(
+		const upsert = db().prepare(
 			'INSERT INTO documents (document_id, type, data, created_at, updated_at) VALUES(?, ?, ?, ?, ?) ON CONFLICT(document_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at'
 		);
-		const delete_document_refs = db.prepare('DELETE FROM document_refs WHERE source_document_id = ?');
-		const insert_document_ref = db.prepare(
+		const delete_document_refs = db().prepare('DELETE FROM document_refs WHERE source_document_id = ?');
+		const insert_document_ref = db().prepare(
 			'INSERT OR REPLACE INTO document_refs (target_document_id, source_document_id, ref_order) VALUES (?, ?, ?)'
 		);
 
@@ -1284,11 +1297,11 @@ export const update_page_slug = command(update_page_slug_input_schema, async (in
 			);
 		}
 
-		db.exec(sql`
+		db().exec(sql`
 			COMMIT
 		`);
 	} catch (err) {
-		db.exec(sql`
+		db().exec(sql`
 			ROLLBACK
 		`);
 		throw err;

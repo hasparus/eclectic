@@ -1,14 +1,22 @@
 import migrations from './migrations.js';
-import db from './db.js';
 
-function sleep_sync(ms) {
-	const start = Date.now();
-	while (Date.now() - start < ms) {
-		// Blocking loop
-	}
+/**
+ * Pad the ISO timestamp with a monotonic index so ORDER BY timestamp
+ * preserves migration order even when migrations apply within the same
+ * millisecond.
+ *
+ * @param {string} base_iso
+ * @param {number} index
+ * @returns {string}
+ */
+function timestamp_with_index(base_iso, index) {
+	return `${base_iso}.${String(index).padStart(4, '0')}`;
 }
 
-export default function migrate() {
+/**
+ * @param {import('node:sqlite').DatabaseSync} db
+ */
+export default function migrate(db) {
 	// Invariants
 	const migration_names = migrations.map((migration) => migration.name);
 	if (new Set(migration_names).size !== migration_names.length) {
@@ -61,7 +69,8 @@ export default function migrate() {
 	db.exec('BEGIN TRANSACTION');
 
 	try {
-		for (const migration of remaining_migrations) {
+		const run_at_iso = new Date().toISOString();
+		for (const [index, migration] of remaining_migrations.entries()) {
 			const migration_name = migration.name;
 			if (!migration_name) throw new Error('Migration name (e.g. add_name_to_user) is required.');
 
@@ -74,9 +83,7 @@ export default function migrate() {
 				INSERT INTO _migrations (id, timestamp)
 				VALUES (?, ?)
 			`
-			).run(migration_name, new Date().toISOString());
-
-			sleep_sync(100); // this makes sure we don't end up with the same timestamp for multiple migrations (if they run too fast)
+			).run(migration_name, timestamp_with_index(run_at_iso, index));
 		}
 		db.exec('COMMIT');
 	} catch (error) {
