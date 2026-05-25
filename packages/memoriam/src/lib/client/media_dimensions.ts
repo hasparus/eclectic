@@ -1,36 +1,35 @@
+export interface MediaDimensions {
+	width: number;
+	height: number;
+}
+
 /**
- * Extract image dimensions using an <img> element.
- *
- * @param {Blob} blob
- * @returns {Promise<{ width: number, height: number }>}
+ * Extract image dimensions using an `<img>` element.
  */
-function get_image_dimensions(blob) {
+function getImageDimensions(blob: Blob): Promise<MediaDimensions> {
 	return new Promise((resolve, reject) => {
 		const img = new Image();
-		const object_url = URL.createObjectURL(blob);
+		const objectUrl = URL.createObjectURL(blob);
 
 		img.onload = () => {
-			URL.revokeObjectURL(object_url);
+			URL.revokeObjectURL(objectUrl);
 			resolve({ width: img.naturalWidth || img.width, height: img.naturalHeight || img.height });
 		};
 
 		img.onerror = () => {
-			URL.revokeObjectURL(object_url);
+			URL.revokeObjectURL(objectUrl);
 			reject(new Error('Failed to load image'));
 		};
 
-		img.src = object_url;
+		img.src = objectUrl;
 	});
 }
 
 /**
  * Extract dimensions from an SVG by parsing the viewBox attribute.
- * Falls back to get_image_dimensions if no viewBox is found.
- *
- * @param {Blob} blob
- * @returns {Promise<{ width: number, height: number }>}
+ * Falls back to getImageDimensions if no viewBox is found.
  */
-async function get_svg_dimensions(blob) {
+async function getSvgDimensions(blob: Blob): Promise<MediaDimensions> {
 	try {
 		const text = await blob.text();
 		const match = text.match(/viewBox=["']([^"']+)["']/);
@@ -47,43 +46,37 @@ async function get_svg_dimensions(blob) {
 	} catch {
 		// Fall through to img-based extraction
 	}
-	return get_image_dimensions(blob);
+	return getImageDimensions(blob);
 }
 
 /**
- * Extract video dimensions using a temporary <video> element.
- *
- * @param {Blob} blob
- * @returns {Promise<{ width: number, height: number }>}
+ * Extract video dimensions using a temporary `<video>` element.
  */
-export function get_video_dimensions(blob) {
+export function getVideoDimensions(blob: Blob): Promise<MediaDimensions> {
 	return new Promise((resolve, reject) => {
 		const video = document.createElement('video');
 		video.preload = 'metadata';
-		const object_url = URL.createObjectURL(blob);
+		const objectUrl = URL.createObjectURL(blob);
 
 		video.onloadedmetadata = () => {
-			URL.revokeObjectURL(object_url);
+			URL.revokeObjectURL(objectUrl);
 			resolve({ width: video.videoWidth, height: video.videoHeight });
 		};
 
 		video.onerror = () => {
-			URL.revokeObjectURL(object_url);
+			URL.revokeObjectURL(objectUrl);
 			reject(new Error('Failed to load video metadata'));
 		};
 
-		video.src = object_url;
+		video.src = objectUrl;
 	});
 }
 
 /**
  * Extract dimensions from a media file (image or video).
- *
- * @param {File} file
- * @returns {Promise<{ width: number, height: number }>}
  */
-export function get_media_dimensions(file) {
-	if (file.type.startsWith('video/')) return get_video_dimensions(file);
-	if (file.type === 'image/svg+xml') return get_svg_dimensions(file);
-	return get_image_dimensions(file);
+export function getMediaDimensions(file: File): Promise<MediaDimensions> {
+	if (file.type.startsWith('video/')) return getVideoDimensions(file);
+	if (file.type === 'image/svg+xml') return getSvgDimensions(file);
+	return getImageDimensions(file);
 }

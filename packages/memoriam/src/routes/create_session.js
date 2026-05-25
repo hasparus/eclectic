@@ -53,10 +53,10 @@ import Highlight from './components/Highlight.svelte';
 import Link from './components/Link.svelte';
 
 import { documentSchema } from '$lib/document_schema.js';
-import { start_processing } from '$lib/client/asset_upload.js';
+import { startProcessing } from '$lib/client/asset_upload.js';
 import { MEDIA_DEFAULTS } from '$lib/config.js';
 import { set_properties } from 'svedit';
-import { get_media_dimensions } from '$lib/client/media_dimensions.js';
+import { getMediaDimensions } from '$lib/client/media_dimensions.js';
 
 /** @returns {'image' | 'video'} */
 function get_media_type(file) {
@@ -78,7 +78,7 @@ async function replace_media(session, path, file, blob_url) {
 	if (node.type !== 'image' && node.type !== 'video') return;
 
 	const media_type = get_media_type(file);
-	const dims = await get_media_dimensions(file);
+	const dims = await getMediaDimensions(file);
 
 	// HACK: Make sure we have a proper before selection
 	// Needed because of the focus steal in Toolbar.
@@ -114,7 +114,7 @@ async function replace_media(session, path, file, blob_url) {
 	// Set selection on the transaction so undo/redo restores it correctly
 	tr.selection = { type: 'property', path };
 	session.apply(tr);
-	start_processing(blob_url, file);
+	startProcessing(blob_url, file);
 }
 
 // App-specific config object, always available via session.config for introspection
@@ -187,7 +187,7 @@ const session_config = {
 				const blob_url = pasted_item.data_url;
 				const media_type = get_media_type(pasted_item.blob);
 
-				const dims = await get_media_dimensions(pasted_item.blob);
+				const dims = await getMediaDimensions(pasted_item.blob);
 				const width = dims.width;
 				const height = dims.height;
 
@@ -209,7 +209,7 @@ const session_config = {
 				pasted_json.main_nodes.push('node_' + i);
 
 				// Start background processing (hash + resize/encode)
-				start_processing(blob_url, pasted_item.blob);
+				startProcessing(blob_url, pasted_item.blob);
 			}
 			return pasted_json;
 		}

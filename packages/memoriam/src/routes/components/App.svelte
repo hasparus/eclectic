@@ -298,13 +298,13 @@
 			/** @type {any} */
 			const get_document = api_module.get_document;
 			const {
-				collect_blob_urls,
-				wait_for_processing,
-				has_pending_processing,
-				ensure_processing,
-				upload_pending,
-				replace_blob_urls,
-				cleanup_pending
+				collectBlobUrls,
+				waitForProcessing,
+				hasPendingProcessing,
+				ensureProcessing,
+				uploadPending,
+				replaceBlobUrls,
+				cleanupPending
 			} = asset_upload_module;
 
 			save_progress_visible = true;
@@ -314,25 +314,25 @@
 			try {
 				let mapping = null;
 				const pre_check = session.to_json();
-				const blob_urls = collect_blob_urls(pre_check.nodes);
+				const blob_urls = collectBlobUrls(pre_check.nodes);
 
 				if (blob_urls.length > 0) {
 					const total = blob_urls.length;
 
-					await ensure_processing(blob_urls);
+					await ensureProcessing(blob_urls);
 
-					if (has_pending_processing()) {
+					if (hasPendingProcessing()) {
 						save_progress_message =
 							total === 1 ? 'Processing image…' : `Processing ${total} images…`;
 
-						await wait_for_processing(({ done, total: processing_total }) => {
+						await waitForProcessing(({ done, total: processing_total }) => {
 							if (processing_total > 1) {
 								save_progress_message = `Processing image ${done + 1}/${processing_total}…`;
 							}
 						});
 					}
 
-					mapping = await upload_pending(blob_urls, ({ phase, index, total: upload_total }) => {
+					mapping = await uploadPending(blob_urls, ({ phase, index, total: upload_total }) => {
 						if (phase === 'uploading') {
 							save_progress_message = `Uploading image ${index}/${upload_total}…`;
 						}
@@ -343,7 +343,7 @@
 
 				const doc_json = session.to_json();
 				if (mapping) {
-					replace_blob_urls(doc_json.nodes, mapping);
+					replaceBlobUrls(doc_json.nodes, mapping);
 				}
 
 				/** @type {{ ok: boolean, document_id?: string, slug?: string, created?: boolean }} */
@@ -364,7 +364,7 @@
 						}
 					}
 					session.apply(tr);
-					cleanup_pending(mapping);
+					cleanupPending(mapping);
 				}
 
 				session.selection = null;

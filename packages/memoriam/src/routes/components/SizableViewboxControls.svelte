@@ -1,6 +1,6 @@
 <script>
 	import { getContext } from 'svelte';
-	import { touch_drag, lock_cursor, unlock_cursor } from '$lib/client/touch_drag.js';
+	import { touchDrag, lockCursor, unlockCursor } from '$lib/client/touchDrag.js';
 	import { SNAP_ASPECT_RATIOS } from '$lib/config.js';
 
 	const svedit = getContext('svedit');
@@ -206,7 +206,7 @@
 		}
 
 		snap_label = null;
-		lock_cursor(CURSOR_FOR_TYPE[drag_type]);
+		lockCursor(CURSOR_FOR_TYPE[drag_type]);
 	}
 
 	function capture_height_state() {
@@ -218,7 +218,7 @@
 		drag_start_max_width = rect?.width ?? 400;
 
 		snap_label = null;
-		lock_cursor(CURSOR_FOR_TYPE[drag_type]);
+		lockCursor(CURSOR_FOR_TYPE[drag_type]);
 	}
 
 	function capture_corner_state() {
@@ -248,7 +248,7 @@
 		}
 
 		snap_label = null;
-		lock_cursor(CURSOR_FOR_TYPE[drag_type]);
+		lockCursor(CURSOR_FOR_TYPE[drag_type]);
 	}
 
 	function handle_move(client_x, client_y) {
@@ -359,39 +359,39 @@
 
 		drag_type = null;
 		snap_label = null;
-		unlock_cursor();
+		unlockCursor();
 	}
 
 	// --- One attachment per handle ---
 
-	const drag_right = touch_drag({
-		on_down(client_x, client_y) {
+	const drag_right = touchDrag({
+		onDown(client_x, client_y) {
 			drag_start_x = client_x;
 			drag_start_y = client_y;
 			capture_width_state('width-right');
 		},
-		on_move: handle_move,
-		on_up: handle_up,
+		onMove: handle_move,
+		onUp: handle_up,
 	});
 
-	const drag_bottom = touch_drag({
-		on_down(client_x, client_y) {
+	const drag_bottom = touchDrag({
+		onDown(client_x, client_y) {
 			drag_start_x = client_x;
 			drag_start_y = client_y;
 			capture_height_state();
 		},
-		on_move: handle_move,
-		on_up: handle_up,
+		onMove: handle_move,
+		onUp: handle_up,
 	});
 
-	const drag_corner = touch_drag({
-		on_down(client_x, client_y) {
+	const drag_corner = touchDrag({
+		onDown(client_x, client_y) {
 			drag_start_x = client_x;
 			drag_start_y = client_y;
 			capture_corner_state();
 		},
-		on_move: handle_move,
-		on_up: handle_up,
+		onMove: handle_move,
+		onUp: handle_up,
 	});
 
 	function handle_width_dblclick(e) {
@@ -480,7 +480,7 @@
 		opacity: 1;
 	}
 
-	/* Toggled by the touch_drag attachment via classList */
+	/* Toggled by the touchDrag attachment via classList */
 	.handle:global(.dragging) {
 		user-select: none;
 	}

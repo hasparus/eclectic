@@ -1,25 +1,28 @@
-import { process_asset } from './process_asset.js';
+import { processAsset } from './process_asset.js';
 import { MAX_IMAGE_WIDTH } from '$lib/config.js';
-import { get_video_dimensions, get_media_dimensions } from './media_dimensions.js';
+import { getVideoDimensions, getMediaDimensions } from './media_dimensions.js';
+
+interface PendingAsset {
+	hash: string;
+	asset_id: string;
+	original: { blob: Blob; width: number; height: number };
+	variants: Array<{ width: number; blob: Blob }>;
+	status: 'processing' | 'ready' | 'error';
+	error: string | null;
+}
+
+export interface UploadedAsset {
+	asset_id: string;
+	width: number;
+	height: number;
+}
 
 /**
- * @typedef {{
- *   hash: string,
- *   asset_id: string,
- *   original: { blob: Blob, width: number, height: number },
- *   variants: Array<{ width: number, blob: Blob }>,
- *   status: 'processing' | 'ready' | 'error',
- *   error: string | null
- * }} PendingAsset
+ * Map of blob URL → PendingAsset. Populated when images are
+ * pasted/dropped, consulted during the save flow to upload and
+ * replace blob URLs.
  */
-
-/**
- * Map of blob URL → PendingAsset. Populated when images are pasted/dropped,
- * consulted during the save flow to upload and replace blob URLs.
- *
- * @type {Map<string, PendingAsset>}
- */
-const pending_assets = new Map();
+const pendingAssets = new Map<string, PendingAsset>();
 
 /**
  * Compute SHA-256 hex hash of a Blob.
@@ -27,11 +30,11 @@ const pending_assets = new Map();
  * @param {Blob} blob
  * @returns {Promise<string>}
  */
-async function hash_blob(blob) {
+async function hashBlob( blob: Blob) {
 	const buffer = await blob.arrayBuffer();
-	const hash_buffer = await crypto.subtle.digest('SHA-256', buffer);
-	const hash_array = Array.from(new Uint8Array(hash_buffer));
-	return hash_array.map((b) => b.toString(16).padStart(2, '0')).join('');
+	const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+	const hashArray = Array.from(new Uint8Array(hashBuffer));
+	return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**
@@ -40,7 +43,7 @@ async function hash_blob(blob) {
  * @param {File} file
  * @returns {Promise<boolean>}
  */
-async function is_animated_gif(file) {
+async function isAnimatedGif( file: File) {
 	if (file.type !== 'image/gif') return false;
 	const buffer = await file.arrayBuffer();
 	const bytes = new Uint8Array(buffer);
@@ -61,7 +64,7 @@ async function is_animated_gif(file) {
  * @param {boolean} animated
  * @returns {string}
  */
-function get_stored_extension(file, animated) {
+function getStoredExtension( file: File, animated: boolean) {
 	if (file.type === 'image/svg+xml') return 'svg';
 	if (file.type === 'image/gif' && animated) return 'gif';
 	// All other raster images get converted to WebP
@@ -74,7 +77,7 @@ function get_stored_extension(file, animated) {
  * @param {File} file
  * @returns {boolean}
  */
-function is_video(file) {
+function isVideo( file: File) {
 	return file.type.startsWith('video/');
 }
 
@@ -84,22 +87,21 @@ function is_video(file) {
  * @param {File} file
  * @returns {string}
  */
-function get_video_extension(file) {
+function getVideoExtension( file: File) {
 	if (file.type === 'video/webm') return 'webm';
 	return 'mp4';
 }
 
 /**
  * Start background processing for a pasted/dropped media file.
- * Call this from handle_media_paste. The blob_url is used as the key
+ * Call this from handle_media_paste. The blobUrl is used as the key
  * to look up the processing result during the save flow.
  *
- * @param {string} blob_url - The blob: URL set as the image node's src
+ * @param {string} blobUrl - The blob: URL set as the image node's src
  * @param {File} file - The original source file
  */
-export async function start_processing(blob_url, file) {
-	/** @type {PendingAsset} */
-	const entry = {
+export async function startProcessing(blobUrl: string, file: File): Promise<void> {
+	const entry: PendingAsset = {
 		hash: '',
 		asset_id: '',
 		original: { blob: file, width: 0, height: 0 },
@@ -107,15 +109,15 @@ export async function start_processing(blob_url, file) {
 		status: 'processing',
 		error: null
 	};
-	pending_assets.set(blob_url, entry);
+	pendingAssets.set(blobUrl, entry);
 
-	if (is_video(file)) {
+	if (isVideo(file)) {
 		try {
 			const [hash, dims] = await Promise.all([
-				hash_blob(file),
-				get_video_dimensions(file)
+				hashBlob(file),
+				getVideoDimensions(file)
 			]);
-			const ext = get_video_extension(file);
+			const ext = getVideoExtension(file);
 			entry.hash = hash;
 			entry.asset_id = `${hash}.${ext}`;
 			entry.original = { blob: file, width: dims.width, height: dims.height };
@@ -124,7 +126,7 @@ export async function start_processing(blob_url, file) {
 		} catch (err) {
 			entry.status = 'error';
 			entry.error = err instanceof Error ? err.message : 'Video processing failed';
-			console.error(`Video processing failed for ${blob_url}:`, err);
+			console.error(`Video processing failed for ${blobUrl}:`, err);
 		}
 		return;
 	}
@@ -132,21 +134,21 @@ export async function start_processing(blob_url, file) {
 	try {
 		// Hash and type detection run concurrently with processing
 		const is_svg = file.type === 'image/svg+xml';
-		const animated = await is_animated_gif(file);
-		const ext = get_stored_extension(file, animated);
-		const hash = await hash_blob(file);
+		const animated = await isAnimatedGif(file);
+		const ext = getStoredExtension(file, animated);
+		const hash = await hashBlob(file);
 
 		entry.hash = hash;
 		entry.asset_id = `${hash}.${ext}`;
 
 		if (is_svg || animated) {
 			// Passthrough — no WASM processing
-			const dims = await get_media_dimensions(file);
+			const dims = await getMediaDimensions(file);
 			entry.original = { blob: file, width: dims.width, height: dims.height };
 			entry.variants = [];
 		} else {
 			// Static raster image — process via WASM worker
-			const result = await process_asset(file);
+			const result = await processAsset(file);
 			entry.original = result.original;
 			entry.variants = result.variants;
 		}
@@ -155,7 +157,7 @@ export async function start_processing(blob_url, file) {
 	} catch (err) {
 		entry.status = 'error';
 		entry.error = err instanceof Error ? err.message : 'Processing failed';
-		console.error(`Asset processing failed for ${blob_url}:`, err);
+		console.error(`Asset processing failed for ${blobUrl}:`, err);
 	}
 }
 
@@ -164,8 +166,8 @@ export async function start_processing(blob_url, file) {
  *
  * @returns {boolean}
  */
-export function has_pending_processing() {
-	for (const entry of pending_assets.values()) {
+export function hasPendingProcessing() {
+	for (const entry of pendingAssets.values()) {
 		if (entry.status === 'processing') return true;
 	}
 	return false;
@@ -179,19 +181,19 @@ export function has_pending_processing() {
 /**
  * Wait until all pending assets have finished processing.
  *
- * @param {ProcessingProgressCallback} [on_progress] - optional progress callback
+ * @param {ProcessingProgressCallback} [onProgress] - optional progress callback
  * @returns {Promise<void>}
  */
-export async function wait_for_processing(on_progress) {
-	while (has_pending_processing()) {
-		if (on_progress) {
+export async function waitForProcessing( onProgress: ((progress: any) => void) | undefined) {
+	while (hasPendingProcessing()) {
+		if (onProgress) {
 			let done = 0;
 			let total = 0;
-			for (const entry of pending_assets.values()) {
+			for (const entry of pendingAssets.values()) {
 				total++;
 				if (entry.status !== 'processing') done++;
 			}
-			on_progress({ done, total });
+			onProgress({ done, total });
 		}
 		await new Promise((resolve) => setTimeout(resolve, 100));
 	}
@@ -203,16 +205,21 @@ export async function wait_for_processing(on_progress) {
  * @param {string} url
  * @param {Blob} blob
  * @param {Record<string, string>} headers
- * @param {(progress: number) => void} [on_progress]
+ * @param {(progress: number) => void} [onProgress]
  * @returns {Promise<any>}
  */
-function upload_blob(url, blob, headers, on_progress) {
+function uploadBlob(
+	url: string,
+	blob: Blob,
+	headers: Record<string, string>,
+	onProgress?: (progress: number) => void
+): Promise<any> {
 	return new Promise((resolve, reject) => {
 		const xhr = new XMLHttpRequest();
-		if (on_progress) {
+		if (onProgress) {
 			xhr.upload.addEventListener('progress', (e) => {
 				if (e.lengthComputable) {
-					on_progress(Math.round((e.loaded / e.total) * 100));
+					onProgress(Math.round((e.loaded / e.total) * 100));
 				}
 			});
 		}
@@ -245,8 +252,8 @@ function upload_blob(url, blob, headers, on_progress) {
  * @param {PendingAsset} entry
  * @returns {Promise<{ asset_id: string, width: number, height: number }>}
  */
-async function upload_asset(entry) {
-	const content_type = entry.asset_id.endsWith('.svg')
+async function uploadAsset( entry: PendingAsset) {
+	const contentType = entry.asset_id.endsWith('.svg')
 		? 'image/svg+xml'
 		: entry.asset_id.endsWith('.gif')
 			? 'image/gif'
@@ -257,8 +264,8 @@ async function upload_asset(entry) {
 					: 'image/webp';
 
 	// Upload original
-	const result = await upload_blob('/api/assets', entry.original.blob, {
-		'Content-Type': content_type,
+	const result = await uploadBlob('/api/assets', entry.original.blob, {
+		'Content-Type': contentType,
 		'X-Content-Hash': entry.hash,
 		'X-Asset-Width': String(entry.original.width),
 		'X-Asset-Height': String(entry.original.height)
@@ -273,7 +280,7 @@ async function upload_asset(entry) {
 	for (let i = 0; i < entry.variants.length; i++) {
 		const variant = entry.variants[i];
 		try {
-			await upload_blob(`/api/assets/${result.asset_id}/variants`, variant.blob, {
+			await uploadBlob(`/api/assets/${result.asset_id}/variants`, variant.blob, {
 				'Content-Type': 'image/webp',
 				'X-Variant-Width': String(variant.width)
 			});
@@ -299,20 +306,20 @@ async function upload_asset(entry) {
  * Only uploads entries whose blob URL appears in the provided list.
  * Throws on the first failure (after cleaning up the failed asset).
  *
- * @param {string[]} blob_urls - blob URLs currently in the document's image nodes
- * @param {UploadProgressCallback} [on_progress] - optional progress callback
+ * @param {string[]} blobUrls - blob URLs currently in the document's image nodes
+ * @param {UploadProgressCallback} [onProgress] - optional progress callback
  * @returns {Promise<Map<string, { asset_id: string, width: number, height: number }>>}
  */
-export async function upload_pending(blob_urls, on_progress) {
+export async function uploadPending( blobUrls: string[], onProgress: ((progress: any) => void) | undefined) {
 	/** @type {Map<string, { asset_id: string, width: number, height: number }>} */
 	const mapping = new Map();
-	const total = blob_urls.length;
+	const total = blobUrls.length;
 
-	for (let i = 0; i < blob_urls.length; i++) {
-		const blob_url = blob_urls[i];
-		const entry = pending_assets.get(blob_url);
+	for (let i = 0; i < blobUrls.length; i++) {
+		const blobUrl = blobUrls[i];
+		const entry = pendingAssets.get(blobUrl);
 		if (!entry) {
-			throw new Error(`No pending asset found for ${blob_url}`);
+			throw new Error(`No pending asset found for ${blobUrl}`);
 		}
 		if (entry.status === 'error') {
 			throw new Error(`Asset processing failed: ${entry.error}`);
@@ -321,12 +328,12 @@ export async function upload_pending(blob_urls, on_progress) {
 			throw new Error('Some assets are still processing');
 		}
 
-		if (on_progress) {
-			on_progress({ phase: 'uploading', index: i + 1, total });
+		if (onProgress) {
+			onProgress({ phase: 'uploading', index: i + 1, total });
 		}
 
-		const result = await upload_asset(entry);
-		mapping.set(blob_url, result);
+		const result = await uploadAsset(entry);
+		mapping.set(blobUrl, result);
 	}
 
 	return mapping;
@@ -339,7 +346,7 @@ export async function upload_pending(blob_urls, on_progress) {
  * @param {Record<string, any>} nodes - The document's nodes map (mutated in place)
  * @param {Map<string, { asset_id: string, width: number, height: number }>} mapping
  */
-export function replace_blob_urls(nodes, mapping) {
+export function replaceBlobUrls( nodes: Record<string, any>, mapping: Map<string, { asset_id: string, width: number, height: number }>) {
 	for (const node of Object.values(nodes)) {
 		if ((node.type === 'image' || node.type === 'video') && typeof node.src === 'string' && node.src.startsWith('blob:')) {
 			const entry = mapping.get(node.src);
@@ -358,25 +365,25 @@ export function replace_blob_urls(nodes, mapping) {
  * that were cleaned up after a previous save), re-fetch the blob and
  * restart processing.
  *
- * @param {string[]} blob_urls - blob URLs currently in the document's image nodes
+ * @param {string[]} blobUrls - blob URLs currently in the document's image nodes
  * @returns {Promise<void>}
  */
-export async function ensure_processing(blob_urls) {
-	for (const blob_url of blob_urls) {
-		if (pending_assets.has(blob_url)) continue;
+export async function ensureProcessing( blobUrls: string[]) {
+	for (const blobUrl of blobUrls) {
+		if (pendingAssets.has(blobUrl)) continue;
 
 		// Re-fetch the blob from the still-valid blob URL
 		try {
-			const response = await fetch(blob_url);
+			const response = await fetch(blobUrl);
 			const blob = await response.blob();
-			const fallback_type = blob.type || 'image/png';
-			const fallback_name = fallback_type.startsWith('video/') ? 'pasted-video' : 'pasted-image';
-			const file = new File([blob], fallback_name, { type: fallback_type });
-			start_processing(blob_url, file);
+			const fallbackType = blob.type || 'image/png';
+			const fallbackName = fallbackType.startsWith('video/') ? 'pasted-video' : 'pasted-image';
+			const file = new File([blob], fallbackName, { type: fallbackType });
+			startProcessing(blobUrl, file);
 		} catch (err) {
-			console.error(`Failed to re-process asset for ${blob_url}:`, err);
-			// Create a failed entry so upload_pending will report the error
-			pending_assets.set(blob_url, {
+			console.error(`Failed to re-process asset for ${blobUrl}:`, err);
+			// Create a failed entry so uploadPending will report the error
+			pendingAssets.set(blobUrl, {
 				hash: '',
 				asset_id: '',
 				original: { blob: new Blob(), width: 0, height: 0 },
@@ -394,14 +401,14 @@ export async function ensure_processing(blob_urls) {
  * @param {Record<string, any>} nodes
  * @returns {string[]}
  */
-export function collect_blob_urls(nodes) {
-	const blob_urls = [];
+export function collectBlobUrls( nodes: Record<string, any>) {
+	const blobUrls = [];
 	for (const node of Object.values(nodes)) {
 		if ((node.type === 'image' || node.type === 'video') && typeof node.src === 'string' && node.src.startsWith('blob:')) {
-			blob_urls.push(node.src);
+			blobUrls.push(node.src);
 		}
 	}
-	return blob_urls;
+	return blobUrls;
 }
 
 /**
@@ -410,8 +417,8 @@ export function collect_blob_urls(nodes) {
  *
  * @param {Map<string, { asset_id: string, width: number, height: number }>} mapping
  */
-export function cleanup_pending(mapping) {
-	for (const blob_url of mapping.keys()) {
-		pending_assets.delete(blob_url);
+export function cleanupPending( mapping: Map<string, { asset_id: string, width: number, height: number }>) {
+	for (const blobUrl of mapping.keys()) {
+		pendingAssets.delete(blobUrl);
 	}
 }

@@ -1,6 +1,6 @@
 <script>
 	import { getContext } from 'svelte';
-	import { touch_drag } from '$lib/client/touch_drag.js';
+	import { touchDrag } from '$lib/client/touchDrag.js';
 
 	const svedit = getContext('svedit');
 
@@ -115,13 +115,13 @@
 		svedit.session.apply(tr, { batch: true });
 	}
 
-	const pan_drag = touch_drag({
-		should_start: () => can_pan,
-		on_down(client_x, client_y) {
+	const pan_drag = touchDrag({
+		shouldStart: () => can_pan,
+		onDown(client_x, client_y) {
 			last_x = client_x;
 			last_y = client_y;
 		},
-		on_move(client_x, client_y) {
+		onMove(client_x, client_y) {
 			if (!can_pan) return;
 			apply_pan_delta(client_x, client_y);
 		}
