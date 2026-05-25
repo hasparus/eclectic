@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	/**
 	 * Reusable bottom drawer / bottom sheet backed by a dialog element so it
 	 * participates in the browser top layer when open.
@@ -9,12 +9,20 @@
 	 * - Optional `label` customizes the panel label
 	 */
 
+	import type { Snippet } from 'svelte';
+
+	interface Props {
+		open?: boolean;
+		label?: string;
+		drawer_height_mode?: 'manual' | 'auto';
+		children?: Snippet<[{ close: () => void }]>;
+	}
 	let {
 		open = $bindable(),
 		label = 'Pages',
 		drawer_height_mode = 'manual',
 		children
-	} = $props();
+	}: Props = $props();
 
 	const min_drawer_height_ratio = 0;
 	const max_drawer_height_ratio = 0.95;
@@ -23,8 +31,8 @@
 	const velocity_threshold = 0.5;
 	const auto_close_drag_distance = 96;
 
-	let dialog_ref = $state();
-	let handle_ref = $state();
+	let dialog_ref = $state<HTMLDialogElement | undefined>();
+	let handle_ref = $state<HTMLDivElement | undefined>();
 
 	let is_visible = $state(open);
 	let is_mounted = $state(false);
@@ -41,11 +49,11 @@
 	let last_pointer_time = $state(0);
 	let drag_velocity = $state(0);
 
-	function clamp_drawer_height_ratio(value) {
+	function clamp_drawer_height_ratio(value: number) {
 		return Math.min(Math.max(value, min_drawer_height_ratio), max_drawer_height_ratio);
 	}
 
-	function get_nearest_snap_drawer_height_ratio(value) {
+	function get_nearest_snap_drawer_height_ratio(value: number) {
 		let nearest_ratio = snap_drawer_height_ratios[0];
 		let nearest_distance = Math.abs(value - nearest_ratio);
 
@@ -60,7 +68,7 @@
 		return nearest_ratio;
 	}
 
-	function get_snap_drawer_height_ratio(value, velocity) {
+	function get_snap_drawer_height_ratio(value: number, velocity: number) {
 		if (Math.abs(velocity) > velocity_threshold) {
 			if (velocity > 0) {
 				return snap_drawer_height_ratios.find((ratio) => ratio < value) ?? 0;
@@ -82,18 +90,18 @@
 		is_mounted = false;
 	}
 
-	function handle_dialog_cancel(event) {
+	function handle_dialog_cancel(event: Event) {
 		event.preventDefault();
 		close();
 	}
 
-	function handle_backdrop_click(event) {
+	function handle_backdrop_click(event: MouseEvent) {
 		if (event.target === dialog_ref) {
 			close();
 		}
 	}
 
-	function handle_handle_pointerdown(event) {
+	function handle_handle_pointerdown(event: PointerEvent) {
 		event.preventDefault();
 
 		is_dragging = true;
@@ -107,7 +115,7 @@
 		handle_ref?.setPointerCapture(event.pointerId);
 	}
 
-	function handle_handle_pointermove(event) {
+	function handle_handle_pointermove(event: PointerEvent) {
 		if (!is_dragging) return;
 
 		const now = Date.now();
@@ -133,7 +141,7 @@
 		drawer_height_ratio = clamp_drawer_height_ratio(drag_start_height_ratio - height_delta);
 	}
 
-	function finish_drag(event) {
+	function finish_drag(event: PointerEvent) {
 		if (!is_dragging) return;
 
 		is_dragging = false;
@@ -171,15 +179,15 @@
 		last_open_drawer_height_ratio = snap_target;
 	}
 
-	function handle_handle_pointerup(event) {
+	function handle_handle_pointerup(event: PointerEvent) {
 		finish_drag(event);
 	}
 
-	function handle_handle_pointercancel(event) {
+	function handle_handle_pointercancel(event: PointerEvent) {
 		finish_drag(event);
 	}
 
-	function handle_drawer_transition_end(event) {
+	function handle_drawer_transition_end(event: TransitionEvent) {
 		if (event.target !== event.currentTarget) return;
 		if (event.propertyName !== 'transform') return;
 

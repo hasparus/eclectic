@@ -1,17 +1,16 @@
-<script>
+<script lang="ts">
 	import { fade } from 'svelte/transition';
 
-	/**
-	 * @type {{
-	 *   visible: boolean,
-	 *   message: string,
-	 *   done: boolean
-	 * }}
-	 */
-	let { visible = false, message = '', done = false } = $props();
+	interface Props {
+		visible?: boolean;
+		message?: string;
+		done?: boolean;
+	}
+
+	let { visible = false, message = '', done = false }: Props = $props();
 
 	let show_modal = $state(false);
-	let delay_timer;
+	let delay_timer: ReturnType<typeof setTimeout> | undefined;
 
 	// Show modal after 1s delay, or immediately if done (to flash success)
 	$effect(() => {

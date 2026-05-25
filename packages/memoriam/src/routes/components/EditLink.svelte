@@ -1,14 +1,18 @@
-<script>
+<script lang="ts">
+	import type { SveditCtx, AppCtx } from './types';
 	import { getContext } from 'svelte';
 	import { get_page_browser } from './page_browser_context.svelte.js';
 
-	const svedit = getContext('svedit');
-	const app = getContext('app');
+	const svedit = getContext<SveditCtx>('svedit');
+	const app = getContext<AppCtx>('app');
 	const page_browser = get_page_browser();
 
-	let { path } = $props();
+	interface Props {
+		path: (string | number)[];
+	}
+	let { path }: Props = $props();
 
-	let edit_link_command = $derived(svedit.session.commands?.edit_link);
+	let edit_link_command = $derived((svedit.session.commands as any)?.edit_link);
 	let target_node = $derived(get_target_node());
 
 	function get_target_node() {
@@ -22,8 +26,8 @@
 	}
 	let href_input_value = $state('');
 	let open_in_new_tab = $state(false);
-	let href_input_ref = $state();
-	let dialog_ref = $state();
+	let href_input_ref = $state<HTMLInputElement | undefined>();
+	let dialog_ref = $state<HTMLDialogElement | undefined>();
 
 	function save() {
 		if (target_node && 'href' in target_node) {
@@ -39,10 +43,10 @@
 		if (edit_link_command) {
 			edit_link_command.show_prompt = false;
 		}
-		svedit.focus_canvas();
+		(svedit as any).focus_canvas();
 	}
 
-	function handle_keydown(event) {
+	function handle_keydown(event: KeyboardEvent) {
 		event.stopPropagation();
 
 		if (event.key === 'Enter') {
@@ -54,7 +58,7 @@
 		}
 	}
 
-	function handle_backdrop_click(event) {
+	function handle_backdrop_click(event: MouseEvent) {
 		if (event.target === dialog_ref) {
 			close();
 		}

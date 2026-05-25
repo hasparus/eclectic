@@ -1,15 +1,19 @@
-<script>
+<script lang="ts">
+	import type { SveditCtx } from './types';
 	import { getContext } from 'svelte';
 
-	const svedit = getContext('svedit');
+	const svedit = getContext<SveditCtx>('svedit');
 
-	let { path } = $props();
+	interface Props {
+		path: (string | number)[];
+	}
+	let { path }: Props = $props();
 
-	let edit_media_command = $derived(svedit.session.commands?.edit_image);
+	let edit_media_command = $derived((svedit.session.commands as any)?.edit_image);
 	let target_node = $derived(svedit.session.get(path));
 	let alt_input_value = $state('');
-	let alt_input_ref = $state();
-	let dialog_ref = $state();
+	let alt_input_ref = $state<HTMLTextAreaElement | undefined>();
+	let dialog_ref = $state<HTMLDialogElement | undefined>();
 
 	function save() {
 		if (target_node?.type === 'image' || target_node?.type === 'video') {
@@ -24,10 +28,10 @@
 		if (edit_media_command) {
 			edit_media_command.show_prompt = false;
 		}
-		svedit.focus_canvas();
+		(svedit as any).focus_canvas();
 	}
 
-	function handle_keydown(event) {
+	function handle_keydown(event: KeyboardEvent) {
 		event.stopPropagation();
 
 		if (event.key === 'Enter' && !event.shiftKey) {
@@ -39,7 +43,7 @@
 		}
 	}
 
-	function handle_backdrop_click(event) {
+	function handle_backdrop_click(event: MouseEvent) {
 		if (event.target === dialog_ref) {
 			close();
 		}

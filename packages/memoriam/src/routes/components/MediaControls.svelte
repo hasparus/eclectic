@@ -1,18 +1,23 @@
-<script>
+<script lang="ts">
+	import type { SveditCtx } from './types';
 	import { getContext } from 'svelte';
-	import { touchDrag } from '$lib/client/touchDrag.js';
+	import { touchDrag } from '$lib/client/touch_drag.js';
 
-	const svedit = getContext('svedit');
+	const svedit = getContext<SveditCtx>('svedit');
 
 	// Zoom constraints
 	const MIN_SCALE = 0.1;
 	const MAX_SCALE = 5.0;
 	const ZOOM_STEP = 0.05;
 
-	let { path, is_mouse_down } = $props();
+	interface Props {
+		path: (string | number)[];
+		is_mouse_down?: boolean;
+	}
+	let { path, is_mouse_down }: Props = $props();
 
 	let media_node = $derived(svedit.session.get(path));
-	let controls_ref = $state(null);
+	let controls_ref = $state<HTMLDivElement | null>(null);
 	// Panning control — disable only when the media exactly fills the container
 	// with no room to move: cover at scale 1.0 with matching aspect ratios.
 	// All other cases (contain, scale > 1, mismatched ratios) allow panning.
@@ -71,7 +76,8 @@
 		can_pan = Math.abs(media_ratio - container_ratio) > 0.01;
 	});
 
-	function apply_pan_delta(client_x, client_y) {
+	function apply_pan_delta(client_x: number, client_y: number) {
+		if (!controls_ref) return;
 		const rect = controls_ref.getBoundingClientRect();
 		const dx = ((client_x - last_x) / rect.width) * -1;
 		const dy = ((client_y - last_y) / rect.height) * -1;
@@ -95,7 +101,7 @@
 		svedit.session.apply(tr, { batch: true });
 	}
 
-	function handle_wheel(e) {
+	function handle_wheel(e: WheelEvent) {
 		// Only zoom when meta (Cmd) or ctrl key is held, otherwise let the page scroll
 		if (!e.metaKey && !e.ctrlKey) return;
 		e.preventDefault();
@@ -117,11 +123,11 @@
 
 	const pan_drag = touchDrag({
 		shouldStart: () => can_pan,
-		onDown(client_x, client_y) {
+		onDown(client_x: number, client_y: number) {
 			last_x = client_x;
 			last_y = client_y;
 		},
-		onMove(client_x, client_y) {
+		onMove(client_x: number, client_y: number) {
 			if (!can_pan) return;
 			apply_pan_delta(client_x, client_y);
 		}

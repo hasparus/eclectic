@@ -1,11 +1,12 @@
-<script>
+<script lang="ts">
+	import type { SveditCtx } from './types';
 	import { getContext } from 'svelte';
 	import { AnnotatedTextProperty, NodeArrayProperty, Node } from 'svedit';
 	import { TW_LIMITER, TW_PAGE_PADDING_X } from '../tailwind_theme.js';
 	import MediaProperty from './MediaProperty.svelte';
 	import SizableViewbox from './SizableViewbox.svelte';
 
-	const svedit = getContext('svedit');
+	const svedit = getContext<SveditCtx>('svedit');
 	let { path } = $props();
 	let node = $derived(svedit.session.get(path));
 	let column_count = $derived(node.footer_link_columns?.length || 0);

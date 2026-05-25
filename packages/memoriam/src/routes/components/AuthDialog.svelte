@@ -1,20 +1,21 @@
-<script>
-	/** @type {{
-		onclose?: () => void,
-		onedit_for_fun?: () => void,
-		onlogin_success?: () => Promise<void> | void
-	}} */
+<script lang="ts">
+	interface Props {
+		onclose?: () => void;
+		onedit_for_fun?: () => void;
+		onlogin_success?: () => Promise<void> | void;
+	}
+
 	let {
 		onclose = () => {},
 		onedit_for_fun = () => {},
 		onlogin_success = () => {}
-	} = $props();
+	}: Props = $props();
 
 	let password = $state('');
 	let error = $state('');
 	let pending = $state(false);
-	let step = $state('choice');
-	let password_input_ref = $state();
+	let step = $state<'choice' | 'login'>('choice');
+	let password_input_ref = $state<HTMLInputElement | undefined>();
 	let should_focus_password_input = $state(false);
 
 	$effect(() => {
@@ -70,7 +71,7 @@
 
 		try {
 			const api_module = await import('$lib/api.remote.js');
-			const result = await api_module.login_admin({ password });
+			const result = await api_module.loginAdmin({ password });
 
 			if (result && result.ok === false && 'message' in result) {
 				error = result.message || 'Login failed.';
@@ -86,7 +87,7 @@
 		}
 	}
 
-	function handle_password_keydown(event) {
+	function handle_password_keydown(event: KeyboardEvent) {
 		if (event.key === 'Enter') {
 			void login_and_edit();
 		}

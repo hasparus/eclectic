@@ -1,4 +1,5 @@
-<script>
+<script lang="ts">
+	import type { SveditCtx } from './types';
 	import { getContext } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { NodeArrayProperty, Node } from 'svedit';
@@ -8,7 +9,7 @@
 
 	let { path } = $props();
 
-	const svedit = getContext('svedit');
+	const svedit = getContext<SveditCtx>('svedit');
 	let node = $derived(svedit.session.get(path));
 	let logo_node = $derived(svedit.session.get([...path, 'logo']));
 	let nav_items = $derived(node.nav_items || []);
@@ -42,7 +43,7 @@
 		</div>
 	{/snippet}
 
-	{#snippet menu_icon(open)}
+	{#snippet menu_icon(open: boolean)}
 		<svg class="w-6 h-6 stroke-(--foreground)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 			{#if open}
 				<path stroke-linecap="square" stroke-linejoin="miter" stroke-width="1.5" d="M6 18L18 6M6 6l12 12" />

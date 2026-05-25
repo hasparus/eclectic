@@ -519,8 +519,8 @@ function summarizePageDocument( pageDoc: PageDocumentRecord | DocumentData) {
 		document_id: pageDoc.document_id,
 		title: metadata.title,
 		description: metadata.description,
-		previewMediaNode: metadata.previewMediaNode,
-		pageHref: activeSlug ? `/${activeSlug}` : '/',
+		preview_media_node: metadata.preview_media_node,
+		page_href: activeSlug ? `/${activeSlug}` : '/',
 		slug: activeSlug ?? '',
 		created_at: pageDoc.created_at ?? null,
 		updated_at: pageDoc.updated_at ?? null
@@ -562,8 +562,8 @@ function buildTreeChildren( refs: string[], assignedPageIds: Set<string>, summar
 		children.push({
 			document_id: summary.document_id,
 			title: summary.title,
-			previewMediaNode: summary.previewMediaNode,
-			pageHref: summary.pageHref,
+			preview_media_node: summary.preview_media_node,
+			page_href: summary.page_href,
 			slug: summary.slug,
 			created_at: summary.created_at,
 			updated_at: summary.updated_at,
@@ -599,8 +599,8 @@ function buildPageTreeNode( root_document_id: string, assignedPageIds: Set<strin
 	return {
 		document_id: summary.document_id,
 		title: summary.title,
-		previewMediaNode: summary.previewMediaNode,
-		pageHref: summary.pageHref,
+		preview_media_node: summary.preview_media_node,
+		page_href: summary.page_href,
 		slug: summary.slug,
 		created_at: summary.created_at,
 		updated_at: summary.updated_at,
@@ -734,9 +734,9 @@ function buildPageBrowserData() {
 	}
 
 	return {
-		homePageId,
-		currentDocumentId,
-		pageForest
+		home_page_id: homePageId,
+		current_document_id: currentDocumentId,
+		page_forest: pageForest
 	};
 }
 
@@ -941,7 +941,7 @@ export const getInternalLinkPreview = query(v.string(), async (href) => {
 		document_id: resolved.document_id,
 		title: metadata.title,
 		description: metadata.description,
-		previewMediaNode: metadata.previewMediaNode
+		preview_media_node: metadata.preview_media_node
 	});
 });
 
@@ -1293,6 +1293,6 @@ export const updatePageSlug = command(updatePageSlugInputSchema, async (input) =
 	return {
 		ok: true,
 		document_id: input.document_id,
-		pageHref: `/${newActiveSlug}`
+		page_href: `/${newActiveSlug}`
 	};
 });

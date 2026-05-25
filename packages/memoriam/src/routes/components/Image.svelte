@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import { ASSET_BASE, VARIANT_WIDTHS } from '$lib/config.js';
 
 	/** @type {{ node: any }} */

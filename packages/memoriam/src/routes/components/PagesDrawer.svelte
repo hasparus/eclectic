@@ -1,62 +1,88 @@
-<script>
+<script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { getContext } from 'svelte';
+	import type { AppCtx } from './types';
 
-	import { get_page_browser_data } from '$lib/api.remote.js';
+	import { getPageBrowserData } from '$lib/api.remote.js';
 	import Media from './Media.svelte';
 	import { get_page_browser } from './page_browser_context.svelte.js';
 
-	const app = getContext('app');
+	interface PageTreeNode {
+		document_id: string;
+		title?: string;
+		preview_media_node?: any;
+		page_href?: string;
+		slug?: string;
+		created_at?: string | null;
+		updated_at?: string | null;
+		children?: PageTreeNode[];
+		is_home_page?: boolean;
+		match_kind?: string;
+		kind?: string;
+		[key: string]: any;
+	}
+
+	interface BrowserData {
+		home_page_id: string | null;
+		current_document_id: string | null;
+		page_forest: PageTreeNode[];
+	}
+
+	const app = getContext<AppCtx>('app');
 	const page_browser = get_page_browser();
 
-	let browser_data = $state(null);
+	let browser_data = $state<BrowserData | null>(null);
 	let loading = $state(false);
 	let load_error = $state('');
 	let loaded_version = $state(-1);
 
-	let menu_item = $state(null);
+	let menu_item = $state<PageTreeNode | null>(null);
 	let menu_anchor_name = $state('');
-	let menu_ref = $state(null);
-	let menu_item_refs = $state([]);
+	let menu_ref = $state<HTMLDialogElement | null>(null);
+	let menu_item_refs = $state<HTMLButtonElement[]>([]);
 	let menu_selected_index = $state(0);
 
-	let confirm_item = $state(null);
-	let confirm_ref = $state(null);
+	let confirm_item = $state<PageTreeNode | null>(null);
+	let confirm_ref = $state<HTMLDialogElement | null>(null);
 	let deleting = $state(false);
 	let delete_error = $state('');
 
-	let page_url_dialog_item = $state(null);
-	let page_url_dialog_ref = $state(null);
+	let page_url_dialog_item = $state<PageTreeNode | null>(null);
+	let page_url_dialog_ref = $state<HTMLDialogElement | null>(null);
 	let page_url_value = $state('');
 	let page_url_error = $state('');
 	let saving_page_url = $state(false);
 
-	let unlisted_info_item = $state(null);
-	let unlisted_info_ref = $state(null);
+	let unlisted_info_item = $state<PageTreeNode | null>(null);
+	let unlisted_info_ref = $state<HTMLDialogElement | null>(null);
 
 	let search_query = $state('');
-	let search_input_ref = $state(null);
+	let search_input_ref = $state<HTMLInputElement | null>(null);
 	let selected_result_index = $state(0);
-	let tree_ref = $state(null);
+	let tree_ref = $state<HTMLDivElement | null>(null);
 	let initialized_selection_version = $state(-1);
-	let initial_scroll_frame_id = $state(null);
+	let initial_scroll_frame_id = $state<number | null>(null);
 
-	function scroll_selected_result_into_view(visible_results, direction = 'nearest') {
+	function scroll_selected_result_into_view(
+		visible_results: PageTreeNode[],
+		direction: 'nearest' | 'start' | 'end' | 'up' | 'down' = 'nearest'
+	) {
 		const selected_document_id = visible_results[selected_result_index]?.document_id;
 		if (!selected_document_id || !tree_ref) return;
+		const tree_el = tree_ref;
 
 		requestAnimationFrame(() => {
-			const selected_row = tree_ref?.querySelector(
+			const selected_row = tree_el.querySelector(
 				`[data-page-browser-row="${selected_document_id}"]`
 			);
 			if (!(selected_row instanceof HTMLElement)) return;
 
-			const scroll_container = tree_ref.closest('.drawer-panel');
+			const scroll_container = tree_el.closest('.drawer-panel');
 			if (!(scroll_container instanceof HTMLElement)) return;
 
 			const scroll_container_rect = scroll_container.getBoundingClientRect();
-			const search_shell = tree_ref
+			const search_shell = tree_el
 				.closest('.pages-drawer')
 				?.querySelector('.search-shell');
 			const search_shell_rect =
@@ -109,7 +135,7 @@
 	const browser_data_query = $derived.by(() => {
 		page_browser?.version ?? 0;
 		if (!page_browser.state.open) return null;
-		return get_page_browser_data();
+		return getPageBrowserData();
 	});
 
 	$effect(() => {
@@ -123,11 +149,11 @@
 
 		loading = query.loading;
 		load_error = query.error ? 'Failed to load pages.' : '';
-		browser_data = query.current ?? null;
+		browser_data = (query.current ?? null) as BrowserData | null;
 		loaded_version = page_browser?.version ?? 0;
 
 		const current_page_id = query.current
-			? /** @type {string | null} */ (query.current.current_document_id ?? null)
+			? ((query.current.current_document_id ?? null) as string | null)
 			: null;
 
 		if (
@@ -137,7 +163,7 @@
 			!normalized_search_query &&
 			current_page_id
 		) {
-			const current_page_forest = query.current.page_forest ?? [];
+			const current_page_forest = (query.current?.page_forest ?? []) as PageTreeNode[];
 			const current_filtered_page_forest = filter_page_forest(
 				current_page_forest,
 				normalize_search_text(search_query)
@@ -233,7 +259,7 @@
 		};
 	});
 
-	function get_page_count(node) {
+	function get_page_count( node: PageTreeNode) {
 		if (!node) return 0;
 
 		let count = 1;
@@ -243,7 +269,7 @@
 		return count;
 	}
 
-	function get_page_forest_count(nodes) {
+	function get_page_forest_count( nodes: PageTreeNode[]) {
 		let count = 0;
 		for (const node of nodes ?? []) {
 			count += get_page_count(node);
@@ -251,15 +277,15 @@
 		return count;
 	}
 
-	function get_resolved_page_href(page_href) {
+	function get_resolved_page_href(page_href: string | null | undefined) {
 		return page_href || '/';
 	}
 
-	function get_page_slug_label(page_href) {
+	function get_page_slug_label(page_href: string | null | undefined) {
 		return page_href || '/';
 	}
 
-	function format_page_browser_timestamp(value) {
+	function format_page_browser_timestamp(value: string | null | undefined) {
 		if (!value) return 'Unknown';
 
 		const date = new Date(value);
@@ -275,7 +301,7 @@
 		});
 	}
 
-	function get_page_title_tooltip(node) {
+	function get_page_title_tooltip( node: PageTreeNode) {
 		const slug_label = get_page_slug_label(node.page_href);
 		const created_at_label = format_page_browser_timestamp(node.created_at);
 		const updated_at_label = format_page_browser_timestamp(node.updated_at);
@@ -285,27 +311,27 @@ Created: ${created_at_label}
 Updated: ${updated_at_label}`;
 	}
 
-	function is_home_page(document_id) {
+	function is_home_page( document_id: string) {
 		return browser_data?.home_page_id === document_id;
 	}
 
-	function has_children(node) {
+	function has_children( node: PageTreeNode) {
 		return !!node?.children?.length;
 	}
 
-	function is_root_node(node, depth) {
+	function is_root_node( node: PageTreeNode, depth: number) {
 		return depth === 0;
 	}
 
-	function is_non_home_root_node(node, depth) {
+	function is_non_home_root_node( node: PageTreeNode, depth: number) {
 		return depth === 0 && !is_home_page(node.document_id);
 	}
 
-	function is_unlisted_page(node, depth, ancestor_is_undiscoverable = false) {
+	function is_unlisted_page( node: PageTreeNode, depth: number, ancestor_is_undiscoverable = false) {
 		return ancestor_is_undiscoverable || is_non_home_root_node(node, depth);
 	}
 
-	function open_unlisted_info(event, item) {
+	function open_unlisted_info( event: Event, item: PageTreeNode) {
 		event.preventDefault();
 		event.stopPropagation();
 		unlisted_info_item = item;
@@ -315,27 +341,27 @@ Updated: ${updated_at_label}`;
 		unlisted_info_item = null;
 	}
 
-	function handle_unlisted_info_click(event) {
+	function handle_unlisted_info_click(event: MouseEvent) {
 		if (event.target === unlisted_info_ref) {
 			close_unlisted_info();
 		}
 	}
 
-	function handle_unlisted_info_cancel(event) {
+	function handle_unlisted_info_cancel(event: Event) {
 		event.preventDefault();
 		close_unlisted_info();
 	}
 
-	function handle_page_click(event, item) {
+	function handle_page_click( event: Event, item: PageTreeNode) {
 		event.preventDefault();
 		page_browser.handle_page_selected(item);
 	}
 
-	function get_menu_anchor_name(document_id) {
+	function get_menu_anchor_name( document_id: string) {
 		return `--page-actions-${document_id}`;
 	}
 
-	function open_menu(event, item) {
+	function open_menu( event: Event, item: PageTreeNode) {
 		event.preventDefault();
 		event.stopPropagation();
 		menu_anchor_name = get_menu_anchor_name(item.document_id);
@@ -375,7 +401,7 @@ Updated: ${updated_at_label}`;
 		page_url_error = '';
 	}
 
-	function handle_menu_click(event) {
+	function handle_menu_click(event: MouseEvent) {
 		if (event.target === menu_ref) {
 			event.preventDefault();
 			event.stopPropagation();
@@ -383,7 +409,7 @@ Updated: ${updated_at_label}`;
 		}
 	}
 
-	function handle_menu_keydown(event) {
+	function handle_menu_keydown(event: KeyboardEvent) {
 		if (!menu_item) return;
 
 		const enabled_item_refs = menu_item_refs.filter((item_ref) => item_ref && !item_ref.disabled);
@@ -432,29 +458,29 @@ Updated: ${updated_at_label}`;
 		}
 	}
 
-	function handle_confirm_click(event) {
+	function handle_confirm_click(event: MouseEvent) {
 		if (event.target === confirm_ref) {
 			close_confirm();
 		}
 	}
 
-	function handle_page_url_dialog_click(event) {
+	function handle_page_url_dialog_click(event: MouseEvent) {
 		if (event.target === page_url_dialog_ref) {
 			close_page_url_dialog();
 		}
 	}
 
-	function handle_menu_cancel(event) {
+	function handle_menu_cancel(event: Event) {
 		event.preventDefault();
 		close_menu();
 	}
 
-	function handle_confirm_cancel(event) {
+	function handle_confirm_cancel(event: Event) {
 		event.preventDefault();
 		close_confirm();
 	}
 
-	function handle_page_url_dialog_cancel(event) {
+	function handle_page_url_dialog_cancel(event: Event) {
 		event.preventDefault();
 		close_page_url_dialog();
 	}
@@ -473,7 +499,7 @@ Updated: ${updated_at_label}`;
 
 		try {
 			const api_module = await import('$lib/api.remote.js');
-			const result = await api_module.update_page_slug({
+			const result = await api_module.updatePageSlug({
 				document_id: page_url_dialog_item.document_id,
 				slug: page_url_value
 			});
@@ -508,7 +534,7 @@ Updated: ${updated_at_label}`;
 
 		try {
 			const api_module = await import('$lib/api.remote.js');
-			await api_module.delete_page({ document_id: confirm_item.document_id });
+			await api_module.deletePage({ document_id: confirm_item.document_id });
 
 			const deleted_document_id = confirm_item.document_id;
 			const home_page_id = browser_data?.home_page_id ?? null;
@@ -536,24 +562,25 @@ Updated: ${updated_at_label}`;
 		}
 	}
 
-	function get_count_label(count, singular_label, plural_label) {
+	function get_count_label( count: number, singular_label: string, plural_label: string) {
 		return `${count} ${count === 1 ? singular_label : plural_label}`;
 	}
 
-	function normalize_search_text(value) {
+	function normalize_search_text( value: string) {
 		return (value ?? '').trim().toLowerCase();
 	}
 
-	function get_page_search_text(item) {
+	function get_page_search_text( item: PageTreeNode) {
 		return `${item?.title ?? ''} ${item?.page_href ?? ''}`.trim().toLowerCase();
 	}
 
-	function item_matches_search(item, normalized_query) {
+	function item_matches_search( item: PageTreeNode, normalized_query: string) {
 		if (!normalized_query) return false;
 		return get_page_search_text(item).includes(normalized_query);
 	}
 
-	function get_highlight_parts(text, normalized_query) {
+	function get_highlight_parts(text: string | null | undefined, normalized_query: string) {
+		text = text ?? '';
 		const source_text = text ?? '';
 		if (!normalized_query) {
 			return [{ text: source_text, is_match: false }];
@@ -583,16 +610,19 @@ Updated: ${updated_at_label}`;
 		return parts;
 	}
 
-	function filter_page_forest_node(node, normalized_query) {
+	function filter_page_forest_node(
+		node: PageTreeNode,
+		normalized_query: string
+	): PageTreeNode | null {
 		if (!node) return null;
 
 		if (!normalized_query) {
 			return {
 				...node,
 				match_kind: 'none',
-				children: (node.children ?? []).map((child) =>
-					filter_page_forest_node(child, normalized_query)
-				)
+				children: (node.children ?? [])
+					.map((child) => filter_page_forest_node(child, normalized_query))
+					.filter((c): c is PageTreeNode => c !== null)
 			};
 		}
 
@@ -629,12 +659,14 @@ Updated: ${updated_at_label}`;
 		return null;
 	}
 
-	function filter_page_forest(nodes, normalized_query) {
+	function filter_page_forest(nodes: PageTreeNode[], normalized_query: string): PageTreeNode[] {
 		if (!normalized_query) {
-			return (nodes ?? []).map((node) => filter_page_forest_node(node, normalized_query));
+			return (nodes ?? [])
+				.map((node) => filter_page_forest_node(node, normalized_query))
+				.filter((n): n is PageTreeNode => n !== null);
 		}
 
-		const filtered_nodes = [];
+		const filtered_nodes: PageTreeNode[] = [];
 		for (const node of nodes ?? []) {
 			const filtered_node = filter_page_forest_node(node, normalized_query);
 			if (filtered_node) {
@@ -644,7 +676,7 @@ Updated: ${updated_at_label}`;
 		return filtered_nodes;
 	}
 
-	function mark_descendant_context(children) {
+	function mark_descendant_context(children: PageTreeNode[]): PageTreeNode[] {
 		return children.map((child) => ({
 			...child,
 			match_kind: 'descendant_context',
@@ -652,19 +684,15 @@ Updated: ${updated_at_label}`;
 		}));
 	}
 
-	function get_match_kind_class(match_kind) {
+	function get_match_kind_class(match_kind: string | undefined) {
 		return '';
 	}
 
-	function flatten_page_forest_results(nodes) {
-		const results = [];
+	function flatten_page_forest_results(nodes: PageTreeNode[]): PageTreeNode[] {
+		const results: PageTreeNode[] = [];
 
 		for (const node of nodes ?? []) {
-			results.push({
-				document_id: node.document_id,
-				page_href: node.page_href,
-				title: node.title
-			});
+			results.push(node);
 
 			for (const child of node.children ?? []) {
 				results.push(...flatten_page_forest_results([child]));
@@ -674,20 +702,20 @@ Updated: ${updated_at_label}`;
 		return results;
 	}
 
-	function get_visible_results(filtered_page_forest) {
+	function get_visible_results( filtered_page_forest: PageTreeNode[]) {
 		return flatten_page_forest_results(filtered_page_forest);
 	}
 
-	function get_visible_result_index(document_id, visible_results) {
+	function get_visible_result_index( document_id: string, visible_results: PageTreeNode[]) {
 		return visible_results.findIndex((result) => result.document_id === document_id);
 	}
 
-	function clamp_selected_result_index(index, visible_results) {
+	function clamp_selected_result_index( index: number, visible_results: PageTreeNode[]) {
 		if (visible_results.length === 0) return 0;
 		return Math.min(Math.max(index, 0), visible_results.length - 1);
 	}
 
-	function handle_search_keydown(event, visible_results) {
+	function handle_search_keydown(event: KeyboardEvent, visible_results: PageTreeNode[]) {
 		if (visible_results.length === 0) return;
 
 		if (event.key === 'ArrowDown') {
@@ -782,7 +810,7 @@ Updated: ${updated_at_label}`;
 			<div class="tree" bind:this={tree_ref}>
 
 
-				{#snippet node_item(node, depth = 0, is_last = true, ancestor_columns = [], ancestor_is_unlisted = false)}
+				{#snippet node_item(node: PageTreeNode, depth: number = 0, is_last: boolean = true, ancestor_columns: boolean[] = [], ancestor_is_unlisted: boolean = false)}
 					{@const node_has_children = has_children(node)}
 					{@const node_is_root = is_root_node(node, depth)}
 					{@const node_is_unlisted = is_unlisted_page(node, depth, ancestor_is_unlisted)}
@@ -819,7 +847,7 @@ Updated: ${updated_at_label}`;
 								class:tree-row-keyboard-selected={visible_results[selected_result_index]?.document_id === node.document_id}
 								data-page-browser-row={node.document_id}
 								title={get_page_title_tooltip(node)}
-								href={resolve(get_resolved_page_href(node.page_href))}
+								href={resolve(get_resolved_page_href(node.page_href) as any)}
 								onclick={(event) =>
 									handle_page_click(event, {
 										document_id: node.document_id,
@@ -896,7 +924,7 @@ Updated: ${updated_at_label}`;
 									{@render node_item(
 										child,
 										depth + 1,
-										index === node.children.length - 1,
+										index === (node.children ?? []).length - 1,
 										[...ancestor_columns, current_column_continues],
 										node_is_unlisted
 									)}

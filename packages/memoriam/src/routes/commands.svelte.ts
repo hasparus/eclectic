@@ -1,15 +1,30 @@
 import { Command, is_selection_collapsed } from 'svedit';
-import { getClosestSwitchableLayout, getColorsetNode, getClosestSwitchableType } from './app_utils.js';
+import {
+	getClosestSwitchableLayout,
+	getColorsetNode,
+	getClosestSwitchableType,
+	type SwitchableTarget
+} from './app_utils.js';
 
+type Direction = 'next' | 'previous';
+
+interface CommandContext {
+	session: any;
+	editable: boolean;
+	[key: string]: any;
+}
 
 /**
- * Command that cycles through available layouts for a node.
- * Direction can be 'next' or 'previous'.
+ * Command that cycles through available layouts for a node. Direction
+ * can be 'next' or 'previous'.
  */
 export class CycleLayoutCommand extends Command {
-	closest_switchable_layout = $derived(getClosestSwitchableLayout(this.context.session, this.context.session.config));
+	direction: Direction;
+	closest_switchable_layout = $derived<SwitchableTarget | null>(
+		getClosestSwitchableLayout(this.context.session, this.context.session.config)
+	);
 
-	constructor(direction, context) {
+	constructor(direction: Direction, context: CommandContext) {
 		super(context);
 		this.direction = direction;
 	}
@@ -19,11 +34,12 @@ export class CycleLayoutCommand extends Command {
 	}
 
 	execute() {
+		if (!this.closest_switchable_layout) return;
 		const session = this.context.session;
 		const { node, node_array_path, node_index } = this.closest_switchable_layout;
 		const layout_count = session.config.node_layouts[node.type];
 
-		let new_layout;
+		let new_layout: number;
 		if (this.direction === 'next') {
 			new_layout = (node.layout % layout_count) + 1;
 		} else {
@@ -31,7 +47,6 @@ export class CycleLayoutCommand extends Command {
 		}
 
 		const tr = session.tr;
-		// Set node selection so it's clear which node's layout changed
 		tr.set_selection({
 			type: 'node',
 			path: node_array_path,
@@ -45,12 +60,14 @@ export class CycleLayoutCommand extends Command {
 
 /**
  * Command that cycles through available node types in a node array.
- * Direction can be 'next' or 'previous'.
  */
 export class CycleNodeTypeCommand extends Command {
-	closest_switchable_type = $derived(getClosestSwitchableType(this.context.session));
+	direction: Direction;
+	closest_switchable_type = $derived<SwitchableTarget | null>(
+		getClosestSwitchableType(this.context.session)
+	);
 
-	constructor(direction, context) {
+	constructor(direction: Direction, context: CommandContext) {
 		super(context);
 		this.direction = direction;
 	}
@@ -60,13 +77,14 @@ export class CycleNodeTypeCommand extends Command {
 	}
 
 	execute() {
+		if (!this.closest_switchable_type) return;
 		const session = this.context.session;
 		const { node, node_array_path, node_index } = this.closest_switchable_type;
 		const node_array_schema = session.inspect(node_array_path);
-		const node_types = node_array_schema.node_types;
+		const node_types: string[] = node_array_schema.node_types;
 
 		const current_type_index = node_types.indexOf(node.type);
-		let new_type_index;
+		let new_type_index: number;
 
 		if (this.direction === 'next') {
 			new_type_index = (current_type_index + 1) % node_types.length;
@@ -76,7 +94,6 @@ export class CycleNodeTypeCommand extends Command {
 
 		const new_type = node_types[new_type_index];
 		const tr = session.tr;
-		// Set the selection inside the transaction so undo/redo replays correctly
 		tr.set_selection({
 			type: 'node',
 			path: node_array_path,
@@ -89,11 +106,10 @@ export class CycleNodeTypeCommand extends Command {
 }
 
 /**
- * Command that cycles through colorset options (0, 1, 2).
- * Finds the nearest ancestor with a colorset property and cycles it.
+ * Cycles colorset (0, 1, 2) on the nearest ancestor with `colorset`.
  */
 export class CycleColorsetCommand extends Command {
-	colorset_node = $derived(getColorsetNode(this.context.session));
+	colorset_node = $derived<any | null>(getColorsetNode(this.context.session));
 
 	is_enabled() {
 		return this.context.editable && this.colorset_node !== null;
@@ -104,7 +120,6 @@ export class CycleColorsetCommand extends Command {
 		const node = this.colorset_node;
 		if (!node) return;
 
-		// Cycle through 0, 1, 2
 		const new_colorset = (node.colorset + 1) % 3;
 
 		const tr = session.tr;
@@ -128,9 +143,9 @@ export class ReplaceMediaCommand extends Command {
 		if (!selection_path) return;
 
 		document.documentElement.dataset.replaceMediaPath = JSON.stringify(selection_path);
-		const replace_media_input = /** @type {HTMLInputElement | null} */ (
-			document.getElementById('replace-media-input')
-		);
+		const replace_media_input = document.getElementById(
+			'replace-media-input'
+		) as HTMLInputElement | null;
 		replace_media_input?.click();
 	}
 }
@@ -138,10 +153,11 @@ export class ReplaceMediaCommand extends Command {
 export class EditImageCommand extends Command {
 	show_prompt = $state(false);
 
-	constructor(context) {
+	constructor(context: CommandContext) {
 		super(context);
 
 		$effect(() => {
+			// Track selection
 			this.context.session.selection;
 			this.show_prompt = false;
 		});
@@ -164,21 +180,18 @@ export class EditImageCommand extends Command {
 }
 
 /**
- * Command that toggles link annotations on text selections.
- * Shows a custom prompt for URL when creating a link.
+ * Toggles link annotations on text selections. Shows a prompt for URL
+ * when creating a link.
  */
 export class ToggleLinkCommand extends Command {
 	active = $derived(this.is_active());
 	show_prompt = $state(false);
 
-	constructor(context) {
+	constructor(context: CommandContext) {
 		super(context);
 
-		// Reset show_prompt when selection changes
 		$effect(() => {
-			// Access selection to track it
 			this.context.session.selection;
-			// Reset prompt state on any selection change
 			this.show_prompt = false;
 		});
 	}
@@ -201,29 +214,24 @@ export class ToggleLinkCommand extends Command {
 		const has_active_link = session.active_annotation('link');
 
 		if (has_active_link) {
-			// Delete link
 			session.apply(session.tr.annotate_text('link'));
 		} else {
-			// Show prompt for creating link
 			this.show_prompt = true;
 		}
 	}
 }
 
 /**
- * Command that opens the edit link dialog for link-ish nodes (nodes with href property).
+ * Opens the edit-link dialog for link-ish nodes (nodes with `href`).
  */
 export class EditLinkCommand extends Command {
 	show_prompt = $state(false);
 
-	constructor(context) {
+	constructor(context: CommandContext) {
 		super(context);
 
-		// Reset show_prompt when selection changes
 		$effect(() => {
-			// Access selection to track it
 			this.context.session.selection;
-			// Reset prompt state on any selection change
 			this.show_prompt = false;
 		});
 	}
@@ -232,11 +240,9 @@ export class EditLinkCommand extends Command {
 		const { session, editable } = this.context;
 		if (!editable || !session.selection) return false;
 
-		// Check if selected_node has an href property (link-ish block node)
 		const selected_node = session.selected_node;
 		if (selected_node && 'href' in selected_node) return true;
 
-		// Check for active link annotation (text link)
 		const active_link = session.active_annotation('link');
 		if (active_link) return true;
 
@@ -246,12 +252,13 @@ export class EditLinkCommand extends Command {
 	execute() {
 		if (this.is_enabled()) {
 			const { session } = this.context;
-			// Select the parent node if a property is selected (but not for annotation links)
 			const active_link = session.active_annotation('link');
-			if (!active_link && (session.selection?.type === 'text' || session.selection?.type === 'property')) {
+			if (
+				!active_link &&
+				(session.selection?.type === 'text' || session.selection?.type === 'property')
+			) {
 				session.select_parent();
 			}
-			// Wait for selection change to settle before showing prompt
 			setTimeout(() => {
 				this.show_prompt = true;
 			}, 0);

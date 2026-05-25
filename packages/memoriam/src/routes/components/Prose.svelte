@@ -1,9 +1,10 @@
-<script>
+<script lang="ts">
+	import type { SveditCtx } from './types';
 	import { getContext } from 'svelte';
 	import { Node, NodeArrayProperty } from 'svedit';
 	import { TW_PAGE_PADDING_X, TW_BLOCK_PADDING_Y, TW_MOBILE_LEFT_INSET, TW_LIMITER } from '../tailwind_theme.js';
 
-	const svedit = getContext('svedit');
+	const svedit = getContext<SveditCtx>('svedit');
 	let { path } = $props();
 	let node = $derived(svedit.session.get(path));
 	let layout = $derived(node.layout || 1);

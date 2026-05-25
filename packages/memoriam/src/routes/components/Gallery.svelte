@@ -1,10 +1,11 @@
-<script>
+<script lang="ts">
+	import type { SveditCtx } from './types';
 	import { getContext } from 'svelte';
 	import { Node, NodeArrayProperty } from 'svedit';
 	import { TW_LIMITER, TW_PAGE_PADDING_X, TW_BLOCK_PADDING_Y } from '../tailwind_theme.js';
 	let { path } = $props();
 
-	const svedit = getContext('svedit');
+	const svedit = getContext<SveditCtx>('svedit');
 	let node = $derived(svedit.session.get(path));
 	let colorset_class = $derived(node.colorset ? `ew-colorset-${node.colorset}` : '');
 	let has_intro = $derived(node.intro && node.intro.length > 0);
@@ -39,7 +40,7 @@
    		`
 		};
 
-		return layouts[node.layout ?? 2];
+		return layouts[(node.layout ?? 2) as 1 | 2 | 3 | 4];
 	}
 	const heading_spacing = `
 		[&>div:has(h1)~div>h1]:pt-8

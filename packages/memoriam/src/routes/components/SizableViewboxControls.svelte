@@ -1,9 +1,10 @@
-<script>
+<script lang="ts">
+	import type { SveditCtx } from './types';
 	import { getContext } from 'svelte';
-	import { touchDrag, lockCursor, unlockCursor } from '$lib/client/touchDrag.js';
+	import { touchDrag, lockCursor, unlockCursor } from '$lib/client/touch_drag.js';
 	import { SNAP_ASPECT_RATIOS } from '$lib/config.js';
 
-	const svedit = getContext('svedit');
+	const svedit = getContext<SveditCtx>('svedit');
 
 	const MIN_WIDTH = 40;
 	const MIN_HEIGHT = 20;
@@ -49,7 +50,7 @@
 	let anchor_name = $derived(`--viewbox-${path.join('-')}-${media_property}`);
 
 	// --- Snap label shown during drag ---
-	let snap_label = $state(/** @type {string | null} */ (null));
+	let snap_label = $state<string | null>(null);
 
 	// --- Snap candidates (all common ratios + natural) ---
 	function get_snap_candidates() {
@@ -67,7 +68,7 @@
 	 * @param {number} fixed_height
 	 * @returns {{ width: number, ratio: number, label: string } | null}
 	 */
-	function snap_width_for_height(raw_width, fixed_height) {
+	function snap_width_for_height( raw_width: number, fixed_height: number) {
 		const candidates = get_snap_candidates();
 		let best = null;
 		let best_distance = Infinity;
@@ -92,7 +93,7 @@
 	 * @param {number} fixed_width
 	 * @returns {{ height: number, ratio: number, label: string } | null}
 	 */
-	function snap_height_for_width(raw_height, fixed_width) {
+	function snap_height_for_width( raw_height: number, fixed_width: number) {
 		const candidates = get_snap_candidates();
 		let best = null;
 		let best_distance = Infinity;
@@ -118,7 +119,7 @@
 	 * @param {number} raw_height
 	 * @returns {{ ratio: number, label: string } | null}
 	 */
-	function snap_corner_ratio(raw_width, raw_height) {
+	function snap_corner_ratio( raw_width: number, raw_height: number) {
 		const candidates = get_snap_candidates();
 		let best = null;
 		let best_distance = Infinity;
@@ -151,19 +152,21 @@
 	 * @param {{ ratio: number, label: string }} snapped
 	 * @returns {number}
 	 */
-	function stored_ratio(snapped) {
+	function stored_ratio( snapped: any) {
 		return snapped.label === 'original' ? 0 : snapped.ratio;
 	}
 
 	// --- Cursor lock during drag ---
-	const CURSOR_FOR_TYPE = {
+	type DragType = 'width-right' | 'height' | 'corner';
+
+	const CURSOR_FOR_TYPE: Record<DragType, string> = {
 		'width-right': 'ew-resize',
 		'height': 'ns-resize',
 		'corner': 'nwse-resize',
 	};
 
 	// --- Drag state (shared across all handles) ---
-	let drag_type = null;
+	let drag_type: DragType | null = null;
 	let drag_start_x = 0;
 	let drag_start_y = 0;
 	let drag_start_max_width = 0;
@@ -178,7 +181,7 @@
 		return document.querySelector(`[data-viewbox-anchor="${anchor_name}"]`);
 	}
 
-	function capture_width_state(side) {
+	function capture_width_state(side: DragType) {
 		drag_type = side;
 
 		const viewbox_el = get_viewbox_el();
@@ -206,7 +209,7 @@
 		}
 
 		snap_label = null;
-		lockCursor(CURSOR_FOR_TYPE[drag_type]);
+		if (drag_type) lockCursor(CURSOR_FOR_TYPE[drag_type]);
 	}
 
 	function capture_height_state() {
@@ -251,7 +254,7 @@
 		lockCursor(CURSOR_FOR_TYPE[drag_type]);
 	}
 
-	function handle_move(client_x, client_y) {
+	function handle_move( client_x: number, client_y: number) {
 		if (!drag_type) return;
 
 		if (drag_type === 'width-right') {
@@ -394,7 +397,7 @@
 		onUp: handle_up,
 	});
 
-	function handle_width_dblclick(e) {
+	function handle_width_dblclick(e: MouseEvent) {
 		e.preventDefault();
 		e.stopPropagation();
 		const tr = svedit.session.tr;
@@ -403,7 +406,7 @@
 		svedit.session.apply(tr);
 	}
 
-	function handle_height_dblclick(e) {
+	function handle_height_dblclick(e: MouseEvent) {
 		e.preventDefault();
 		e.stopPropagation();
 		const tr = svedit.session.tr;
@@ -411,7 +414,7 @@
 		svedit.session.apply(tr);
 	}
 
-	function handle_corner_dblclick(e) {
+	function handle_corner_dblclick(e: MouseEvent) {
 		e.preventDefault();
 		e.stopPropagation();
 		const tr = svedit.session.tr;

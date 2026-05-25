@@ -1,4 +1,5 @@
-<script>
+<script lang="ts">
+	import type { SveditCtx, AppCtx } from './types';
 	import { getContext } from 'svelte';
 	import { get_page_browser } from './page_browser_context.svelte.js';
 	import MediaControls from './MediaControls.svelte';
@@ -10,19 +11,19 @@
 	import AuthDialog from './AuthDialog.svelte';
 	import Drawer from './Drawer.svelte';
 
-	const svedit = getContext('svedit');
-	const app = getContext('app');
+	const svedit = getContext<SveditCtx>('svedit');
+	const app = getContext<AppCtx>('app');
 
 	// True for the whole period the mouse button is down
 	let is_mouse_down = $state(false);
 	// Only becomes true when the mouse actually moves (=drag)
 	let is_dragging = $state(false);
 
-	let overlays_ref = $state();
+	let overlays_ref = $state<HTMLElement | undefined>();
 	const page_browser = get_page_browser();
 
 	// --- File drag-and-drop onto media properties ---
-	let drop_target_path = $state(null);
+	let drop_target_path = $state<string[] | null>(null);
 	let file_drag_active = $state(false);
 
 	$effect(() => {
@@ -39,7 +40,7 @@
 		};
 	});
 
-	function get_media_path_at(e) {
+	function get_media_path_at(e: { clientX: number; clientY: number }): string[] | null {
 		const el = document.elementFromPoint(e.clientX, e.clientY);
 		if (!el) return null;
 		const prop_el = el.closest('[data-type="property"]');
@@ -52,7 +53,7 @@
 		return path;
 	}
 
-	function on_dragover(e) {
+	function on_dragover(e: DragEvent) {
 		if (!svedit.editable) return;
 		if (!e.dataTransfer?.types?.includes('Files')) return;
 		file_drag_active = true;
@@ -70,7 +71,7 @@
 		}
 	}
 
-	function on_dragleave(e) {
+	function on_dragleave(e: DragEvent) {
 		if (!e.relatedTarget && !document.elementFromPoint(e.clientX, e.clientY)) {
 			file_drag_active = false;
 			drop_target_path = null;
@@ -82,7 +83,7 @@
 		}
 	}
 
-	async function on_drop(e) {
+	async function on_drop(e: DragEvent) {
 		const path = drop_target_path ? [...drop_target_path] : null;
 		drop_target_path = null;
 		file_drag_active = false;
@@ -102,9 +103,9 @@
 		await svedit.session.config.replace_media(svedit.session, path, file, blob_url);
 	}
 
-	function handle_mousemove(e) {
+	function handle_mousemove(e: MouseEvent) {
 		if (e.buttons !== 1) return;
-		if (overlays_ref?.contains(e.target)) return;
+		if (overlays_ref?.contains(e.target as Node | null)) return;
 		is_dragging = true;
 	}
 
@@ -201,25 +202,25 @@
 		{#if viewbox_context}
 			<SizableViewboxControls
 				path={viewbox_context.parent_path}
-				media_property={viewbox_context.media_property}
+				media_property={viewbox_context.media_property as string | undefined}
 			/>
 		{/if}
 	{/if}
 
-	{#if link_preview && !svedit.session.commands?.edit_link?.show_prompt && !is_dragging}
+	{#if link_preview && !(svedit.session.commands as any)?.edit_link?.show_prompt && !is_dragging}
 		<LinkPreview node={link_preview.node} path={link_preview.path} />
 	{/if}
 
-	{#if link_preview && svedit.session.commands?.edit_link?.show_prompt}
+	{#if link_preview && (svedit.session.commands as any)?.edit_link?.show_prompt}
 		<EditLink path={link_preview.path} />
 	{/if}
 
-	{#if svedit.session.commands?.toggle_link?.show_prompt}
+	{#if (svedit.session.commands as any)?.toggle_link?.show_prompt}
 		<CreateLink />
 	{/if}
 
-	{#if svedit.session.commands?.edit_image?.show_prompt && is_media_selected}
-		<EditMedia path={svedit.session.selection.path} />
+	{#if (svedit.session.commands as any)?.edit_image?.show_prompt && is_media_selected}
+		<EditMedia path={svedit.session.selection!.path} />
 	{/if}
 
 	{#if app.auth_dialog_open}

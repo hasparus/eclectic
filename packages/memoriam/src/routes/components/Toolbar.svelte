@@ -1,12 +1,19 @@
-<script>
+<script lang="ts">
+	import type { AppCtx } from './types';
 	import { getContext } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { get_page_browser } from './page_browser_context.svelte.js';
 
-	let { session, app_commands, editable, focus_canvas } = $props();
+	interface Props {
+		session: any;
+		app_commands: Record<string, any>;
+		editable: boolean;
+		focus_canvas: () => void;
+	}
+	let { session, app_commands, editable, focus_canvas }: Props = $props();
 
 	const page_browser = get_page_browser();
-	const app = getContext('app');
+	const app = getContext<AppCtx>('app');
 
 	let cancel_command = $derived(app_commands.cancel_editing ?? null);
 	let cancel_button_label = $derived(cancel_command?.label || 'Cancel');
@@ -42,13 +49,13 @@
 
 	let can_show_selection_tool_group = $derived(!!session.selection);
 
-	let file_input_ref = $state(null);
+	let file_input_ref = $state<HTMLInputElement | null>(null);
 
-	function handle_insert_default_node_click(e) {
+	function handle_insert_default_node_click(e: MouseEvent) {
 		handle_btn_mousedown(e, session.commands.insert_default_node);
 	}
 
-	function handle_delete_selection_click(e) {
+	function handle_delete_selection_click(e: MouseEvent) {
 		e.preventDefault();
 		if (session.selection?.type === 'node') {
 			session.apply(session.tr.delete_selection('backward'));
@@ -59,25 +66,26 @@
 		session.config.handle_property_deletion?.(session, session.selection.path);
 	}
 
-	function cache_replace_media_path(path) {
+	function cache_replace_media_path(path: (string | number)[]) {
 		document.documentElement.dataset.replaceMediaPath = JSON.stringify(path);
 	}
 
-	function handle_edit_image_click(e) {
+	function handle_edit_image_click(e: MouseEvent) {
 		e.preventDefault();
 		if (session.commands.edit_image?.disabled) return;
 		session.commands.edit_image?.execute();
 	}
 
-	function handle_replace_image_click(e) {
+	function handle_replace_image_click(e: MouseEvent) {
 		e.preventDefault();
 		if (session.selection?.type !== 'property') return;
 		cache_replace_media_path(session.selection.path);
 		file_input_ref?.click();
 	}
 
-	async function handle_file_selected(e) {
-		const file = e.target.files?.[0];
+	async function handle_file_selected(e: Event) {
+		const target = e.target as HTMLInputElement;
+		const file = target.files?.[0];
 		const cached_path = document.documentElement.dataset.replaceMediaPath;
 		const path = cached_path ? JSON.parse(cached_path) : null;
 		if (!file || !path) return;
@@ -91,7 +99,7 @@
 		await session.config.replace_media(session, path, normalized_blob, blob_url);
 		delete document.documentElement.dataset.replaceMediaPath;
 		// Reset so the same file can be re-selected
-		e.target.value = '';
+		target.value = '';
 	}
 
 	const TW_TOOLBAR_POSITION = 'bottom-0 sm:bottom-3 right-5 sm:right-7 md:right-10 lg:right-14';
@@ -102,7 +110,7 @@
 	const TW_TOOLBAR_BTN_DISABLED = 'text-[color-mix(in_oklch,var(--background)_70%,var(--foreground))] border-[color-mix(in_oklch,var(--background)_94%,var(--foreground))] !cursor-not-allowed shadow-none';
 	const TW_TOOLBAR_BTN_HOVER = 'hover:bg-[color-mix(in_oklch,var(--background)_96%,var(--foreground))] hover:border-[color-mix(in_oklch,var(--background)_88%,var(--foreground))] active:bg-[color-mix(in_oklch,var(--background)_94%,var(--foreground))] active:border-[color-mix(in_oklch,var(--background)_84%,var(--foreground))] active:scale-95 active:translate-y-px';
 
-	function handle_btn_mousedown(event, command) {
+	function handle_btn_mousedown(event: Event, command: any) {
 		event.preventDefault();
 		if (command?.disabled) return;
 		command.execute();

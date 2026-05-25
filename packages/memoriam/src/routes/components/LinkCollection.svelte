@@ -1,10 +1,11 @@
-<script>
+<script lang="ts">
+	import type { SveditCtx } from './types';
 	import { getContext } from 'svelte';
 	import { Node, NodeArrayProperty } from 'svedit';
 	import { TW_LIMITER, TW_PAGE_PADDING_X } from '../tailwind_theme.js';
 	let { path } = $props();
 
-	const svedit = getContext('svedit');
+	const svedit = getContext<SveditCtx>('svedit');
 	let node = $derived(svedit.session.get(path));
 	let colorset_class = $derived(node.colorset ? `ew-colorset-${node.colorset}` : '');
 	let has_intro = $derived(node.intro && node.intro.length > 0);

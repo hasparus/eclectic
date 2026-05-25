@@ -1,8 +1,11 @@
-<script>
+<script lang="ts">
 	import { ASSET_BASE } from '$lib/config.js';
 
-	/** @type {{ node: any, editable?: boolean }} */
-	let { node, editable = false } = $props();
+	interface Props {
+		node: any;
+		editable?: boolean;
+	}
+	let { node, editable = false }: Props = $props();
 
 	// Determine if src is a blob URL (unsaved), a saved asset id, or empty
 	let is_blob = $derived(node.src?.startsWith('blob:'));
@@ -24,7 +27,7 @@
 	`);
 
 	/** @type {HTMLVideoElement | null} */
-	let video_el = $state(null);
+	let video_el = $state<(HTMLVideoElement & { webkitEnterFullscreen?: () => void; webkitRequestFullscreen?: () => void }) | null>(null);
 	let is_fullscreen = $state(false);
 
 	// Autoplay handling — try multiple strategies since the element may be
@@ -60,7 +63,7 @@
 	});
 
 	/** @param {MouseEvent} e */
-	function enter_fullscreen(e) {
+	function enter_fullscreen(e: MouseEvent) {
 		// Only allow fullscreen in published view (not editable)
 		if (editable) return;
 		e.preventDefault();
@@ -107,7 +110,7 @@
 		function handle_fullscreen_change() {
 			if (!v) return;
 			const fs = document.fullscreenElement
-				|| /** @type {any} */ (document).webkitFullscreenElement;
+				|| (document as any).webkitFullscreenElement;
 			if (fs === v) {
 				is_fullscreen = true;
 			} else if (!fs) {

@@ -1,10 +1,11 @@
-<script>
+<script lang="ts">
+	import type { SveditCtx } from './types';
 	import { getContext } from 'svelte';
 	import { Node, NodeArrayProperty, AnnotatedTextProperty } from 'svedit';
 	import { TW_PAGE_PADDING_X, TW_MOBILE_LEFT_INSET, TW_LIMITER } from '../tailwind_theme.js';
 	import { reveal } from '../reveal.js';
 
-	const svedit = getContext('svedit');
+	const svedit = getContext<SveditCtx>('svedit');
 	let { path } = $props();
 	let node = $derived(svedit.session.get(path));
 	let has_buttons = $derived(node.buttons?.length > 0);

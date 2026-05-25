@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import { setContext } from 'svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -39,7 +39,7 @@
 
 	let auth_dialog_open = $state(false);
 	let mobile_overscroll_triggered = $state(false);
-	let mobile_overscroll_timeout_id = $state(null);
+	let mobile_overscroll_timeout_id = $state<ReturnType<typeof setTimeout> | null>(null);
 	let mobile_touch_active = $state(false);
 	let mobile_touch_started_at_page_end = $state(false);
 
@@ -94,7 +94,7 @@
 
 	function focus_canvas() {
 		if (svedit_ref) {
-			svedit_ref.focus_canvas();
+			(svedit_ref as any).focus_canvas();
 		}
 	}
 
@@ -118,7 +118,7 @@
 			version = parseInt(ua.match(/Version\/(\d+)/)?.[1] || '0');
 		}
 
-		const min_versions = { Chrome: 142, Firefox: 147, Safari: 26 };
+		const min_versions: Record<string, number> = { Chrome: 142, Firefox: 147, Safari: 26 };
 
 		if (browser && min_versions[browser] && version < min_versions[browser]) {
 			return { supported: false, browser, version, required: min_versions[browser] };
@@ -294,9 +294,9 @@
 			]);
 
 			/** @type {any} */
-			const persist_document = api_module.save_document;
+			const persist_document = api_module.saveDocument;
 			/** @type {any} */
-			const get_document = api_module.get_document;
+			const get_document = api_module.getDocument;
 			const {
 				collectBlobUrls,
 				waitForProcessing,
@@ -372,7 +372,7 @@
 
 				if (result?.created && result.document_id && result.slug) {
 					try {
-						await get_document(result.slug).run();
+						await (get_document(String(result.slug)) as any).run();
 						current_is_new = false;
 						invalidate_page_browser_data();
 						await goto(resolve(`/${result.slug}`), { replaceState: true });
@@ -408,7 +408,7 @@
 		async execute() {
 			try {
 				const api_module = await import('$lib/api.remote.js');
-				await api_module.logout_admin();
+				await api_module.logoutAdmin();
 				editable = false;
 				page_browser.close?.();
 				await invalidateAll();

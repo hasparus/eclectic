@@ -2,13 +2,14 @@
 	export const LAYOUT_COUNT = 1;
 </script>
 
-<script>
+<script lang="ts">
+	import type { SveditCtx } from './types';
 	import { getContext } from 'svelte';
 	import { Node } from 'svedit';
 	import MediaProperty from './MediaProperty.svelte';
 	import SizableViewbox from './SizableViewbox.svelte';
 
-	const svedit = getContext('svedit');
+	const svedit = getContext<SveditCtx>('svedit');
 	let { path } = $props();
 
 	// Read the parent Prose node's layout to determine alignment

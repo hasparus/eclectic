@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import { Node } from 'svedit';
 	import MediaProperty from './MediaProperty.svelte';
 	import { reveal } from '../reveal.js';

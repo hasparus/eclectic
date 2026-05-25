@@ -1,4 +1,5 @@
-<script>
+<script lang="ts">
+	import type { SveditCtx } from './types';
   import { getContext } from 'svelte';
   import { AnnotatedTextProperty, Node, NodeArrayProperty } from 'svedit';
   import Nav from './Nav.svelte';
@@ -7,7 +8,7 @@
   import { getHeadMetadata, getMediaAssetUrl } from '$lib/page_metadata.js';
   import { TW_LIMITER, TW_PAGE_PADDING_X } from '../tailwind_theme.js';
 
-  const svedit = getContext('svedit');
+  const svedit = getContext<SveditCtx>('svedit');
   let { path } = $props();
   let node = $derived(svedit.session.get(path));
   let first_body_node_id = $derived(node.body?.[0]);

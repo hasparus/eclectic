@@ -1,13 +1,18 @@
-<script>
+<script lang="ts">
+	import type { SveditCtx, AppCtx } from './types';
 	import { getContext } from 'svelte';
 	import Media from './Media.svelte';
 
-	const svedit = getContext('svedit');
-	const app = getContext('app');
+	const svedit = getContext<SveditCtx>('svedit');
+	const app = getContext<AppCtx>('app');
 
-	let { node, path } = $props();
+	interface Props {
+		node: any;
+		path: (string | number)[];
+	}
+	let { node, path }: Props = $props();
 
-	let is_annotation = $derived(svedit.session.kind(node) === 'annotation');
+	let is_annotation = $derived((svedit.session as any).kind(node) === 'annotation');
 	let internal_page_href = $derived(get_internal_page_href(node?.href));
 
 	let page_preview = $derived.by(async () => {
@@ -16,11 +21,13 @@
 		if (!href) return null;
 
 		const api_module = await import('$lib/api.remote.js');
-		return await api_module.get_internal_link_preview(href).run();
+		// RemoteQuery has a `.run()` method at runtime that's missing from
+		// the declared type; cast to bypass.
+		return await (api_module.getInternalLinkPreview(href) as any).run();
 	});
 
 	function handle_edit() {
-		const edit_link_command = svedit.session.commands?.edit_link;
+		const edit_link_command = (svedit.session.commands as any)?.edit_link;
 		if (edit_link_command) {
 			edit_link_command.execute();
 		}
@@ -28,15 +35,15 @@
 
 	function handle_remove() {
 		if (is_annotation) {
-			svedit.session.apply(svedit.session.tr.annotate_text('link'));
+			svedit.session.apply((svedit.session.tr as any).annotate_text('link'));
 		} else {
 			const tr = svedit.session.tr;
-			tr.set([node.id, 'href'], '');
+			(tr as any).set([node.id, 'href'], '');
 			svedit.session.apply(tr);
 		}
 	}
 
-	function get_internal_page_href(href) {
+	function get_internal_page_href(href: unknown): string | null {
 		if (typeof href !== 'string') return null;
 		if (!href.startsWith('/')) return null;
 		if (href.startsWith('//')) return null;

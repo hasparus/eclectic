@@ -1,9 +1,10 @@
-<script>
+<script lang="ts">
+	import type { SveditCtx } from './types';
 	import { getContext } from 'svelte';
 	import { Node, AnnotatedTextProperty } from 'svedit';
 	import { reveal } from '../reveal.js';
 
-	const svedit = getContext('svedit');
+	const svedit = getContext<SveditCtx>('svedit');
 	let { path } = $props();
 	let node = $derived(svedit.session.get(path));
 	let layout = $derived(node.layout || 1);
@@ -11,7 +12,7 @@
 	let text_style = $derived(get_text_style(layout));
 	let placeholder = $derived(get_placeholder(layout));
 
-	function get_tag(layout) {
+	function get_tag(layout: number) {
 		switch (layout) {
 			case 1:
 				return 'p';
@@ -28,7 +29,7 @@
 		}
 	}
 
-	function get_text_style(layout) {
+	function get_text_style(layout: number) {
 		switch (layout) {
 			case 1:
 				return '';
@@ -45,7 +46,7 @@
 		}
 	}
 
-	function get_placeholder(layout) {
+	function get_placeholder(layout: number) {
 		switch (layout) {
 			case 1:
 				return 'Paragraph';
