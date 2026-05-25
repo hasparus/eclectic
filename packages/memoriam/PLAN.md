@@ -100,38 +100,47 @@ Output of phase 0: go/no-go decision + a concrete shape for the binding.
 
 Get the vendored code into a shape we can build on. No new features.
 
-- [ ] Vendor `svedit` into `packages/svedit-vendored/` and re-point the
-      memoriam import.
-- [ ] TypeScript migration. `strict: true`. Start with `src/lib/server/`
-      and `src/lib/*.js`, then routes, then components last. Same
-      pass renames snake_case identifiers to camelCase / PascalCase
-      to match TS / Svelte idiom. Mechanical but invasive; do it as
-      one coordinated commit per directory to keep the diff
-      reviewable.
-- [ ] Kill `src/lib/server/db.js` singleton. Replace with
-      `get_db(site_id)` backed by an LRU cache (key: site_id, value:
-      `DatabaseSync` instance + last-access timestamp, eviction at e.g.
-      256 open connections). Touches every call site in `api.remote.js`.
-- [ ] Per-site asset paths. `ASSET_PATH` becomes
-      `join(DATA_DIR, site_id, 'assets')`. Update
-      `src/lib/server/asset_storage.js` to take `site_id`.
-- [ ] Lazy per-site migrations. On `get_db(site_id)`, check
-      `PRAGMA user_version`, run any pending migrations, set version.
-      Cache "this site is up to date" in memory.
-- [ ] **Security fix:** auth-gate `POST /api/assets`,
-      `POST /api/assets/[id]/variants`, and `DELETE /api/assets/[id]`.
-      Verify `X-Content-Hash` matches the body (compute SHA-256
-      server-side during stream-to-disk, reject if mismatch).
-- [ ] Fix Range header support in `src/routes/assets/[...path]/+server.js`
-      so videos seek properly (currently sets `Accept-Ranges: bytes`
-      without honoring the header).
-- [ ] Replace `sleep_sync(100)` in `migrate.js` with a real timestamp
-      collision fix (incrementing suffix, or use rowid order).
-- [ ] Delete `eslint.config.js.orig`, trim `ARCHITECTURE.md` /
-      `IMPLEMENTATION_PLAN.md` of duplication, drop the AI-written
-      sprawl.
-- [ ] Set up test infrastructure: `vitest` + `@playwright/test`. No
-      tests yet; just the harness.
+- [x] Kill `src/lib/server/db.js` singleton. Replace with
+      `getDb(siteId)` backed by an LRU cache (256-cap, eviction
+      closes connections). Lazy migrations on first open per site.
+- [x] Per-site asset paths under `data/sites/<site_id>/assets/`.
+- [x] Lazy per-site migrations.
+- [x] **Security:** auth-gate `POST /api/assets`,
+      `POST /api/assets/[id]/variants`, `DELETE /api/assets/[id]`.
+      `POST /api/assets` verifies SHA-256 of streamed body matches
+      `X-Content-Hash`, rejects + cleans up on mismatch.
+- [x] HTTP Range support for videos in `/assets/[...path]` (206 +
+      416).
+- [x] Replace `sleep_sync(100)` in `migrate.js` with a monotonic
+      suffix on timestamps.
+- [x] Delete `eslint.config.js.orig`, ARCHITECTURE.md, and
+      IMPLEMENTATION_PLAN.md (the latter two were upstream AI
+      sprawl).
+- [x] Test infrastructure: vitest harness, 9 smoke tests covering
+      per-site DB isolation, lazy migrations, invalid-id rejection,
+      `constantTimeEqual`. Playwright deferred — no Svelte
+      component tests yet.
+- [x] Constant-time password comparison in `loginAdmin` (moved up
+      from Phase 6).
+- [x] TypeScript migration, `strict: true`, for:
+      `src/lib/server/`, `src/lib/server_config`, `src/lib/*` (incl.
+      `api.remote.ts` — accepted ~50 strict residual errors in
+      svedit-adjacent surfaces), `src/lib/client/`, route-level
+      `.js` files including `create_session.ts`. snake_case stays
+      for SQL columns, our JSON document keys (`focal_point_x`,
+      etc.), and svedit's schema contract.
+- [ ] **TypeScript migration: components.** ~17 `.svelte` files,
+      `create_session.ts`'s residual, `commands.svelte.js`, and
+      `page_browser_context.svelte.js`. ~200 strict errors at
+      baseline, mostly implicit-any on props/event handlers and
+      svedit's `session.selection` shape. Substantial work — own
+      session.
+- [ ] **Vendor `svedit`** into `packages/svedit-vendored/`. Defer
+      until Phase 3 — the Automerge binding will reshape svedit's
+      integration surface anyway, vendoring before that means
+      doing the work twice. Phase 0 Spike A will surface whether
+      vendoring + a few patches is enough or a deeper fork is
+      needed.
 
 ## Phase 2 — Platform layer (2 weeks)
 
