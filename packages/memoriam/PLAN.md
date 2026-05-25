@@ -110,6 +110,16 @@ tenant routing.
 - [ ] Per-site storage quota tracking (sum asset bytes from disk on
       cron, store in platform DB, enforce on upload).
 - [ ] Rate limiting on auth endpoints (per IP + per email).
+- [ ] **Permanent short URLs.** `short_codes` table in the platform DB:
+      `(code TEXT PRIMARY KEY, site_id, created_at, target_path)`.
+      Codes are forever — never reassigned, never deleted, even if the
+      underlying site is deleted (then resolves to a tombstone page).
+      Resolved by a dedicated `/r/<code>` redirect endpoint kept
+      deliberately small and dependency-light, so it can be moved to a
+      Cloudflare Worker / standalone process and survive outages of the
+      main app. This is the URL we'll print on physical objects
+      (phase 5 QR feature). Get this table right *now* — every code
+      issued is a permanent commitment.
 
 ## Phase 3 — CRDT + local-first (3-4 weeks)
 
@@ -187,6 +197,30 @@ Sequence loosely; each is independent.
 - [ ] **Memorial book PDF export.** Generate a print-ready PDF from
       the site content. High-value product hook (paid feature?
       gifted to family?).
+- [ ] **QR codes for engraving.** Generate scannable codes pointing
+      to the permanent short URL (`mmr.am/<code>` from phase 2), in
+      print-ready formats for stonemasons and plaque engravers.
+      Specifics:
+      - Encode the short URL, not the canonical site URL. The short
+        code is our permanent point of indirection — domain or
+        architecture changes don't invalidate the engraving.
+      - Error correction level **H** (~30% damage tolerance). Outdoor
+        granite weathers; lichen grows; rain etches. Don't ship L or M.
+      - SVG primary export (vector, infinite scale, what engravers
+        want). PDF secondary with bleed marks, dimension labels, and
+        the human-readable URL printed below the QR as fallback for
+        scanners that fail.
+      - Three preset sizes: memorial card (~25mm), plaque (~50mm),
+        headstone (~80-100mm). Each preset enforces a minimum module
+        count so the engraver doesn't shrink it below the readable
+        threshold.
+      - Warn in the UI when the medium is low-contrast (engraved
+        grey-on-grey granite barely works — recommend an inset of
+        contrasting material, or accept reduced scannability).
+      - Owner-only download. Log every QR generation against the
+        `short_codes` row (which medium, when) — useful for support
+        ("the QR on my mother's grave doesn't work") and for the
+        long-term commitment audit trail.
 - [ ] **Full archival export.** ZIP of the SQLite DB + assets
       directory. "Your memorial, your data, forever."
 - [ ] **Multi-language.** Families spread across countries.
@@ -252,6 +286,14 @@ Worth writing down so we don't drift.
 - **Grief is a sensitive context** (HIGH). Bugs that delete
   someone's grandmother's photos are not the same as bugs in a
   task tracker. Test coverage and backup hygiene are not optional.
+- **Engraved URLs are forever** (HIGH). Once a QR is etched on
+  granite, that short code must resolve correctly for decades. This
+  constrains every architectural change downstream: domain swaps
+  need a redirect, table migrations on `short_codes` need to
+  preserve every row, shutdown is not a clean option (see below).
+  Mitigation: keep the redirect endpoint tiny and portable, mirror
+  `short_codes` to an off-platform store (e.g. a public git repo or
+  IPFS), document the recovery story in the ToS.
 
 ## Open questions
 
@@ -262,5 +304,15 @@ Worth writing down so we don't drift.
 - Comment moderation: pre-publish review by default, or post-publish
   with takedown?
 - Long-term storage promise: "we'll keep this online forever" is
-  emotionally weighted. What's the actual policy if we ever shut
-  down? (Mandatory export-on-shutdown clause in ToS.)
+  emotionally weighted, and once we ship QR codes for engraving it
+  becomes a hard commitment, not a promise. Concrete policy needed
+  *before* the first QR is downloaded:
+  - Escrow plan: which third party holds the `short_codes` mirror
+    and the redirect-endpoint code if we shut down?
+  - Minimum sunset period (e.g. 5 years guaranteed redirect even
+    after shutdown).
+  - Pricing model that funds the redirect endpoint independently
+    of editing infra — one-time "perpetuity fee" per QR issued?
+    Endowment-style?
+  - Open-source the redirect endpoint + short-code format so the
+    community can keep it running if we vanish.
