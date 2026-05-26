@@ -9,18 +9,21 @@
 	import { createSession } from '../create_session.js';
 	import { create_page_browser, set_page_browser } from './page_browser_context.svelte.js';
 
-	import { demo_doc } from '$lib/demo_doc.js';
-
-	/** @type {{ document?: any, slug?: string | null, has_backend?: boolean, is_new?: boolean, is_admin?: boolean, origin?: string | null }} */
+	interface Props {
+		document?: any;
+		slug?: string | null;
+		is_new?: boolean;
+		is_admin?: boolean;
+		origin?: string | null;
+	}
 	let {
 		document: doc,
-		has_backend = false,
 		is_new = false,
 		is_admin: server_is_admin = false,
 		origin = null
-	} = $props();
+	}: Props = $props();
 
-	let initial_doc = $derived(has_backend ? doc : demo_doc);
+	let initial_doc = $derived(doc);
 
 	let initial_doc_json = $derived(JSON.stringify(initial_doc));
 
@@ -44,9 +47,6 @@
 	let mobile_touch_started_at_page_end = $state(false);
 
 	const app = {
-		get has_backend() {
-			return has_backend;
-		},
 		get is_admin() {
 			return is_admin;
 		},
@@ -239,7 +239,7 @@
 				);
 			}
 
-			if (!has_backend || is_admin) {
+			if (is_admin) {
 				enter_edit_mode();
 				return;
 			}
@@ -272,13 +272,6 @@
 		}
 
 		async execute() {
-			if (!has_backend) {
-				console.log('Document saved', session.to_json());
-				session.selection = null;
-				this.context.editable = false;
-				return;
-			}
-
 			if (!is_admin_mode) {
 				return;
 			}
@@ -402,7 +395,7 @@
 
 	class LogoutCommand extends Command {
 		is_enabled() {
-			return has_backend && is_admin && !editable;
+			return is_admin && !editable;
 		}
 
 		async execute() {
@@ -438,7 +431,7 @@
 
 	class BrowsePagesCommand extends Command {
 		is_enabled() {
-			return has_backend && is_admin && !this.context.editable;
+			return is_admin && !this.context.editable;
 		}
 
 		execute() {
@@ -496,11 +489,9 @@
 	/>
 	<Svedit {session} bind:editable bind:this={svedit_ref} path={[session.doc.document_id]} />
 
-	{#if has_backend}
-		<SaveProgressModal
-			visible={save_progress_visible}
-			message={save_progress_message}
-			done={save_progress_done}
-		/>
-	{/if}
+	<SaveProgressModal
+		visible={save_progress_visible}
+		message={save_progress_message}
+		done={save_progress_done}
+	/>
 </div>

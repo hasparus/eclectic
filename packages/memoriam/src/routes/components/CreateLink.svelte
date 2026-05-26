@@ -83,28 +83,26 @@
 					class="create-link-input w-72 min-w-0 flex-1 border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-3 py-2 text-sm text-(--foreground) focus:border-[var(--svedit-editing-stroke)] focus:outline-none focus:ring-0 focus:shadow-none"
 					onkeydown={handle_keydown}
 				/>
-				{#if app.has_backend}
-					<button
-						type="button"
-						class="shrink-0 cursor-pointer border border-l-transparent border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] px-3 text-(--svedit-editing-stroke) hover:bg-[color-mix(in_oklch,var(--foreground)_10%,var(--background))] focus:border-[var(--svedit-editing-stroke)] focus:outline-none focus:ring-0 focus:shadow-none"
-						title="Select page"
-						aria-label="Select page"
-						onclick={() => {
-							page_browser.open_select((page) => {
-								href_input_value = page.page_href || '/';
-								open_in_new_tab = false;
-								create_link();
-							});
-						}}
-					>
-						<svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15 15" fill="none" aria-hidden="true">
-							<rect x="1.5" y="1.5" width="5" height="5" rx="0.5" stroke="currentColor" />
-							<rect x="8.5" y="1.5" width="5" height="5" rx="0.5" stroke="currentColor" />
-							<rect x="1.5" y="8.5" width="5" height="5" rx="0.5" stroke="currentColor" />
-							<rect x="8.5" y="8.5" width="5" height="5" rx="0.5" stroke="currentColor" />
-						</svg>
-					</button>
-				{/if}
+				<button
+					type="button"
+					class="shrink-0 cursor-pointer border border-l-transparent border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] px-3 text-(--svedit-editing-stroke) hover:bg-[color-mix(in_oklch,var(--foreground)_10%,var(--background))] focus:border-[var(--svedit-editing-stroke)] focus:outline-none focus:ring-0 focus:shadow-none"
+					title="Select page"
+					aria-label="Select page"
+					onclick={() => {
+						page_browser.open_select((page) => {
+							href_input_value = page.page_href || '/';
+							open_in_new_tab = false;
+							create_link();
+						});
+					}}
+				>
+					<svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+						<rect x="1.5" y="1.5" width="5" height="5" rx="0.5" stroke="currentColor" />
+						<rect x="8.5" y="1.5" width="5" height="5" rx="0.5" stroke="currentColor" />
+						<rect x="1.5" y="8.5" width="5" height="5" rx="0.5" stroke="currentColor" />
+						<rect x="8.5" y="8.5" width="5" height="5" rx="0.5" stroke="currentColor" />
+					</svg>
+				</button>
 			</div>
 		</div>
 		<div class="flex items-center justify-between px-3 py-2">

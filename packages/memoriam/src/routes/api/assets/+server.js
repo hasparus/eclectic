@@ -1,5 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import { assetExists, writeAsset, deleteAsset } from '$lib/server/asset_storage.js';
+import { getSiteStorageStatus } from '$lib/server/storage_quota.js';
 
 /** Map content types to stored file extensions */
 const CONTENT_TYPE_TO_EXT = /** @type {Record<string, string>} */ ({
@@ -52,6 +53,14 @@ export async function POST({ request, locals }) {
 		return json({ asset_id: assetId, width, height, deduplicated: true });
 	}
 
+	// Storage quota check (pre-upload). We don't know the incoming size
+	// yet; refuse if the site is already at or over the cap. Post-upload
+	// we re-check and roll back if the write pushed us over.
+	const preStatus = await getSiteStorageStatus(siteId);
+	if (preStatus.over) {
+		error(413, 'Site storage quota exceeded');
+	}
+
 	if (!request.body) {
 		error(400, 'Empty request body');
 	}
@@ -76,6 +85,12 @@ export async function POST({ request, locals }) {
 	if (actualHash !== claimedHash) {
 		await deleteAsset(siteId, assetId).catch(() => {});
 		error(400, 'Body does not match X-Content-Hash');
+	}
+
+	// Post-upload quota re-check — if the write pushed us over, roll back.
+	if (preStatus.usedBytes + bytesWritten > preStatus.quotaBytes) {
+		await deleteAsset(siteId, assetId).catch(() => {});
+		error(413, 'Site storage quota exceeded');
 	}
 
 	return json({ asset_id: assetId, width, height, deduplicated: false });

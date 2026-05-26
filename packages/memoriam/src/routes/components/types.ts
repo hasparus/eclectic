@@ -15,7 +15,6 @@ export interface SveditCtx {
 
 // App context (set in App.svelte via setContext('app', ...)).
 export interface AppCtx {
-	has_backend: boolean;
 	is_admin: boolean;
 	origin: string | null;
 	auth_dialog_open: boolean;

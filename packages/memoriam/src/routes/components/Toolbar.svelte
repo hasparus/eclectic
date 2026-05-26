@@ -17,9 +17,9 @@
 
 	let cancel_command = $derived(app_commands.cancel_editing ?? null);
 	let cancel_button_label = $derived(cancel_command?.label || 'Cancel');
-	let can_browse_pages = $derived(app.has_backend && app.is_admin && !editable);
-	let can_create_pages = $derived(app.has_backend && app.is_admin);
-	let can_logout = $derived(app.has_backend && app.is_admin && !editable);
+	let can_browse_pages = $derived(app.is_admin && !editable);
+	let can_create_pages = $derived(app.is_admin);
+	let can_logout = $derived(app.is_admin && !editable);
 
 	let selected_property = $derived(
 		session.selection?.type === 'property'
@@ -164,7 +164,7 @@
 						</button>
 					{/if}
 
-					{#if (!app.has_backend || app.is_admin) && !app_commands.edit_document.disabled}
+					{#if app.is_admin && !app_commands.edit_document.disabled}
 						<button
 							class="{TW_TOOLBAR_BTN} {TW_TOOLBAR_BTN_HOVER}"
 							onclick={() => app_commands.edit_document.execute()}

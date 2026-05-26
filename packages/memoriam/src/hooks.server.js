@@ -11,7 +11,7 @@ import {
 	setPlatformSessionCookie
 } from '$lib/server/sessions.js';
 import { getUser } from '$lib/server/users.js';
-import { userCanEditSite } from '$lib/server/sites.js';
+import { userCanEditSite, getSite, getSiteMember } from '$lib/server/sites.js';
 import { ensureDefaultSite } from '$lib/server/seed.js';
 
 /** @type {import('@sveltejs/kit').ServerInit} */
@@ -44,6 +44,8 @@ export const handle = async ({ event, resolve }) => {
 	}
 
 	// 2. Read the platform session cookie and resolve user.
+	// (visibility gating below depends on knowing the user, so resolve them
+	//  before deciding whether to expose the site.)
 	const sessionId = event.cookies.get(platformSessionCookieName);
 	if (sessionId) {
 		const session = getPlatformSession(sessionId);
@@ -66,7 +68,23 @@ export const handle = async ({ event, resolve }) => {
 		}
 	}
 
-	// 3. Compute isAdmin for the resolved site.
+	// 3. Visibility enforcement. `private` sites are only reachable by
+	// members; non-members see the site as if it didn't exist (null siteId).
+	// `public` and `unlisted` are both reachable by URL.
+	if (event.locals.siteId) {
+		const site = getSite(event.locals.siteId);
+		if (site && site.visibility === 'private') {
+			const member = event.locals.userId
+				? getSiteMember(event.locals.siteId, event.locals.userId)
+				: null;
+			if (!member) {
+				event.locals.siteId = null;
+				event.locals.db = null;
+			}
+		}
+	}
+
+	// 4. Compute isAdmin for the resolved site.
 	if (event.locals.siteId && event.locals.userId) {
 		event.locals.isAdmin = userCanEditSite(event.locals.siteId, event.locals.userId);
 	}

@@ -233,7 +233,7 @@
 		</Drawer>
 	{/if}
 
-	{#if app.has_backend && app.is_admin}
+	{#if app.is_admin}
 		{@const PagesDrawer = (await import('./PagesDrawer.svelte')).default}
 		<Drawer bind:open={page_browser.state.open} label="Pages">
 			<PagesDrawer />

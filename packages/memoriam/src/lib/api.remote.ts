@@ -21,6 +21,7 @@ import { issueMagicLink, consumeMagicLink } from '$lib/server/magic_link.js';
 import { sendMagicLink } from '$lib/server/email.js';
 import { upsertUserByEmail } from '$lib/server/users.js';
 import { createSite as createSiteCore } from '$lib/server/sites.js';
+import { checkRateLimit } from '$lib/server/rate_limit.js';
 
 /**
  * Per-site database accessor. Always resolves to the database for the
@@ -811,16 +812,36 @@ export const getSharedDocuments = query(v.void(), async () => {
 	};
 });
 
+// Rate-limit magic-link requests: at most 5 per email per hour, and at
+// most 30 per IP per hour (each IP can't request links for many emails
+// to bypass the per-email cap). The response is uniform regardless of
+// rate-limit state so attackers can't use the endpoint to fingerprint
+// registered emails.
+const MAGIC_LINK_RATE_PER_EMAIL = { max: 5, windowMs: 60 * 60 * 1000 };
+const MAGIC_LINK_RATE_PER_IP = { max: 30, windowMs: 60 * 60 * 1000 };
+
 /**
  * Issue a magic-link token for the given email and send the sign-in
  * link via Resend (or log it to stdout in dev when RESEND_API_KEY is
  * unset). Always returns `{ ok: true }` regardless of whether the
- * email was actually delivered — surfacing delivery results would let
- * attackers probe for registered emails.
+ * email was actually delivered or rate-limited — surfacing those
+ * results would let attackers probe for registered emails or DOS
+ * mailboxes.
  */
 export const requestMagicLink = command(requestMagicLinkInputSchema, async ({ email }) => {
-	const { url } = getRequestEvent();
-	const issued = issueMagicLink(email);
+	const { url, getClientAddress } = getRequestEvent();
+	const normalized = email.trim().toLowerCase();
+
+	const emailCheck = checkRateLimit(`mlink:email:${normalized}`, MAGIC_LINK_RATE_PER_EMAIL);
+	const ipCheck = checkRateLimit(`mlink:ip:${getClientAddress()}`, MAGIC_LINK_RATE_PER_IP);
+	if (!emailCheck.ok || !ipCheck.ok) {
+		console.warn(
+			`[auth] rate-limited magic-link request for ${normalized} from ${getClientAddress()}`
+		);
+		return { ok: true };
+	}
+
+	const issued = issueMagicLink(normalized);
 	const link = `${url.origin}/auth/magic?token=${encodeURIComponent(issued.token)}`;
 	await sendMagicLink(issued.email, link);
 	return { ok: true };

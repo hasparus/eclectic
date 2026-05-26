@@ -195,23 +195,31 @@ tenant routing.
 - [ ] Member management UI: invite by email, accept invite, role
       changes, leave site, transfer ownership. (Backend tables are
       in place; the flows aren't.)
-- [ ] Visibility-level enforcement in `hooks.server.js`. The
-      `visibility` column exists (`public` / `unlisted` / `private`)
-      but private-site gating against the membership table hasn't
-      shipped.
-- [ ] Per-site storage quota tracking (sum asset bytes from disk on
-      cron, store in platform DB, enforce on upload).
-- [ ] Rate limiting on auth endpoints (per IP + per email).
-- [ ] `/r/<code>` redirect endpoint backed by `short_codes` —
-      designed to be small and dependency-light so it can move to a
-      Cloudflare Worker.
-- [ ] Strip the dead `has_backend` flag. Phase 1's upstream Vercel
-      static fallback is gone (the deploy decision lives in
-      § Deploy target). The flag still threads through
-      `+layout.server.ts` → page data → `App.svelte` → toolbar
-      gates → `demo_doc` fallback. Replace with `isAdmin` /
-      `siteId` checks at each site, drop the `demo_doc` branch in
-      App.svelte. Spans ~10 components; do as one focused commit.
+- [x] Visibility-level enforcement in `hooks.server.js`. `private`
+      sites resolve to `siteId = null` for non-members, so the rest
+      of the request pipeline treats them as "no site found" (clean
+      404 from page loads). `public` and `unlisted` stay reachable
+      by URL.
+- [x] Per-site storage quota tracking. `storage_quota.ts` recurses
+      the assets directory on demand; `POST /api/assets` does a
+      pre-upload check (refuses if already over) and a post-upload
+      re-check (rolls back if the write pushed over). Cap defaults
+      to 1 GiB, overridable via `MEMORIAM_SITE_QUOTA_BYTES`.
+      DB-backed accounting + cron-based aggregation can come later
+      if disk-walking on every upload becomes a bottleneck.
+- [x] Rate limiting on auth endpoints. In-memory token bucket per
+      email (5/hr) and per IP (30/hr) on `requestMagicLink`.
+      Cluster-unsafe; swap for a shared store before
+      multi-process production.
+- [x] `/r/<code>` redirect endpoint backed by `short_codes` —
+      designed small and dependency-light. Prefers custom domain
+      → subdomain → site-id path prefix. `issueShortCode` library
+      function lives in `short_codes.ts`; UI to mint codes is
+      Phase 5 (QR generation).
+- [x] Strip the dead `has_backend` flag. Removed from layout/page
+      server loads, App.svelte props (and the `demo_doc` fallback),
+      AppCtx interface, and Toolbar/Overlays/CreateLink/EditLink/
+      LinkPreview consumers.
 
 ## Phase 3 — Multiplayer + local-first via Automerge (3-4 weeks)
 
