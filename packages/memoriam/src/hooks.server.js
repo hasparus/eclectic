@@ -1,58 +1,74 @@
 import { env } from '$env/dynamic/private';
+import { getPlatformDb } from '$lib/server/platform_db.js';
+import { resolveSiteIdFromUrl } from '$lib/server/site_resolution.js';
+import { getDb } from '$lib/server/db.js';
 import {
-	adminSessionCookieName,
-	clearAdminSessionCookie,
-	getSessionExpiresAt,
-	setAdminSessionCookie
-} from '$lib/server/auth.js';
-import { resolveSiteId } from '$lib/server_config.js';
+	platformSessionCookieName,
+	getPlatformSession,
+	deletePlatformSession,
+	extendPlatformSession,
+	clearPlatformSessionCookie,
+	setPlatformSessionCookie
+} from '$lib/server/sessions.js';
+import { getUser } from '$lib/server/users.js';
+import { userCanEditSite } from '$lib/server/sites.js';
+import { ensureDefaultSite } from '$lib/server/seed.js';
 
 /** @type {import('@sveltejs/kit').ServerInit} */
 export async function init() {
-	if (!env.VERCEL && !env.ADMIN_PASSWORD) {
-		throw new Error('ADMIN_PASSWORD must be set');
-	}
+	// Eagerly initialize the platform DB so its migrations run at startup.
+	// Per-site DBs still migrate lazily on first getDb(siteId) call.
+	getPlatformDb();
 
-	// Migrations run lazily on first getDb(siteId) per site (see
-	// $lib/server/db.ts). No eager migration here — there is no longer a
-	// single application database to migrate up front.
+	// In dev / single-tenant deployments, ensure the configured default
+	// site exists. Idempotent — no-op if the site is already there.
+	if (env.MEMORIAM_DEFAULT_SITE_ID) {
+		ensureDefaultSite();
+	}
 }
 
 /** @type {import('@sveltejs/kit').Handle} */
 export const handle = async ({ event, resolve }) => {
+	event.locals.platformDb = getPlatformDb();
+	event.locals.siteId = null;
+	event.locals.db = null;
+	event.locals.userId = null;
+	event.locals.userEmail = null;
 	event.locals.isAdmin = false;
 
-	if (env.VERCEL) {
-		return resolve(event);
+	// 1. Resolve site from URL (custom domain → subdomain → fallback).
+	const siteId = resolveSiteIdFromUrl(event.url);
+	if (siteId) {
+		event.locals.siteId = siteId;
+		event.locals.db = getDb(siteId);
 	}
 
-	const siteId = resolveSiteId(event.url);
-	event.locals.siteId = siteId;
-
-	const { getDb } = await import('$lib/server/db.js');
-	const db = getDb(siteId);
-	event.locals.db = db;
-
-	const sessionId = event.cookies.get(adminSessionCookieName);
-
+	// 2. Read the platform session cookie and resolve user.
+	const sessionId = event.cookies.get(platformSessionCookieName);
 	if (sessionId) {
-		const row = /** @type {{ expires: number } | undefined} */ (
-			db.prepare('SELECT expires FROM sessions WHERE session_id = ?').get(sessionId)
-		);
-
-		if (!row) {
-			clearAdminSessionCookie(event.cookies);
-		} else if (row.expires <= Math.floor(Date.now() / 1000)) {
-			db.prepare('DELETE FROM sessions WHERE session_id = ?').run(sessionId);
-			clearAdminSessionCookie(event.cookies);
+		const session = getPlatformSession(sessionId);
+		if (!session) {
+			clearPlatformSessionCookie(event.cookies);
+		} else if (session.expires <= Math.floor(Date.now() / 1000)) {
+			deletePlatformSession(sessionId);
+			clearPlatformSessionCookie(event.cookies);
 		} else {
-			db.prepare('UPDATE sessions SET expires = ? WHERE session_id = ?').run(
-				getSessionExpiresAt(),
-				sessionId
-			);
-			setAdminSessionCookie(event.cookies, sessionId);
-			event.locals.isAdmin = true;
+			const user = getUser(session.user_id);
+			if (!user) {
+				deletePlatformSession(sessionId);
+				clearPlatformSessionCookie(event.cookies);
+			} else {
+				event.locals.userId = user.user_id;
+				event.locals.userEmail = user.email;
+				extendPlatformSession(sessionId);
+				setPlatformSessionCookie(event.cookies, sessionId);
+			}
 		}
+	}
+
+	// 3. Compute isAdmin for the resolved site.
+	if (event.locals.siteId && event.locals.userId) {
+		event.locals.isAdmin = userCanEditSite(event.locals.siteId, event.locals.userId);
 	}
 
 	const response = await resolve(event);

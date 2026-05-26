@@ -3,6 +3,9 @@ import { deleteAsset, assetExists } from '$lib/server/asset_storage.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function DELETE({ params, locals }) {
+	if (!locals.siteId) {
+		error(404, 'Site not found');
+	}
 	if (!locals.isAdmin) {
 		error(401, 'Authentication required');
 	}

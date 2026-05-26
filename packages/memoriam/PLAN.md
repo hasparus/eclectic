@@ -147,53 +147,61 @@ Get the vendored code into a shape we can build on. No new features.
 The piece that doesn't exist upstream. Multi-user, multi-site, with
 tenant routing.
 
-- [ ] Platform DB schema:
-      - `users`, `sites`, `site_members` (user_id, site_id, role:
-        owner/editor/viewer), `domains` (custom domain → site_id),
-        `invites`, `platform_sessions`.
-      - Genealogy registry: `people` (person_id, display_name,
-        given_names, surname, birth_year, death_year, is_living,
-        privacy_level, owner_user_id, created_at, updated_at),
-        `person_aliases` (person_id, alias, source) for maiden names
-        and alternate spellings, `relationships` (parent_id, child_id,
-        relation_type, certainty, source_note) — modeled as directed
-        parent→child edges; spouses derived from shared-child queries
-        or stored explicitly as relation_type='spouse',
-        `person_memorials` (person_id, site_id) linking platform
-        people to per-site memorial pages, `person_access` for
-        per-person ACLs (who can edit a person record, who can see
-        them if `is_living=1`).
-      - Person records are platform-level because they cross sites
-        (your grandmother appears on your memorial and your cousin's).
-        The memorial *content* stays in the per-site DB; only the
-        identity + relationship graph lives in the platform DB.
-- [ ] Auth: email magic link (lowest friction for grieving families,
-      no password to forget). `nodemailer` + Resend or Postmark for
-      transactional. Optional Google OAuth as second method.
-- [ ] Site creation flow. New memorial = generate site_id, create
-      `data/<site_id>/`, run migrations, seed with a default page, add
-      creator as owner in `site_members`.
-- [ ] Tenant resolution in `hooks.server.js`. Order: custom domain
-      lookup → subdomain (`<site_id>.memoriam.app`) → fallback. Stash
-      `event.locals.site_id` and `event.locals.db`.
+- [x] Platform DB schema — `_platform.sqlite3` next to per-site DBs.
+      Tables: `users`, `sites`, `site_members`, `domains`, `invites`,
+      `platform_sessions`, `magic_link_tokens`, `short_codes`. Plus
+      the genealogy registry: `people`, `person_aliases`,
+      `relationships`, `person_memorials`, `person_access`. SQL
+      idiomatic snake_case, foreign keys enabled. People are
+      platform-level because they cross sites; memorial content
+      stays in the per-site DB.
+- [x] Tenant resolution in `hooks.server.js`. Order: custom domain
+      lookup → subdomain (`<site_id>.memoriam.app`, configurable via
+      `MEMORIAM_HOST_SUFFIX`) → `MEMORIAM_DEFAULT_SITE_ID` fallback.
+      Stashes `event.locals.siteId`, `event.locals.db`,
+      `event.locals.platformDb`, `event.locals.userId`, and
+      `event.locals.isAdmin` (derived from membership role).
+- [x] Site creation backend (`createSite`). Allocates a site_id
+      (nanoid or caller's preference), inserts `sites` +
+      `site_members(role=owner)` rows in one platform transaction,
+      then opens the per-site DB which lazily runs the per-site
+      initial migration (seeds nav + footer + home page).
+- [x] Magic-link auth backend (`requestMagicLink`,
+      `consumeMagicLinkToken`, `/auth/magic` route). Tokens are
+      256-bit URL-safe base64, single-use, 15-minute TTL. Replaces
+      the old single-password admin model entirely. Dev mode logs
+      the magic link to stdout; transactional email integration
+      (Resend / Postmark) is the remaining step.
+- [x] Platform session model. Replaces per-site `sessions` table
+      (dropped in a per-site migration). Cookie is `mm_session`,
+      14-day sliding window, opaque session id keyed in
+      `platform_sessions`.
+- [x] **Permanent short URLs table** (`short_codes`). The actual
+      `/r/<code>` redirect endpoint + QR generation are still TODO
+      (Phase 5 work); the persistent table that backs them is in
+      place now so every issued code is durable from day one.
+- [x] AuthDialog UI updated to the email + magic-link flow (sends
+      link, shows "check your email" screen). Old password input
+      removed.
+- [ ] Email delivery (transactional). Wire up Resend / Postmark
+      behind a `sendMagicLink(email, link)` helper. In dev the link
+      keeps logging to stdout.
+- [ ] Site listing + creation UI for signed-in users (e.g. a
+      `/sites` route showing the current user's memorials with a
+      "create new memorial" button calling `createSite`).
 - [ ] Member management UI: invite by email, accept invite, role
-      changes, leave site, transfer ownership.
-- [ ] Visibility levels per site: public, unlisted (link only),
-      private (invited members only). Enforced in
-      `hooks.server.js` before serving page HTML.
+      changes, leave site, transfer ownership. (Backend tables are
+      in place; the flows aren't.)
+- [ ] Visibility-level enforcement in `hooks.server.js`. The
+      `visibility` column exists (`public` / `unlisted` / `private`)
+      but private-site gating against the membership table hasn't
+      shipped.
 - [ ] Per-site storage quota tracking (sum asset bytes from disk on
       cron, store in platform DB, enforce on upload).
 - [ ] Rate limiting on auth endpoints (per IP + per email).
-- [ ] **Permanent short URLs.** `short_codes` table in the platform DB:
-      `(code TEXT PRIMARY KEY, site_id, created_at, target_path)`.
-      Codes are forever — never reassigned, never deleted, even if the
-      underlying site is deleted (then resolves to a tombstone page).
-      Resolved by a dedicated `/r/<code>` redirect endpoint kept
-      deliberately small and dependency-light, so it can be moved to a
-      Cloudflare Worker / standalone process and survive outages of the
-      main app. This is the URL we'll print on physical objects
-      (phase 5 QR feature). Get this table right *now* — every code
-      issued is a permanent commitment.
+- [ ] `/r/<code>` redirect endpoint backed by `short_codes` —
+      designed to be small and dependency-light so it can move to a
+      Cloudflare Worker.
 
 ## Phase 3 — Multiplayer + local-first via Automerge (3-4 weeks)
 

@@ -11,12 +11,13 @@
 		onlogin_success = () => {}
 	}: Props = $props();
 
-	let password = $state('');
+	let email = $state('');
 	let error = $state('');
 	let pending = $state(false);
-	let step = $state<'choice' | 'login'>('choice');
-	let password_input_ref = $state<HTMLInputElement | undefined>();
-	let should_focus_password_input = $state(false);
+	let sent_to = $state<string | null>(null);
+	let step = $state<'choice' | 'login' | 'sent'>('choice');
+	let email_input_ref = $state<HTMLInputElement | undefined>();
+	let should_focus_email_input = $state(false);
 
 	$effect(() => {
 		if (step !== 'choice') return;
@@ -29,21 +30,22 @@
 	});
 
 	$effect(() => {
-		if (step !== 'login' || !password_input_ref || !should_focus_password_input) return;
+		if (step !== 'login' || !email_input_ref || !should_focus_email_input) return;
 
 		requestAnimationFrame(() => {
-			password_input_ref?.focus();
-			password_input_ref?.select();
-			should_focus_password_input = false;
+			email_input_ref?.focus();
+			email_input_ref?.select();
+			should_focus_email_input = false;
 		});
 	});
 
 	function reset_dialog() {
-		password = '';
+		email = '';
 		error = '';
 		pending = false;
+		sent_to = null;
 		step = 'choice';
-		should_focus_password_input = false;
+		should_focus_email_input = false;
 	}
 
 	function close_auth_dialog() {
@@ -59,37 +61,43 @@
 	function open_login_step() {
 		step = 'login';
 		error = '';
-		password = '';
-		should_focus_password_input = true;
+		email = '';
+		should_focus_email_input = true;
 	}
 
-	async function login_and_edit() {
+	async function send_magic_link() {
 		if (pending) return;
+		const trimmed = email.trim();
+		if (!trimmed || !trimmed.includes('@')) {
+			error = 'Enter a valid email address.';
+			return;
+		}
 
 		pending = true;
 		error = '';
 
 		try {
 			const api_module = await import('$lib/api.remote.js');
-			const result = await api_module.loginAdmin({ password });
-
-			if (result && result.ok === false && 'message' in result) {
-				error = result.message || 'Login failed.';
+			const result = (await api_module.requestMagicLink({ email: trimmed })) as
+				| { ok: true }
+				| { ok: false; code: string; message: string };
+			if (result.ok === false) {
+				error = result.message || 'Could not send link.';
 				return;
 			}
 
-			reset_dialog();
-			await onlogin_success();
+			sent_to = trimmed;
+			step = 'sent';
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Login failed.';
+			error = err instanceof Error ? err.message : 'Could not send link.';
 		} finally {
 			pending = false;
 		}
 	}
 
-	function handle_password_keydown(event: KeyboardEvent) {
+	function handle_email_keydown(event: KeyboardEvent) {
 		if (event.key === 'Enter') {
-			void login_and_edit();
+			void send_magic_link();
 		}
 	}
 </script>
@@ -153,45 +161,57 @@
 					</div>
 
 					<div class="flex flex-col items-center gap-1 text-center sm:gap-1.5">
-						<div class="text-[1rem] leading-none font-medium sm:text-[1.15rem]">Login</div>
+						<div class="text-[1rem] leading-none font-medium sm:text-[1.15rem]">Sign in</div>
 						<div class="text-[0.68rem] leading-tight text-[color-mix(in_oklch,var(--foreground)_62%,transparent)] sm:text-xs">
-							For admins
+							Email link
 						</div>
 					</div>
 				</button>
 			</div>
 		</div>
-	{:else}
+	{:else if step === 'login'}
 		<div class="mx-auto flex w-full max-w-lg flex-col gap-8 px-1 pt-8 pb-8">
 			<div class="flex flex-col items-center gap-1 text-center">
 				<h2 class="m-0 text-xl leading-[1.15] font-medium sm:text-2xl">
-					Login as admin
+					Sign in with your email
 				</h2>
+				<p class="m-0 text-sm text-[color-mix(in_oklch,var(--foreground)_64%,transparent)]">
+					We'll email you a link to sign in.
+				</p>
 			</div>
 
 			<div class="flex items-stretch gap-2">
 				<input
-					type="password"
-					bind:this={password_input_ref}
-					bind:value={password}
-					placeholder="Enter password"
+					type="email"
+					bind:this={email_input_ref}
+					bind:value={email}
+					placeholder="you@example.com"
+					autocomplete="email"
 					class="min-w-0 flex-1 appearance-none rounded-[0.9rem] border border-[color-mix(in_oklch,var(--background)_92%,var(--foreground))] bg-(--background) px-4 py-3 text-base text-(--foreground) outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-[color-mix(in_oklch,var(--foreground)_52%,transparent)] hover:border-[color-mix(in_oklch,var(--background)_84%,var(--foreground))] focus:outline-none focus:ring-0 focus-visible:border-[color-mix(in_oklch,var(--background)_76%,var(--foreground))] focus-visible:shadow-[0_0_0_3px_color-mix(in_oklch,var(--background)_92%,var(--foreground))]"
-					onkeydown={handle_password_keydown}
+					onkeydown={handle_email_keydown}
 				/>
 
 				<button
 					type="button"
 					class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-[0.8rem] border border-(--svedit-editing-stroke) bg-(--background) px-5 py-3 text-base font-semibold text-(--svedit-editing-stroke) shadow-sm outline-1 outline-transparent transition-all duration-150 hover:bg-[color-mix(in_oklch,var(--foreground)_4%,var(--background))] active:translate-y-px active:scale-95 active:bg-[color-mix(in_oklch,var(--foreground)_7%,var(--background))] focus-visible:outline-1 focus-visible:outline-(--svedit-editing-stroke) focus-visible:outline-offset-1"
-					onclick={() => void login_and_edit()}
+					onclick={() => void send_magic_link()}
 					disabled={pending}
 				>
-					{pending ? 'Logging in…' : 'Login'}
+					{pending ? 'Sending…' : 'Send link'}
 				</button>
 			</div>
 
 			{#if error}
 				<div class="text-sm text-red-600">{error}</div>
 			{/if}
+		</div>
+	{:else}
+		<div class="mx-auto flex w-full max-w-lg flex-col gap-6 px-1 pt-8 pb-8 text-center">
+			<h2 class="m-0 text-xl leading-[1.15] font-medium sm:text-2xl">Check your email</h2>
+			<p class="m-0 text-sm text-[color-mix(in_oklch,var(--foreground)_64%,transparent)]">
+				We sent a sign-in link to <span class="text-(--foreground)">{sent_to}</span>.
+				Open it on this device to finish signing in.
+			</p>
 		</div>
 	{/if}
 </div>

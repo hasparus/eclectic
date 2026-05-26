@@ -194,6 +194,11 @@ const migrations: Migration[] = [
 					updated_at = COALESCE(updated_at, ?)
 			`
 		).run(now, now);
+	},
+	function drop_per_site_sessions({ db }) {
+		// Sessions are now platform-level (Phase 2). The per-site
+		// `sessions` table is no longer read or written; drop it.
+		db.exec(sql`DROP TABLE IF EXISTS sessions`);
 	}
 ];
 

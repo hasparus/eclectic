@@ -9,16 +9,17 @@ import {
 	extractPlainText,
 	collectPageBodyNodeIds
 } from '$lib/page_metadata.js';
+import { requireAdminSession } from '$lib/server/auth.js';
 import {
-	adminSessionCookieName,
-	getRequiredAdminPassword,
-	getSessionExpiresAt,
-	deleteSession,
-	clearAdminSessionCookie,
-	setAdminSessionCookie,
-	requireAdminSession,
-	constantTimeEqual
-} from '$lib/server/auth.js';
+	platformSessionCookieName,
+	createPlatformSession,
+	deletePlatformSession,
+	setPlatformSessionCookie,
+	clearPlatformSessionCookie
+} from '$lib/server/sessions.js';
+import { issueMagicLink, consumeMagicLink } from '$lib/server/magic_link.js';
+import { upsertUserByEmail } from '$lib/server/users.js';
+import { createSite as createSiteCore } from '$lib/server/sites.js';
 
 /**
  * Per-site database accessor. Always resolves to the database for the
@@ -27,11 +28,19 @@ import {
  * reference, so the same code path works for any site.
  */
 function db(): import('node:sqlite').DatabaseSync {
-	return getRequestEvent().locals.db;
+	const handle = getRequestEvent().locals.db;
+	if (!handle) {
+		throw new Error('No site resolved for this request');
+	}
+	return handle;
 }
 
-const adminLoginInputSchema = v.object({
-	password: v.string()
+const requestMagicLinkInputSchema = v.object({
+	email: v.pipe(v.string(), v.email())
+});
+
+const consumeMagicLinkInputSchema = v.object({
+	token: v.string()
 });
 
 interface ErrorResult {
@@ -812,39 +821,79 @@ export const getAuthStatus = query(v.void(), async () => {
 	};
 });
 
-export const loginAdmin = command(adminLoginInputSchema, async ({ password }) => {
-	const { cookies } = getRequestEvent();
-	const adminPassword = getRequiredAdminPassword();
+/**
+ * Issue a magic-link token for the given email. In dev (no email
+ * integration yet) the link is logged to stdout — copy/paste the URL
+ * into a browser to complete sign-in.
+ */
+export const requestMagicLink = command(requestMagicLinkInputSchema, async ({ email }) => {
+	const { url } = getRequestEvent();
+	const issued = issueMagicLink(email);
+	const link = `${url.origin}/auth/magic?token=${encodeURIComponent(issued.token)}`;
+	console.log(`[auth] Magic link for ${issued.email}: ${link}`);
+	return { ok: true };
+});
 
-	if (!constantTimeEqual(password, adminPassword)) {
-		return createAuthErrorResult('invalid_password', 'Incorrect admin password.');
+/**
+ * Consume a magic-link token: validates, upserts the user, creates a
+ * platform session, and sets the session cookie.
+ */
+export const consumeMagicLinkToken = command(
+	consumeMagicLinkInputSchema,
+	async ({ token }) => {
+		const { cookies } = getRequestEvent();
+		const result = consumeMagicLink(token);
+		if (!result.ok || !result.email) {
+			return createAuthErrorResult(result.reason ?? 'unknown', 'Magic link is not valid.');
+		}
+
+		const user = upsertUserByEmail(result.email);
+		const session = createPlatformSession(user.user_id);
+		setPlatformSessionCookie(cookies, session.session_id);
+
+		return { ok: true, userId: user.user_id, email: user.email };
+	}
+);
+
+export const logout = command(v.void(), async () => {
+	const { cookies } = getRequestEvent();
+	const sessionId = cookies.get(platformSessionCookieName);
+
+	if (sessionId) {
+		deletePlatformSession(sessionId);
 	}
 
-	const sessionId = crypto.randomUUID();
-	db().prepare('INSERT INTO sessions (session_id, expires) VALUES (?, ?)').run(
-		sessionId,
-		getSessionExpiresAt()
-	);
-	setAdminSessionCookie(cookies, sessionId);
+	clearPlatformSessionCookie(cookies);
 
 	return {
 		ok: true
 	};
 });
 
-export const logoutAdmin = command(v.void(), async () => {
-	const { cookies } = getRequestEvent();
-	const sessionId = cookies.get(adminSessionCookieName);
+const createSiteInputSchema = v.object({
+	display_name: v.optional(v.string()),
+	preferred_site_id: v.optional(v.string()),
+	visibility: v.optional(v.picklist(['public', 'unlisted', 'private']))
+});
 
-	if (sessionId) {
-		deleteSession(db(), sessionId);
+/**
+ * Create a new site owned by the authenticated user. Returns the
+ * created site row. v1 has no per-user site quota — Phase 2 follow-up.
+ */
+export const createSite = command(createSiteInputSchema, async (input) => {
+	const { locals } = getRequestEvent();
+	if (!locals.userId) {
+		return createAuthErrorResult('unauthenticated', 'Sign in first.');
 	}
 
-	clearAdminSessionCookie(cookies);
+	const site = createSiteCore({
+		ownerUserId: locals.userId,
+		displayName: input.display_name,
+		preferredSiteId: input.preferred_site_id,
+		visibility: input.visibility
+	});
 
-	return {
-		ok: true
-	};
+	return { ok: true, site };
 });
 
 /**

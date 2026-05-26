@@ -12,6 +12,9 @@ const CONTENT_TYPE_TO_EXT = /** @type {Record<string, string>} */ ({
 
 /** @type {import('./$types').RequestHandler} */
 export async function POST({ request, locals }) {
+	if (!locals.siteId) {
+		error(404, 'Site not found');
+	}
 	if (!locals.isAdmin) {
 		error(401, 'Authentication required');
 	}

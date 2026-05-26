@@ -408,7 +408,7 @@
 		async execute() {
 			try {
 				const api_module = await import('$lib/api.remote.js');
-				await api_module.logoutAdmin();
+				await api_module.logout();
 				editable = false;
 				page_browser.close?.();
 				await invalidateAll();

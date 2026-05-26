@@ -91,6 +91,9 @@ function parseRange(header, size) {
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ params, request, locals }) {
+	if (!locals.siteId) {
+		error(404, 'Site not found');
+	}
 	const siteId = locals.siteId;
 	const path = params.path;
 
