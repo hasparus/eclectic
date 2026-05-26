@@ -183,9 +183,12 @@ tenant routing.
 - [x] AuthDialog UI updated to the email + magic-link flow (sends
       link, shows "check your email" screen). Old password input
       removed.
-- [ ] Email delivery (transactional). Wire up Resend / Postmark
-      behind a `sendMagicLink(email, link)` helper. In dev the link
-      keeps logging to stdout.
+- [x] Email delivery via Resend, behind `sendMagicLink(email, link)`
+      in `src/lib/server/email.ts`. Lazy-imports the SDK so the dev
+      path (no `RESEND_API_KEY`) doesn't pull it in. Always returns
+      ok-from-the-API-surface to prevent email enumeration; logs
+      failures server-side. `MEMORIAM_EMAIL_FROM` and
+      `MEMORIAM_PRODUCT_NAME` are configurable.
 - [ ] Site listing + creation UI for signed-in users (e.g. a
       `/sites` route showing the current user's memorials with a
       "create new memorial" button calling `createSite`).

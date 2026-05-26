@@ -18,6 +18,7 @@ import {
 	clearPlatformSessionCookie
 } from '$lib/server/sessions.js';
 import { issueMagicLink, consumeMagicLink } from '$lib/server/magic_link.js';
+import { sendMagicLink } from '$lib/server/email.js';
 import { upsertUserByEmail } from '$lib/server/users.js';
 import { createSite as createSiteCore } from '$lib/server/sites.js';
 
@@ -822,15 +823,17 @@ export const getAuthStatus = query(v.void(), async () => {
 });
 
 /**
- * Issue a magic-link token for the given email. In dev (no email
- * integration yet) the link is logged to stdout — copy/paste the URL
- * into a browser to complete sign-in.
+ * Issue a magic-link token for the given email and send the sign-in
+ * link via Resend (or log it to stdout in dev when RESEND_API_KEY is
+ * unset). Always returns `{ ok: true }` regardless of whether the
+ * email was actually delivered — surfacing delivery results would let
+ * attackers probe for registered emails.
  */
 export const requestMagicLink = command(requestMagicLinkInputSchema, async ({ email }) => {
 	const { url } = getRequestEvent();
 	const issued = issueMagicLink(email);
 	const link = `${url.origin}/auth/magic?token=${encodeURIComponent(issued.token)}`;
-	console.log(`[auth] Magic link for ${issued.email}: ${link}`);
+	await sendMagicLink(issued.email, link);
 	return { ok: true };
 });
 
