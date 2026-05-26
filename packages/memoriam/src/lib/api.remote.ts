@@ -812,17 +812,6 @@ export const getSharedDocuments = query(v.void(), async () => {
 });
 
 /**
- * Return page browser data for the pages drawer.
- */
-export const getAuthStatus = query(v.void(), async () => {
-	const { locals } = getRequestEvent();
-
-	return {
-		isAdmin: !!locals.isAdmin
-	};
-});
-
-/**
  * Issue a magic-link token for the given email and send the sign-in
  * link via Resend (or log it to stdout in dev when RESEND_API_KEY is
  * unset). Always returns `{ ok: true }` regardless of whether the

@@ -91,6 +91,10 @@ const migrations: Migration[] = [
 			);
 		`);
 
+		// Phase 1 created sessions per-site. Phase 2 moved sessions to the
+		// platform DB and the table is dropped by `drop_per_site_sessions`
+		// below. The create+drop dance stays so already-applied initial
+		// migrations match this file's checksum.
 		db.exec(sql`
 			CREATE TABLE sessions (
 				session_id TEXT NOT NULL PRIMARY KEY,

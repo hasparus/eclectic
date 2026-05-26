@@ -1,7 +1,7 @@
-import { redirect } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ parent }) => {
+export const load: PageServerLoad = async ({ parent, locals }) => {
 	const parentData = await parent();
 	const hasBackend = parentData.has_backend;
 	const isAdmin = parentData.is_admin ?? false;
@@ -12,6 +12,10 @@ export const load: PageServerLoad = async ({ parent }) => {
 			is_admin: isAdmin,
 			shared_documents: null
 		};
+	}
+
+	if (!locals.siteId) {
+		throw error(404, 'No memorial found for this address.');
 	}
 
 	if (!isAdmin) {

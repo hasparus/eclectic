@@ -205,6 +205,13 @@ tenant routing.
 - [ ] `/r/<code>` redirect endpoint backed by `short_codes` —
       designed to be small and dependency-light so it can move to a
       Cloudflare Worker.
+- [ ] Strip the dead `has_backend` flag. Phase 1's upstream Vercel
+      static fallback is gone (the deploy decision lives in
+      § Deploy target). The flag still threads through
+      `+layout.server.ts` → page data → `App.svelte` → toolbar
+      gates → `demo_doc` fallback. Replace with `isAdmin` /
+      `siteId` checks at each site, drop the `demo_doc` branch in
+      App.svelte. Spans ~10 components; do as one focused commit.
 
 ## Phase 3 — Multiplayer + local-first via Automerge (3-4 weeks)
 

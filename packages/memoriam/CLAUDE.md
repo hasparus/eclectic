@@ -21,11 +21,23 @@ decisions live in [PLAN.md](./PLAN.md).
 
 ## Server
 
-Backend code reaches the per-site SQLite via
-`event.locals.db` (set in `hooks.server.js`) or the `db()`
-accessor in `api.remote.js`. There is no module-level
-singleton — the per-site LRU cache in `src/lib/server/db.js`
-owns every `DatabaseSync`.
+Per-site SQLite is reached via `event.locals.db` (set in
+`hooks.server.js`) or the `db()` accessor in `api.remote.ts`.
+`locals.db` is **nullable** — it's null when the request didn't
+resolve to a site (apex domain, unknown subdomain, etc.). The
+`db()` accessor throws; in page server loads check
+`locals.siteId` first and `error(404)` if the route requires a
+site. The platform-wide DB (`locals.platformDb`) is always
+available.
+
+Edit permission is `locals.isAdmin`, derived in
+`hooks.server.js` from the user's `site_members` role on the
+resolved site (owner / editor → admin; viewer / non-member → not).
+Use `requireAdminSession(locals)` in mutating remote functions.
+
+There is no module-level DB singleton. The per-site LRU cache in
+`src/lib/server/db.ts` owns every `DatabaseSync`;
+`platform_db.ts` owns the single platform connection.
 
 ## Adding a node property
 
