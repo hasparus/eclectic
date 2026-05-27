@@ -28,11 +28,32 @@ describe('generateQrSvg', () => {
 		// Original QR <path> still present.
 		expect(svg).toMatch(/<path /);
 		// Logo is nested via a child <svg> with x/y/width/height set.
-		expect(svg).toMatch(/<svg x="[\d.]+" y="[\d.]+" width="[\d.]+" height="[\d.]+" viewBox="0 0 72 72">/);
+		expect(svg).toMatch(/<svg x="\d+" y="\d+" width="\d+" height="\d+" viewBox="0 0 72 72">/);
 		// And it carries the logo's <circle> content forward.
 		expect(svg).toContain('<circle');
 		// Backdrop rect is drawn first so modules don't bleed through.
 		expect(svg).toMatch(/<rect [^/]*fill="#ffffff"\/>/);
+	});
+
+	it('snaps the backdrop to integer module coordinates', async () => {
+		const svg = await generateQrSvg('https://example.com', {
+			logo: { svg: sampleLogo }
+		});
+		// Backdrop rect must use integer x/y/width/height — that's
+		// what makes it pixel-perfect against the QR grid.
+		const rect = svg.match(/<rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)"/);
+		expect(rect).toBeTruthy();
+		const [, x, y, w, h] = rect!;
+		// Symmetric: the backdrop spans the same number of modules on
+		// each side, so x === y and w === h.
+		expect(x).toBe(y);
+		expect(w).toBe(h);
+		// Width must be odd so the box centres on the matrix's middle
+		// module (the matrix is always odd).
+		expect(Number(w) % 2).toBe(1);
+		// And the offsets sum to (total - width) for a centred box.
+		const qrSize = Number(svg.match(/viewBox="0 0 (\d+) \1"/)![1]);
+		expect(Number(x) * 2 + Number(w)).toBe(qrSize);
 	});
 
 	it('clamps the logo scale to a safe range', async () => {
@@ -42,7 +63,7 @@ describe('generateQrSvg', () => {
 			logo: { svg: sampleLogo, scale: 0.9 }
 		});
 		const qrViewBox = svg.match(/^<svg [^>]*viewBox="0 0 (\d+) \1"/);
-		const inner = svg.match(/<svg x="[\d.]+" y="[\d.]+" width="([\d.]+)" /);
+		const inner = svg.match(/<svg x="\d+" y="\d+" width="(\d+)" /);
 		expect(qrViewBox).toBeTruthy();
 		expect(inner).toBeTruthy();
 		const total = Number(qrViewBox![1]);

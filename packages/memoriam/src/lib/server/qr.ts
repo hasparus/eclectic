@@ -73,21 +73,38 @@ export async function generateQrSvg(
 		throw new Error('Unexpected QR SVG format: no square viewBox');
 	}
 	const size = Number(match[1]);
+	const margin = options.margin ?? 1;
+	// One module = one viewBox unit. The matrix is always an odd
+	// square (21, 25, 29, …); together with the symmetric quiet zone
+	// the full viewBox edge is also odd.
+	const matrixSize = size - 2 * margin;
 	const rawScale = options.logo.scale ?? 0.2;
 	const scale = Math.max(0.05, Math.min(0.25, rawScale));
-	const box = size * scale;
-	const offset = (size - box) / 2;
-	const padding = box * 0.1;
+
+	// Snap the backdrop to an *odd* module count so it centres on the
+	// matrix's middle module — both halves come out as integers, giving
+	// pixel-perfect alignment with the QR's module grid (no half-module
+	// seams between the white box and the surrounding dark modules).
+	const target = matrixSize * scale;
+	const backdropModules = Math.max(3, nearestOdd(target));
+	const offset = (size - backdropModules) / 2;
+
 	const backdrop =
 		options.logo.backgroundFill === null
 			? ''
-			: `<rect x="${offset - padding}" y="${offset - padding}" width="${box + padding * 2}" height="${
-					box + padding * 2
-				}" fill="${options.logo.backgroundFill ?? options.light ?? '#ffffff'}"/>`;
+			: `<rect x="${offset}" y="${offset}" width="${backdropModules}" height="${backdropModules}" fill="${options.logo.backgroundFill ?? options.light ?? '#ffffff'}"/>`;
 	const inner = stripOuterSvg(options.logo.svg);
-	const overlay = `<g>${backdrop}<svg x="${offset}" y="${offset}" width="${box}" height="${box}" viewBox="${inner.viewBox}">${inner.body}</svg></g>`;
+	const overlay = `<g>${backdrop}<svg x="${offset}" y="${offset}" width="${backdropModules}" height="${backdropModules}" viewBox="${inner.viewBox}">${inner.body}</svg></g>`;
 
 	return svg.replace('</svg>', `${overlay}</svg>`);
+}
+
+/** Round to the nearest odd integer; ties go to the lower odd. */
+function nearestOdd(x: number): number {
+	const lower = Math.floor(x);
+	const oddLower = lower % 2 === 1 ? lower : lower - 1;
+	const oddUpper = oddLower + 2;
+	return x - oddLower <= oddUpper - x ? oddLower : oddUpper;
 }
 
 interface StrippedSvg {
