@@ -33,6 +33,54 @@ test.describe('qr codes', () => {
 		expect(body).toContain('<rect ');
 	});
 
+	test('owner can download a PDF for each preset size', async ({ page }) => {
+		const ownerEmail = uniqueEmail('qr-pdf-owner');
+
+		await signInAs(page, ownerEmail, '/sites');
+		await page.getByPlaceholder(/display name/i).fill('Bronze plaque');
+		await page.getByRole('button', { name: /create memorial/i }).click();
+		await page.getByRole('link', { name: /bronze plaque/i }).click();
+		await page.getByRole('button', { name: /generate qr code/i }).click();
+
+		const qrImg = page.getByRole('img', { name: /qr code/i });
+		await expect(qrImg).toBeVisible();
+		const src = (await qrImg.getAttribute('src'))!;
+		const sizes = ['card', 'plaque', 'headstone'] as const;
+
+		// One labelled PDF link per preset; each should fetch a real
+		// PDF with the correct Content-Disposition for a download.
+		for (const size of sizes) {
+			const link = page.getByRole('link', { name: new RegExp(`PDF · `) }).nth(sizes.indexOf(size));
+			await expect(link).toBeVisible();
+		}
+
+		for (const size of sizes) {
+			const pdfUrl = `${src}?format=pdf&size=${size}`;
+			const response = await page.context().request.get(pdfUrl);
+			expect(response.status()).toBe(200);
+			expect(response.headers()['content-type']).toContain('application/pdf');
+			expect(response.headers()['content-disposition']).toContain(`-${size}.pdf`);
+			// PDF magic header — confirms the body actually is a PDF.
+			const body = await response.body();
+			expect(body.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+		}
+	});
+
+	test('rejects unknown preset size with a 400', async ({ page }) => {
+		const ownerEmail = uniqueEmail('qr-bad-size');
+		await signInAs(page, ownerEmail, '/sites');
+		await page.getByPlaceholder(/display name/i).fill('Whatever');
+		await page.getByRole('button', { name: /create memorial/i }).click();
+		await page.getByRole('link', { name: /whatever/i }).click();
+		await page.getByRole('button', { name: /generate qr code/i }).click();
+
+		const qrImg = page.getByRole('img', { name: /qr code/i });
+		await expect(qrImg).toBeVisible();
+		const src = (await qrImg.getAttribute('src'))!;
+		const response = await page.context().request.get(`${src}?format=pdf&size=mega`);
+		expect(response.status()).toBe(400);
+	});
+
 	test('a non-member cannot fetch a site QR even with a valid code', async ({ page }) => {
 		const ownerEmail = uniqueEmail('qr-owner-private');
 		const strangerEmail = uniqueEmail('qr-stranger');

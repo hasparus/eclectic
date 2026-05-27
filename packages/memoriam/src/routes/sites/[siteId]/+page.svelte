@@ -282,13 +282,24 @@
 						<span class="text-xs text-[color-mix(in_oklch,var(--foreground)_55%,transparent)]">
 							→ {sc.target_path}
 						</span>
-						<a
-							href={`/sites/${data.site.site_id}/qr/${sc.code}`}
-							download={`${sc.code}.svg`}
-							class="text-xs underline"
-						>
-							Download SVG
-						</a>
+						<div class="flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1 text-xs">
+							<a
+								href={`/sites/${data.site.site_id}/qr/${sc.code}`}
+								download={`${sc.code}.svg`}
+								class="underline"
+							>
+								SVG
+							</a>
+							{#each [['card', '25 mm'], ['plaque', '50 mm'], ['headstone', '80 mm']] as [size, label]}
+								<a
+									href={`/sites/${data.site.site_id}/qr/${sc.code}?format=pdf&size=${size}`}
+									download={`${sc.code}-${size}.pdf`}
+									class="underline"
+								>
+									PDF · {label}
+								</a>
+							{/each}
+						</div>
 					</li>
 				{/each}
 			</ul>

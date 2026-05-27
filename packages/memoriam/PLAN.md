@@ -395,21 +395,26 @@ Sequence loosely; each is independent.
       engraving. Library wrapper lives in `src/lib/server/qr.ts`,
       unit-tested for scale clamping, EC level defaults, and logo
       composition.
-- [ ] **QR codes for engraving — v2.** Still TODO:
-      - PDF secondary export with bleed marks, dimension labels,
-        and the human-readable URL printed below the QR as fallback
-        for scanners that fail.
-      - Three preset sizes: memorial card (~25mm), plaque (~50mm),
-        headstone (~80-100mm). Each preset enforces a minimum module
-        count so the engraver doesn't shrink it below the readable
-        threshold.
-      - Warn in the UI when the medium is low-contrast (engraved
-        grey-on-grey granite barely works — recommend an inset of
-        contrasting material, or accept reduced scannability).
-      - Audit log: every QR generation against the `short_codes` row
-        (which medium, when) — useful for support ("the QR on my
-        mother's grave doesn't work") and for the long-term commitment
-        audit trail.
+- [x] **QR codes for engraving — v2.** Print-ready PDF export via
+      `pdfkit` + `svg-to-pdfkit`. The QR stays vector inside the PDF
+      (crisp at any zoom) with the short URL printed below as the
+      human-readable fallback per RTL convention (every QR should
+      survive a failed scan). Three preset sizes named for their
+      physical edge length: `card` (25 mm), `plaque` (50 mm),
+      `headstone` (80 mm); each renders to a square PDF page sized
+      to the QR plus margins, with the memorial display name above
+      and the URL below. Endpoint `?format=pdf&size=…` on the same
+      QR route; UI exposes one labelled link per preset. Library
+      wrapper at `src/lib/server/qr_pdf.ts`, unit-tested for
+      structure / page dimensions / every preset.
+- [ ] **QR codes — v3 follow-ups (deferred).** Bleed marks (only
+      matters for full-bleed paper, irrelevant for stone markers),
+      low-contrast warning (engraved grey-on-grey granite barely
+      works — defer until a customer hits it; the colour options
+      on `generateQrSvg` already allow contrast tuning), audit log
+      of QR generations against `short_codes` rows (operational
+      concern — wait for the first support ticket before paying
+      the row-per-render cost).
 - [ ] **Full archival export.** ZIP of the SQLite DB + assets
       directory. "Your memorial, your data, forever."
 - [ ] **Multi-language.** Families spread across countries.

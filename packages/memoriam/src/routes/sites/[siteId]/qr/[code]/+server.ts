@@ -1,16 +1,23 @@
 import { error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { getSiteMember } from '$lib/server/sites.js';
+import { getSite, getSiteMember } from '$lib/server/sites.js';
 import { resolveShortCode } from '$lib/server/short_codes.js';
 import { generateQrSvg } from '$lib/server/qr.js';
+import { generateQrPdf, QR_PDF_PRESETS, type QrPdfSize } from '$lib/server/qr_pdf.js';
 import logoSvg from '$lib/qr-logo.svg?raw';
 import type { RequestHandler } from './$types';
 
 /**
- * Render the QR code for a short code as an SVG. Members of the
- * owning site can fetch it; the short code itself doesn't carry any
- * secret (it's printable on a grave) but the QR endpoint is gated so
- * a stranger can't enumerate which codes resolve to which sites.
+ * Render the QR code for a short code, member-gated. The short code
+ * itself doesn't carry any secret (it's printable on a grave) but
+ * the QR endpoint is gated so a stranger can't enumerate which codes
+ * resolve to which sites.
+ *
+ * Default response is SVG (one optimised `<path>` per module set —
+ * prints crisply, tiny file). `?format=pdf&size=card|plaque|headstone`
+ * returns a print-ready PDF carrying the QR at the preset's physical
+ * size with the short URL printed below as a human-readable fallback
+ * for scanners that fail.
  */
 export const GET: RequestHandler = async ({ params, url, locals }) => {
 	const { siteId, code } = params;
@@ -32,10 +39,34 @@ export const GET: RequestHandler = async ({ params, url, locals }) => {
 	const withLogo = url.searchParams.get('logo') !== '0';
 	const svg = await generateQrSvg(target, withLogo ? { logo: { svg: logoSvg } } : {});
 
+	if (url.searchParams.get('format') === 'pdf') {
+		const sizeParam = url.searchParams.get('size') ?? 'plaque';
+		if (!(sizeParam in QR_PDF_PRESETS)) error(400, `Unknown size: ${sizeParam}`);
+		const size = sizeParam as QrPdfSize;
+		const site = getSite(siteId);
+		const pdf = await generateQrPdf({
+			qrSvg: svg,
+			url: target,
+			size,
+			title: site?.display_name ?? undefined
+		});
+		return new Response(pdf, {
+			headers: {
+				'Content-Type': 'application/pdf',
+				// Filename hints the engraver at the intended size when
+				// they open it weeks later.
+				'Content-Disposition': `attachment; filename="${code}-${size}.pdf"`,
+				// The title is read from the (mutable) site row, so don't
+				// cache long. Short cache still helps reload flicker.
+				'Cache-Control': 'private, max-age=60'
+			}
+		});
+	}
+
 	return new Response(svg, {
 		headers: {
 			'Content-Type': 'image/svg+xml; charset=utf-8',
-			// Short codes are permanent and the rendering is
+			// Short codes are permanent and the SVG rendering is
 			// deterministic per (code, logo flag) — cache aggressively.
 			'Cache-Control': 'public, max-age=31536000, immutable'
 		}
