@@ -53,7 +53,8 @@ function db(): import('node:sqlite').DatabaseSync {
 }
 
 const requestMagicLinkInputSchema = v.object({
-	email: v.pipe(v.string(), v.email())
+	email: v.pipe(v.string(), v.email()),
+	next: v.optional(v.string())
 });
 
 const consumeMagicLinkInputSchema = v.object({
@@ -843,7 +844,7 @@ const MAGIC_LINK_RATE_PER_IP = { max: 30, windowMs: 60 * 60 * 1000 };
  * results would let attackers probe for registered emails or DOS
  * mailboxes.
  */
-export const requestMagicLink = command(requestMagicLinkInputSchema, async ({ email }) => {
+export const requestMagicLink = command(requestMagicLinkInputSchema, async ({ email, next }) => {
 	const { url, getClientAddress } = getRequestEvent();
 	const normalized = email.trim().toLowerCase();
 
@@ -857,7 +858,9 @@ export const requestMagicLink = command(requestMagicLinkInputSchema, async ({ em
 	}
 
 	const issued = issueMagicLink(normalized);
-	const link = `${url.origin}/auth/magic?token=${encodeURIComponent(issued.token)}`;
+	const params = new URLSearchParams({ token: issued.token });
+	if (next && next.startsWith('/')) params.set('next', next);
+	const link = `${url.origin}/auth/magic?${params.toString()}`;
 	await sendMagicLink(issued.email, link);
 	return { ok: true };
 });

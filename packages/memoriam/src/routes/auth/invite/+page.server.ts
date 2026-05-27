@@ -14,7 +14,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 	// was sent to; we don't tell them which email until they're in.
 	if (!locals.userId) {
 		const next = `/auth/invite?token=${encodeURIComponent(token)}`;
-		throw redirect(303, `/?next=${encodeURIComponent(next)}`);
+		throw redirect(303, `/signin?next=${encodeURIComponent(next)}`);
 	}
 
 	const user = getUser(locals.userId);

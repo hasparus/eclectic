@@ -3,8 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-/** @type {string} */
-let tmpDir;
+let tmpDir: string;
 
 beforeEach(() => {
 	tmpDir = mkdtempSync(join(tmpdir(), 'memoriam-members-'));

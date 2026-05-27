@@ -4,7 +4,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 export default defineConfig({
 	plugins: [svelte()],
 	test: {
-		include: ['tests/**/*.test.js'],
+		include: ['tests/**/*.test.ts'],
 		environment: 'node',
 		// Server-only modules don't depend on Svelte components, but
 		// migrations.js imports demo_doc.js which transitively imports
@@ -24,7 +24,7 @@ export default defineConfig({
 		conditions: ['svelte', 'browser', 'import', 'default'],
 		alias: {
 			$lib: new URL('./src/lib', import.meta.url).pathname,
-			'$env/dynamic/private': new URL('./tests/stubs/sveltekit-env.js', import.meta.url).pathname
+			'$env/dynamic/private': new URL('./tests/stubs/sveltekit-env.ts', import.meta.url).pathname
 		}
 	}
 });

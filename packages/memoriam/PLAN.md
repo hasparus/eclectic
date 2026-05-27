@@ -228,6 +228,15 @@ tenant routing.
       server loads, App.svelte props (and the `demo_doc` fallback),
       AppCtx interface, and Toolbar/Overlays/CreateLink/EditLink/
       LinkPreview consumers.
+- [x] Playwright e2e suite. Accessible-query first (`getByRole`,
+      `getByLabel`, `getByPlaceholder`, `getByText`), no
+      `data-testid`. Covers auth (signin / signout / magic-link
+      reuse), site creation + listing, invitation accept / reject /
+      revoke, and visibility enforcement (private 403, public
+      reachable). Runs against `bun run dev` on port 5174 with an
+      isolated `.e2e-data` directory wiped per suite. The DB helper
+      reads magic-link and invite tokens directly from the platform
+      SQLite. `bun run e2e` runs the suite.
 
 ## Phase 3 — Multiplayer + local-first via Automerge (3-4 weeks)
 

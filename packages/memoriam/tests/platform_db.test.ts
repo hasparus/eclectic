@@ -3,8 +3,7 @@ import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-/** @type {string} */
-let tmpDir;
+let tmpDir: string;
 
 beforeEach(() => {
 	tmpDir = mkdtempSync(join(tmpdir(), 'memoriam-platform-'));
@@ -27,13 +26,18 @@ describe('platform DB', () => {
 
 		expect(existsSync(join(tmpDir, '_platform.sqlite3'))).toBe(true);
 
-		// Spot-check a few key tables.
-		for (const table of ['users', 'sites', 'site_members', 'platform_sessions', 'magic_link_tokens', 'short_codes', 'people']) {
-			const row = /** @type {{ name: string } | undefined} */ (
-				db
-					.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`)
-					.get(table)
-			);
+		for (const table of [
+			'users',
+			'sites',
+			'site_members',
+			'platform_sessions',
+			'magic_link_tokens',
+			'short_codes',
+			'people'
+		]) {
+			const row = db
+				.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`)
+				.get(table) as { name: string } | undefined;
 			expect(row?.name).toBe(table);
 		}
 	});
@@ -50,7 +54,7 @@ describe('user upsert', () => {
 	it('creates a user on first call, returns existing on second', async () => {
 		const { upsertUserByEmail } = await import('$lib/server/users.js');
 		const u1 = upsertUserByEmail('alice@example.com');
-		const u2 = upsertUserByEmail('  Alice@Example.com  '); // trimmed + lowercased
+		const u2 = upsertUserByEmail('  Alice@Example.com  ');
 		expect(u1.user_id).toBe(u2.user_id);
 		expect(u1.email).toBe('alice@example.com');
 	});
@@ -120,8 +124,6 @@ describe('sites', () => {
 		expect(userCanEditSite(site.site_id, user.user_id)).toBe(true);
 		expect(userCanEditSite(site.site_id, null)).toBe(false);
 
-		// Per-site DB file was created (uses module-cached DATA_DIR, may differ
-		// from the fresh tmpDir if this test isn't the first to import).
 		expect(existsSync(siteDbPath(site.site_id))).toBe(true);
 	});
 

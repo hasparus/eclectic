@@ -3,8 +3,7 @@ import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-/** @type {string} */
-let tmpDir;
+let tmpDir: string;
 
 beforeEach(() => {
 	tmpDir = mkdtempSync(join(tmpdir(), 'memoriam-test-'));
@@ -25,14 +24,14 @@ describe('getDb', () => {
 
 		expect(existsSync(join(tmpDir, 'sites', 'site_a', 'db.sqlite3'))).toBe(true);
 
-		const row = /** @type {{ name: string } | undefined} */ (
-			db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'documents'`).get()
-		);
+		const row = db
+			.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'documents'`)
+			.get() as { name: string } | undefined;
 		expect(row?.name).toBe('documents');
 
-		const migrations = /** @type {{ count: number }} */ (
-			db.prepare(`SELECT COUNT(*) AS count FROM _migrations`).get()
-		);
+		const migrations = db.prepare(`SELECT COUNT(*) AS count FROM _migrations`).get() as {
+			count: number;
+		};
 		expect(migrations.count).toBeGreaterThan(0);
 	});
 
@@ -51,12 +50,12 @@ describe('getDb', () => {
 		dbA.prepare(`INSERT INTO site_settings (key, value) VALUES (?, ?)`).run('marker', 'a');
 		dbB.prepare(`INSERT INTO site_settings (key, value) VALUES (?, ?)`).run('marker', 'b');
 
-		const aMarker = /** @type {{ value: string } | undefined} */ (
-			dbA.prepare(`SELECT value FROM site_settings WHERE key = 'marker'`).get()
-		);
-		const bMarker = /** @type {{ value: string } | undefined} */ (
-			dbB.prepare(`SELECT value FROM site_settings WHERE key = 'marker'`).get()
-		);
+		const aMarker = dbA
+			.prepare(`SELECT value FROM site_settings WHERE key = 'marker'`)
+			.get() as { value: string } | undefined;
+		const bMarker = dbB
+			.prepare(`SELECT value FROM site_settings WHERE key = 'marker'`)
+			.get() as { value: string } | undefined;
 
 		expect(aMarker?.value).toBe('a');
 		expect(bMarker?.value).toBe('b');

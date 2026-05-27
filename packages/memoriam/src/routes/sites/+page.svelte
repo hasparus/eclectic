@@ -38,8 +38,10 @@
 			}
 			display_name = '';
 			visibility = 'public';
+			// Refresh the listing so the new site appears. We don't
+			// auto-navigate to /sites/[id] — under experimental.async
+			// goto here races the load re-run and bounces us back.
 			await invalidateAll();
-			await goto(`/sites/${result.site.site_id}`);
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Could not create site.';
 		} finally {

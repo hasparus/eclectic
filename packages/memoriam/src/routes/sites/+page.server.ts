@@ -4,7 +4,7 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = ({ locals, url }) => {
 	if (!locals.userId) {
-		throw redirect(303, `/?next=${encodeURIComponent(url.pathname)}`);
+		throw redirect(303, `/signin?next=${encodeURIComponent(url.pathname)}`);
 	}
 	return {
 		sites: listUserSites(locals.userId),
