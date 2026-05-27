@@ -52,3 +52,12 @@ export function resolveShortCode(code: string): ResolvedShortCode | null {
 		.get(code) as ResolvedShortCode | undefined;
 	return row ?? null;
 }
+
+export function listShortCodesForSite(siteId: string): ShortCode[] {
+	return getPlatformDb()
+		.prepare(
+			`SELECT code, site_id, target_path, created_at FROM short_codes
+			 WHERE site_id = ? ORDER BY created_at DESC`
+		)
+		.all(siteId) as unknown as ShortCode[];
+}

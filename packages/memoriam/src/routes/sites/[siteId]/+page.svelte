@@ -17,6 +17,13 @@
 		expires_at: string;
 	}
 
+	interface ShortCodeEntry {
+		code: string;
+		site_id: string;
+		target_path: string;
+		created_at: string;
+	}
+
 	interface Props {
 		data: {
 			site: { site_id: string; display_name: string | null; visibility: string; created_at: string };
@@ -24,11 +31,36 @@
 			current_user_role: 'owner' | 'editor' | 'viewer';
 			members: Member[];
 			invites: Invite[];
+			short_codes: ShortCodeEntry[];
 		};
 	}
 	let { data }: Props = $props();
 
 	let is_owner = $derived(data.current_user_role === 'owner');
+
+	let qr_pending = $state(false);
+	let qr_error = $state('');
+
+	async function mint_short_code() {
+		if (qr_pending) return;
+		qr_pending = true;
+		qr_error = '';
+		try {
+			const api = await import('$lib/api.remote.js');
+			const result = (await api.issueSiteShortCode({ site_id: data.site.site_id })) as
+				| { ok: true; short_code: ShortCodeEntry }
+				| { ok: false; code: string; message: string };
+			if (result.ok === false) {
+				qr_error = result.message || 'Could not mint code.';
+				return;
+			}
+			await invalidateAll();
+		} catch (err) {
+			qr_error = err instanceof Error ? err.message : 'Could not mint code.';
+		} finally {
+			qr_pending = false;
+		}
+	}
 
 	let invite_email = $state('');
 	let invite_role = $state<'editor' | 'viewer'>('editor');
@@ -212,4 +244,54 @@
 			{/if}
 		</section>
 	{/if}
+
+	<section class="flex flex-col gap-3">
+		<h2 class="m-0 text-lg font-medium">QR codes</h2>
+		<p class="m-0 text-sm text-[color-mix(in_oklch,var(--foreground)_60%,transparent)]">
+			Each code resolves to this memorial via the short URL
+			<code>/r/&lt;code&gt;</code>
+			and is meant to be printed — on a marker, a card, a plaque. Codes are permanent.
+		</p>
+
+		<div>
+			<button
+				type="button"
+				onclick={() => void mint_short_code()}
+				disabled={qr_pending}
+				class="border border-(--svedit-editing-stroke) bg-(--background) px-4 py-2 text-sm font-semibold text-(--svedit-editing-stroke) disabled:opacity-50"
+			>
+				{qr_pending ? 'Minting…' : 'Generate QR code'}
+			</button>
+		</div>
+		{#if qr_error}
+			<div class="text-sm text-red-600">{qr_error}</div>
+		{/if}
+
+		{#if data.short_codes.length > 0}
+			<ul class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+				{#each data.short_codes as sc (sc.code)}
+					<li
+						class="flex flex-col items-center gap-2 border border-[color-mix(in_oklch,var(--foreground)_15%,transparent)] p-4"
+					>
+						<img
+							src={`/sites/${data.site.site_id}/qr/${sc.code}`}
+							alt={`QR code ${sc.code}`}
+							class="h-40 w-40"
+						/>
+						<code class="text-xs">{sc.code}</code>
+						<span class="text-xs text-[color-mix(in_oklch,var(--foreground)_55%,transparent)]">
+							→ {sc.target_path}
+						</span>
+						<a
+							href={`/sites/${data.site.site_id}/qr/${sc.code}`}
+							download={`${sc.code}.svg`}
+							class="text-xs underline"
+						>
+							Download SVG
+						</a>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
 </main>

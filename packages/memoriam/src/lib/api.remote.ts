@@ -37,6 +37,7 @@ import {
 } from '$lib/server/members.js';
 import { getUser } from '$lib/server/users.js';
 import { checkRateLimit } from '$lib/server/rate_limit.js';
+import { issueShortCode } from '$lib/server/short_codes.js';
 
 /**
  * Per-site database accessor. Always resolves to the database for the
@@ -1499,3 +1500,23 @@ export const transferSiteOwnership = command(transferOwnershipInputSchema, async
 	}
 });
 
+
+const issueSiteShortCodeInputSchema = v.object({
+	site_id: v.string(),
+	target_path: v.optional(v.string())
+});
+
+/**
+ * Mint a permanent short code pointing at a (site, path). Any member
+ * of the site can issue codes — they're the durable identifier we
+ * print on grave markers, so caller-side rate limiting is more
+ * appropriate than a hard refusal here.
+ */
+export const issueSiteShortCode = command(issueSiteShortCodeInputSchema, async ({ site_id, target_path }) => {
+	const { locals } = getRequestEvent();
+	if (!locals.userId) return createAuthErrorResult('unauthenticated', 'Sign in first.');
+	requireMember(site_id, locals.userId);
+	const path = target_path && target_path.startsWith('/') ? target_path : '/';
+	const issued = issueShortCode(site_id, path);
+	return { ok: true as const, short_code: issued };
+});

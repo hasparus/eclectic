@@ -383,19 +383,22 @@ Sequence loosely; each is independent.
 - [ ] **Memorial book PDF export.** Generate a print-ready PDF from
       the site content. High-value product hook (paid feature?
       gifted to family?).
-- [ ] **QR codes for engraving.** Generate scannable codes pointing
-      to the permanent short URL (`mmr.am/<code>` from phase 2), in
-      print-ready formats for stonemasons and plaque engravers.
-      Specifics:
-      - Encode the short URL, not the canonical site URL. The short
-        code is our permanent point of indirection — domain or
-        architecture changes don't invalidate the engraving.
-      - Error correction level **H** (~30% damage tolerance). Outdoor
-        granite weathers; lichen grows; rain etches. Don't ship L or M.
-      - SVG primary export (vector, infinite scale, what engravers
-        want). PDF secondary with bleed marks, dimension labels, and
-        the human-readable URL printed below the QR as fallback for
-        scanners that fail.
+- [x] **QR codes for engraving — v1.** SVG-first QR generation built
+      on the `qrcode` npm package. Composites the bundled logo into
+      the centre (clamped to 20% of the QR area; EC level **H**
+      ~30% redundancy absorbs the cut-out). Endpoint at
+      `/sites/[siteId]/qr/[code]` is member-gated and cache-immutable
+      (codes are permanent, rendering is deterministic). UI on
+      `/sites/[siteId]` has a "Generate QR code" button + per-code
+      preview and SVG download. The QR encodes the `/r/<code>` short
+      URL so domain or architecture changes don't invalidate the
+      engraving. Library wrapper lives in `src/lib/server/qr.ts`,
+      unit-tested for scale clamping, EC level defaults, and logo
+      composition.
+- [ ] **QR codes for engraving — v2.** Still TODO:
+      - PDF secondary export with bleed marks, dimension labels,
+        and the human-readable URL printed below the QR as fallback
+        for scanners that fail.
       - Three preset sizes: memorial card (~25mm), plaque (~50mm),
         headstone (~80-100mm). Each preset enforces a minimum module
         count so the engraver doesn't shrink it below the readable
@@ -403,10 +406,10 @@ Sequence loosely; each is independent.
       - Warn in the UI when the medium is low-contrast (engraved
         grey-on-grey granite barely works — recommend an inset of
         contrasting material, or accept reduced scannability).
-      - Owner-only download. Log every QR generation against the
-        `short_codes` row (which medium, when) — useful for support
-        ("the QR on my mother's grave doesn't work") and for the
-        long-term commitment audit trail.
+      - Audit log: every QR generation against the `short_codes` row
+        (which medium, when) — useful for support ("the QR on my
+        mother's grave doesn't work") and for the long-term commitment
+        audit trail.
 - [ ] **Full archival export.** ZIP of the SQLite DB + assets
       directory. "Your memorial, your data, forever."
 - [ ] **Multi-language.** Families spread across countries.
