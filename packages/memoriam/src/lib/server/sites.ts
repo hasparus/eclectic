@@ -143,3 +143,23 @@ export function userCanEditSite(siteId: string, userId: string | null): boolean 
 export function siteIsViewableByPublic(visibility: Site['visibility']): boolean {
 	return visibility === 'public' || visibility === 'unlisted';
 }
+
+export interface UserSiteEntry extends Site {
+	role: 'owner' | 'editor' | 'viewer';
+}
+
+/**
+ * List every site the user has a membership on, newest first.
+ */
+export function listUserSites(userId: string): UserSiteEntry[] {
+	return getPlatformDb()
+		.prepare(
+			`SELECT s.site_id, s.owner_user_id, s.display_name, s.visibility,
+			        s.created_at, s.updated_at, m.role
+			 FROM site_members m
+			 JOIN sites s ON s.site_id = m.site_id
+			 WHERE m.user_id = ?
+			 ORDER BY s.created_at DESC`
+		)
+		.all(userId) as unknown as UserSiteEntry[];
+}

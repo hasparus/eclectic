@@ -18,9 +18,24 @@ import {
 	clearPlatformSessionCookie
 } from '$lib/server/sessions.js';
 import { issueMagicLink, consumeMagicLink } from '$lib/server/magic_link.js';
-import { sendMagicLink } from '$lib/server/email.js';
+import { sendMagicLink, sendInvite } from '$lib/server/email.js';
 import { upsertUserByEmail } from '$lib/server/users.js';
-import { createSite as createSiteCore } from '$lib/server/sites.js';
+import {
+	createSite as createSiteCore,
+	getSite as getSiteCore,
+	getSiteMember,
+	listUserSites
+} from '$lib/server/sites.js';
+import {
+	createInvite,
+	listMembers,
+	listOutstandingInvites,
+	revokeInvite,
+	changeMemberRole,
+	removeMember,
+	transferOwnership
+} from '$lib/server/members.js';
+import { getUser } from '$lib/server/users.js';
 import { checkRateLimit } from '$lib/server/rate_limit.js';
 
 /**
@@ -1358,3 +1373,126 @@ export const updatePageSlug = command(updatePageSlugInputSchema, async (input) =
 		page_href: `/${newActiveSlug}`
 	};
 });
+
+
+// --- Site listing + member management ---
+
+const inviteMemberInputSchema = v.object({
+	site_id: v.string(),
+	email: v.pipe(v.string(), v.email()),
+	role: v.picklist(["editor", "viewer"])
+});
+
+const changeMemberRoleInputSchema = v.object({
+	site_id: v.string(),
+	user_id: v.string(),
+	role: v.picklist(["owner", "editor", "viewer"])
+});
+
+const removeMemberInputSchema = v.object({
+	site_id: v.string(),
+	user_id: v.string()
+});
+
+const revokeInviteInputSchema = v.object({
+	site_id: v.string(),
+	invite_token: v.string()
+});
+
+const transferOwnershipInputSchema = v.object({
+	site_id: v.string(),
+	to_user_id: v.string()
+});
+
+const siteIdInputSchema = v.object({ site_id: v.string() });
+
+function requireOwner(siteId: string, userId: string): void {
+	const member = getSiteMember(siteId, userId);
+	if (!member || member.role !== "owner") {
+		throw new Error("Only the site owner can do that");
+	}
+}
+
+function requireMember(siteId: string, userId: string): void {
+	const member = getSiteMember(siteId, userId);
+	if (!member) throw new Error("Not a member of this site");
+}
+
+/** Sites the current user belongs to. */
+export const listMySites = query(v.void(), async () => {
+	const { locals } = getRequestEvent();
+	if (!locals.userId) return { ok: false as const, sites: [] };
+	return { ok: true as const, sites: listUserSites(locals.userId) };
+});
+
+/** Member list + outstanding invites for a site. Owner-only. */
+export const listSiteMembers = query(siteIdInputSchema, async ({ site_id }) => {
+	const { locals } = getRequestEvent();
+	if (!locals.userId) throw new Error("Sign in first");
+	requireMember(site_id, locals.userId);
+	const site = getSiteCore(site_id);
+	if (!site) throw new Error("Site not found");
+	return {
+		site,
+		members: listMembers(site_id),
+		invites: listOutstandingInvites(site_id)
+	};
+});
+
+export const inviteMember = command(inviteMemberInputSchema, async ({ site_id, email, role }) => {
+	const { locals, url } = getRequestEvent();
+	if (!locals.userId) return createAuthErrorResult("unauthenticated", "Sign in first.");
+	requireOwner(site_id, locals.userId);
+	const site = getSiteCore(site_id);
+	if (!site) return createAuthErrorResult("not_found", "Site not found");
+	try {
+		const invite = createInvite(site_id, email, role);
+		const link = `${url.origin}/auth/invite?token=${encodeURIComponent(invite.invite_token)}`;
+		const inviter = locals.userId ? getUser(locals.userId) : null;
+		await sendInvite(invite.email, link, site.display_name, inviter?.email ?? null);
+		return { ok: true as const, invite_token: invite.invite_token, email: invite.email };
+	} catch (err) {
+		return createAuthErrorResult("invite_failed", err instanceof Error ? err.message : "Could not invite");
+	}
+});
+
+export const revokeMemberInvite = command(revokeInviteInputSchema, async ({ site_id, invite_token }) => {
+	const { locals } = getRequestEvent();
+	if (!locals.userId) return createAuthErrorResult("unauthenticated", "Sign in first.");
+	requireOwner(site_id, locals.userId);
+	revokeInvite(site_id, invite_token);
+	return { ok: true };
+});
+
+export const changeMemberRoleCommand = command(changeMemberRoleInputSchema, async ({ site_id, user_id, role }) => {
+	const { locals } = getRequestEvent();
+	if (!locals.userId) return createAuthErrorResult("unauthenticated", "Sign in first.");
+	requireOwner(site_id, locals.userId);
+	changeMemberRole(site_id, user_id, role);
+	return { ok: true };
+});
+
+export const removeMemberCommand = command(removeMemberInputSchema, async ({ site_id, user_id }) => {
+	const { locals } = getRequestEvent();
+	if (!locals.userId) return createAuthErrorResult("unauthenticated", "Sign in first.");
+	// Owners can remove others; anyone can remove themselves.
+	if (user_id !== locals.userId) requireOwner(site_id, locals.userId);
+	try {
+		removeMember(site_id, user_id);
+		return { ok: true };
+	} catch (err) {
+		return createAuthErrorResult("remove_failed", err instanceof Error ? err.message : "Could not remove");
+	}
+});
+
+export const transferSiteOwnership = command(transferOwnershipInputSchema, async ({ site_id, to_user_id }) => {
+	const { locals } = getRequestEvent();
+	if (!locals.userId) return createAuthErrorResult("unauthenticated", "Sign in first.");
+	try {
+		transferOwnership(site_id, locals.userId, to_user_id);
+		return { ok: true };
+	} catch (err) {
+		return createAuthErrorResult("transfer_failed", err instanceof Error ? err.message : "Could not transfer");
+	}
+});
+

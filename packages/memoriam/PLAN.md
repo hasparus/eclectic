@@ -189,12 +189,20 @@ tenant routing.
       ok-from-the-API-surface to prevent email enumeration; logs
       failures server-side. `MEMORIAM_EMAIL_FROM` and
       `MEMORIAM_PRODUCT_NAME` are configurable.
-- [ ] Site listing + creation UI for signed-in users (e.g. a
-      `/sites` route showing the current user's memorials with a
-      "create new memorial" button calling `createSite`).
-- [ ] Member management UI: invite by email, accept invite, role
-      changes, leave site, transfer ownership. (Backend tables are
-      in place; the flows aren't.)
+- [x] Site listing + creation UI. `/sites` route: signed-in users
+      see every memorial they belong to (with role label) and can
+      create a new one (display name + visibility picker).
+      Authenticated guard redirects to `/?next=…` when no session.
+- [x] Member management UI. `/sites/[siteId]` page renders the
+      member list, current invites, role changes (owner-only),
+      remove / leave (refuses last-owner removal), and ownership
+      transfer (demotes previous owner to editor). Invite by email
+      goes through `inviteMember` which emails an `/auth/invite`
+      link via Resend. `/auth/invite?token=…` accepts the invite
+      after verifying the signed-in user's email matches the
+      invite's email (mismatch → clear error page). If the user
+      isn't signed in, the invite link bounces through the
+      magic-link flow with `next=` preserved.
 - [x] Visibility-level enforcement in `hooks.server.js`. `private`
       sites resolve to `siteId = null` for non-members, so the rest
       of the request pipeline treats them as "no site found" (clean

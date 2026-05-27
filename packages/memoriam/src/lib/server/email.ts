@@ -68,3 +68,25 @@ export async function sendMagicLink(email: string, link: string): Promise<EmailS
 
 	return sendEmail({ to: email, subject, text, html });
 }
+
+export async function sendInvite(
+	email: string,
+	link: string,
+	siteName: string | null,
+	inviterEmail: string | null
+): Promise<EmailSendResult> {
+	const product = env.MEMORIAM_PRODUCT_NAME || 'Memoriam';
+	const siteLabel = siteName || 'a memorial';
+	const fromLabel = inviterEmail ? ` from ${inviterEmail}` : '';
+	const subject = `You're invited to ${siteLabel}`;
+	const text = `You have an invitation${fromLabel} to join "${siteLabel}" on ${product}:\n\n${link}\n\nThe link expires in 14 days. If you didn't expect this, you can ignore this email.`;
+	const html = `<!doctype html>
+<html><body style="font-family: ui-sans-serif, system-ui, sans-serif; line-height: 1.5; color: #111; padding: 24px;">
+<p>You have an invitation${fromLabel} to join <strong>${siteLabel}</strong> on ${product}.</p>
+<p><a href="${link}" style="display: inline-block; padding: 12px 18px; background: #111; color: #fff; text-decoration: none; border-radius: 6px;">Accept invitation</a></p>
+<p style="color: #555; font-size: 14px;">Or paste this URL into your browser: <br><span style="color: #888; word-break: break-all;">${link}</span></p>
+<p style="color: #888; font-size: 13px;">The link expires in 14 days. If you didn't expect this, you can ignore this email.</p>
+</body></html>`;
+
+	return sendEmail({ to: email, subject, text, html });
+}
