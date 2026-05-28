@@ -237,6 +237,27 @@ tenant routing.
       isolated `.e2e-data` directory wiped per suite. The DB helper
       reads magic-link and invite tokens directly from the platform
       SQLite. `bun run e2e` runs the suite.
+- [x] **Family tree — Phase A (read + minimal CRUD).** Extends
+      the existing platform `people` / `relationships` schema with
+      `sex`, full ISO `birth_date` / `death_date` (plus `_place`
+      columns), `biography`, a per-edge `kind` for parent-of
+      edges (bio / adoptive / foster / step / unknown), and a new
+      `couples` table for marriages / partnerships with start /
+      end dates and an end reason. `sites.subject_person_id`
+      points each memorial at its focal person. Tree CRUD lives
+      in `src/lib/server/people.ts` with a `getTreeRootedAt`
+      recursive CTE walk (ancestors + descendants + everyone's
+      spouses) and a `userCanEditPerson` ACL that grants writes
+      transitively via `person_memorials` × `site_members`. The
+      `/sites/[siteId]/tree` route renders the DAG via d3-dag
+      Sugiyama on Svelte 5 SVG cards; clicking a card opens a
+      side drawer with the person's facts (editable for
+      admins). "+ Parent / + Spouse / + Child" affordances in
+      the drawer open a modal that creates the new person and
+      wires the appropriate edge / couple in one round-trip.
+      Phase B = inline ghost cards, living-redaction for
+      non-admins, per-edge type chip; Phase C = GEDCOM 7 import
+      + export + fan-chart mobile view.
 - [x] **App UI translation (EN + PL) via Paraglide JS.** All
       user-facing strings live in `messages/{en,pl}.json`; Paraglide
       compiles them to tree-shakable typed functions in

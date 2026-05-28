@@ -54,6 +54,41 @@ E2e tests pin to the base locale (English) by default — no
 cookie set means `baseLocale`. `e2e/i18n.e2e.ts` exercises the
 switcher round-trip; other suites assert on English strings.
 
+## Genealogy / family tree
+
+People are platform-level. The platform DB owns the canonical
+`people` row; a person can be linked to many memorial sites via
+`person_memorials`. Relationships (parent-of, sibling-of) live in
+`relationships`; marriages / partnerships live in `couples` as
+their own table (start/end dates + end reason don't fit the edge
+schema).
+
+A site's central person is `sites.subject_person_id` (nullable
+until set). The `/sites/[siteId]/tree` page is rooted on that id.
+
+ACL for editing a person: `userCanEditPerson(personId, userId)`
+returns true if the user (a) has an explicit `person_access` row
+with role owner/editor, or (b) is an owner/editor of any site
+this person is linked to via `person_memorials`. New people
+created through `createPerson(remote)` auto-link to the site
+the caller passed in and grant the caller `person_access.owner`.
+
+Types live in `src/lib/people_types.ts` (client-safe) — never
+`type`-import from `$lib/server/people` outside server files.
+
+Tree visualisation: d3-dag's Sugiyama layout (parent-child DAG)
+→ Svelte 5 SVG cards positioned in `src/lib/tree_layout.ts`.
+Couples are rendered as a thin dashed line between the two
+adjacent spouse cards; they don't participate in the Sugiyama
+ranking. Card dimensions live in `tree_layout.ts` as `CARD_WIDTH`
+/ `CARD_HEIGHT` — keep the values there and the Svelte template
+in sync.
+
+`isLikelyLiving(person)` is the redaction heuristic: returns true
+if `is_living=1`, or if no death date is recorded AND birth was
+<100y ago. The drawer / card-render path will swap in a
+"Living relative" placeholder for non-admin viewers (Phase B).
+
 ## Server
 
 Per-site SQLite is reached via `event.locals.db` (set in

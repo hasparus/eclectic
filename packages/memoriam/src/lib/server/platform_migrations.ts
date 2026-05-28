@@ -203,6 +203,59 @@ const migrations: Migration[] = [
 		db.exec(sql`CREATE INDEX relationships_to_idx ON relationships (to_person_id);`);
 		db.exec(sql`CREATE INDEX person_memorials_site_id_idx ON person_memorials (site_id);`);
 		db.exec(sql`CREATE INDEX person_access_user_id_idx ON person_access (user_id);`);
+	},
+
+	function extend_genealogy_for_tree_v1({ db }) {
+		// The initial registry stored only birth/death YEAR and lacked a
+		// few fields the tree UI needs. Add them all as nullable columns
+		// — the existing rows (none in any live deployment yet) stay
+		// valid; new rows will populate them.
+		db.exec(sql`ALTER TABLE people ADD COLUMN sex TEXT CHECK (sex IN ('M','F','X','U') OR sex IS NULL);`);
+		db.exec(sql`ALTER TABLE people ADD COLUMN birth_date TEXT;`);
+		db.exec(sql`ALTER TABLE people ADD COLUMN birth_place TEXT;`);
+		db.exec(sql`ALTER TABLE people ADD COLUMN death_date TEXT;`);
+		db.exec(sql`ALTER TABLE people ADD COLUMN death_place TEXT;`);
+		db.exec(sql`ALTER TABLE people ADD COLUMN biography TEXT;`);
+
+		// Per-edge nature for parent_of edges. Sibling_of edges leave it
+		// NULL. Default 'biological' is set in the insert path, not in
+		// the column default, so existing rows stay unannotated.
+		db.exec(sql`ALTER TABLE relationships ADD COLUMN kind TEXT CHECK (kind IN ('biological','adoptive','foster','step','unknown') OR kind IS NULL);`);
+
+		// Marriages / partnerships. Modelled as their own table rather
+		// than `relationships.spouse_of` rows — they need start/end
+		// dates and an end_reason that don't fit the edge schema, and
+		// a single person can be in many couples sequentially.
+		//
+		// We normalise so person_a_id < person_b_id; that gives a
+		// deterministic unique key and lets us dedup without ordering
+		// the inputs in every caller.
+		db.exec(sql`
+			CREATE TABLE couples (
+				couple_id TEXT NOT NULL PRIMARY KEY,
+				person_a_id TEXT NOT NULL,
+				person_b_id TEXT NOT NULL,
+				kind TEXT NOT NULL DEFAULT 'marriage' CHECK (kind IN ('marriage','partnership','engagement','other')),
+				start_date TEXT,
+				end_date TEXT,
+				end_reason TEXT CHECK (end_reason IN ('divorce','death','annulment','separation') OR end_reason IS NULL),
+				certainty TEXT NOT NULL DEFAULT 'certain' CHECK (certainty IN ('certain','probable','unverified')),
+				source_note TEXT,
+				created_at TEXT NOT NULL,
+				CHECK (person_a_id < person_b_id),
+				FOREIGN KEY (person_a_id) REFERENCES people(person_id),
+				FOREIGN KEY (person_b_id) REFERENCES people(person_id)
+			);
+		`);
+		db.exec(sql`CREATE INDEX couples_person_a_idx ON couples (person_a_id);`);
+		db.exec(sql`CREATE INDEX couples_person_b_idx ON couples (person_b_id);`);
+		db.exec(sql`CREATE UNIQUE INDEX couples_pair_idx ON couples (person_a_id, person_b_id);`);
+
+		// A memorial site is "about" one focal person. The /tree page
+		// renders the tree rooted on this id. Nullable until the
+		// owner sets it (or accepts the auto-suggestion built from
+		// site.display_name).
+		db.exec(sql`ALTER TABLE sites ADD COLUMN subject_person_id TEXT REFERENCES people(person_id);`);
 	}
 ];
 

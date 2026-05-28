@@ -38,6 +38,19 @@ import {
 import { getUser } from '$lib/server/users.js';
 import { checkRateLimit } from '$lib/server/rate_limit.js';
 import { issueShortCode } from '$lib/server/short_codes.js';
+import {
+	createPerson as createPersonCore,
+	getPerson as getPersonCore,
+	updatePerson as updatePersonCore,
+	addParentEdge as addParentEdgeCore,
+	removeParentEdge as removeParentEdgeCore,
+	createCouple as createCoupleCore,
+	setSiteSubject as setSiteSubjectCore,
+	getSiteSubjectId,
+	getTreeRootedAt,
+	userCanEditPerson,
+	linkPersonToSite
+} from '$lib/server/people.js';
 
 /**
  * Per-site database accessor. Always resolves to the database for the
@@ -1520,3 +1533,193 @@ export const issueSiteShortCode = command(issueSiteShortCodeInputSchema, async (
 	const issued = issueShortCode(site_id, path);
 	return { ok: true as const, short_code: issued };
 });
+
+
+// =============================================================
+// Genealogy / family-tree (Phase A — read + minimal CRUD).
+// Person records live in the platform DB; ACL grants write access
+// to any site owner/editor whose site this person is linked to,
+// plus explicit person_access grants.
+// =============================================================
+
+const sexSchema = v.picklist(['M', 'F', 'X', 'U']);
+const parentKindSchema = v.picklist(['biological', 'adoptive', 'foster', 'step', 'unknown']);
+const coupleKindSchema = v.picklist(['marriage', 'partnership', 'engagement', 'other']);
+const coupleEndReasonSchema = v.picklist(['divorce', 'death', 'annulment', 'separation']);
+const isoDateSchema = v.pipe(v.string(), v.regex(/^-?\d{4}(-\d{2}(-\d{2})?)?$/));
+
+const createPersonInputSchema = v.object({
+	site_id: v.string(),
+	display_name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),
+	given_names: v.optional(v.nullable(v.string())),
+	surname: v.optional(v.nullable(v.string())),
+	sex: v.optional(v.nullable(sexSchema)),
+	birth_date: v.optional(v.nullable(isoDateSchema)),
+	birth_place: v.optional(v.nullable(v.string())),
+	death_date: v.optional(v.nullable(isoDateSchema)),
+	death_place: v.optional(v.nullable(v.string())),
+	is_living: v.optional(v.boolean()),
+	biography: v.optional(v.nullable(v.string()))
+});
+
+export const createPerson = command(createPersonInputSchema, async (input) => {
+	const { locals } = getRequestEvent();
+	if (!locals.userId) return createAuthErrorResult('unauthenticated', 'Sign in first.');
+	requireMember(input.site_id, locals.userId);
+	if (!userCanEditSiteOrError(input.site_id, locals.userId)) {
+		return createAuthErrorResult('forbidden', 'Editors and owners only.');
+	}
+	const person = createPersonCore({
+		owner_user_id: locals.userId,
+		display_name: input.display_name,
+		given_names: input.given_names ?? null,
+		surname: input.surname ?? null,
+		sex: input.sex ?? null,
+		birth_date: input.birth_date ?? null,
+		birth_place: input.birth_place ?? null,
+		death_date: input.death_date ?? null,
+		death_place: input.death_place ?? null,
+		is_living: input.is_living,
+		biography: input.biography ?? null,
+		link_to_site_id: input.site_id
+	});
+	return { ok: true as const, person };
+});
+
+const updatePersonInputSchema = v.object({
+	person_id: v.string(),
+	display_name: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200))),
+	given_names: v.optional(v.nullable(v.string())),
+	surname: v.optional(v.nullable(v.string())),
+	sex: v.optional(v.nullable(sexSchema)),
+	birth_date: v.optional(v.nullable(isoDateSchema)),
+	birth_place: v.optional(v.nullable(v.string())),
+	death_date: v.optional(v.nullable(isoDateSchema)),
+	death_place: v.optional(v.nullable(v.string())),
+	is_living: v.optional(v.boolean()),
+	biography: v.optional(v.nullable(v.string()))
+});
+
+export const updatePerson = command(updatePersonInputSchema, async ({ person_id, ...patch }) => {
+	const { locals } = getRequestEvent();
+	if (!locals.userId) return createAuthErrorResult('unauthenticated', 'Sign in first.');
+	if (!userCanEditPerson(person_id, locals.userId)) {
+		return createAuthErrorResult('forbidden', "You don't have edit access to that person.");
+	}
+	const person = updatePersonCore(person_id, patch);
+	return { ok: true as const, person };
+});
+
+const setSiteSubjectInputSchema = v.object({
+	site_id: v.string(),
+	person_id: v.nullable(v.string())
+});
+
+export const setSiteSubject = command(setSiteSubjectInputSchema, async ({ site_id, person_id }) => {
+	const { locals } = getRequestEvent();
+	if (!locals.userId) return createAuthErrorResult('unauthenticated', 'Sign in first.');
+	if (!userCanEditSiteOrError(site_id, locals.userId)) {
+		return createAuthErrorResult('forbidden', 'Editors and owners only.');
+	}
+	if (person_id && !userCanEditPerson(person_id, locals.userId)) {
+		return createAuthErrorResult('forbidden', "You don't have edit access to that person.");
+	}
+	setSiteSubjectCore(site_id, person_id);
+	return { ok: true as const };
+});
+
+const addParentInputSchema = v.object({
+	parent_id: v.string(),
+	child_id: v.string(),
+	kind: v.optional(parentKindSchema),
+	site_id: v.string()
+});
+
+export const addParentEdge = command(addParentInputSchema, async ({ parent_id, child_id, kind, site_id }) => {
+	const { locals } = getRequestEvent();
+	if (!locals.userId) return createAuthErrorResult('unauthenticated', 'Sign in first.');
+	if (
+		!userCanEditPerson(parent_id, locals.userId) ||
+		!userCanEditPerson(child_id, locals.userId)
+	) {
+		return createAuthErrorResult('forbidden', "You don't have edit access to one of those people.");
+	}
+	try {
+		// Make sure both endpoints are linked to this site so the tree
+		// page can show them. Idempotent.
+		linkPersonToSite(parent_id, site_id);
+		linkPersonToSite(child_id, site_id);
+		const edge = addParentEdgeCore({ parent_id, child_id, kind });
+		return { ok: true as const, edge };
+	} catch (err) {
+		return createAuthErrorResult('edge_failed', err instanceof Error ? err.message : 'Could not add edge.');
+	}
+});
+
+const removeParentInputSchema = v.object({
+	parent_id: v.string(),
+	child_id: v.string()
+});
+
+export const removeParentEdge = command(removeParentInputSchema, async ({ parent_id, child_id }) => {
+	const { locals } = getRequestEvent();
+	if (!locals.userId) return createAuthErrorResult('unauthenticated', 'Sign in first.');
+	if (
+		!userCanEditPerson(parent_id, locals.userId) ||
+		!userCanEditPerson(child_id, locals.userId)
+	) {
+		return createAuthErrorResult('forbidden', "You don't have edit access to one of those people.");
+	}
+	removeParentEdgeCore(parent_id, child_id);
+	return { ok: true as const };
+});
+
+const addCoupleInputSchema = v.object({
+	person_a_id: v.string(),
+	person_b_id: v.string(),
+	kind: v.optional(coupleKindSchema),
+	start_date: v.optional(v.nullable(isoDateSchema)),
+	end_date: v.optional(v.nullable(isoDateSchema)),
+	end_reason: v.optional(v.nullable(coupleEndReasonSchema)),
+	site_id: v.string()
+});
+
+export const addCouple = command(addCoupleInputSchema, async ({ site_id, ...input }) => {
+	const { locals } = getRequestEvent();
+	if (!locals.userId) return createAuthErrorResult('unauthenticated', 'Sign in first.');
+	if (
+		!userCanEditPerson(input.person_a_id, locals.userId) ||
+		!userCanEditPerson(input.person_b_id, locals.userId)
+	) {
+		return createAuthErrorResult('forbidden', "You don't have edit access to one of those people.");
+	}
+	linkPersonToSite(input.person_a_id, site_id);
+	linkPersonToSite(input.person_b_id, site_id);
+	const couple = createCoupleCore(input);
+	return { ok: true as const, couple };
+});
+
+const getTreeInputSchema = v.object({
+	site_id: v.string(),
+	levels: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(10)))
+});
+
+export const getSiteTree = query(getTreeInputSchema, async ({ site_id, levels }) => {
+	const subjectId = getSiteSubjectId(site_id);
+	if (!subjectId) {
+		return { ok: false as const, code: 'no_subject', message: 'No subject person set for this site.' };
+	}
+	const tree = getTreeRootedAt(subjectId, levels ?? 4);
+	return { ok: true as const, tree };
+});
+
+export const getPersonRecord = query(v.string(), async (personId) => {
+	const person = getPersonCore(personId);
+	if (!person) return { ok: false as const, code: 'not_found', message: 'Person not found.' };
+	return { ok: true as const, person };
+});
+
+function userCanEditSiteOrError(siteId: string, userId: string): boolean {
+	const member = getSiteMember(siteId, userId);
+	return !!member && (member.role === 'owner' || member.role === 'editor');
+}

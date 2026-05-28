@@ -172,6 +172,12 @@
 		<p class="m-0 text-sm text-[color-mix(in_oklch,var(--foreground)_60%,transparent)]">
 			{m.site_meta_line({ siteId: data.site.site_id, visibility: visibilityLabel(data.site.visibility) })}
 		</p>
+		<a
+			href={`/sites/${data.site.site_id}/tree`}
+			class="text-sm text-(--svedit-editing-stroke) underline"
+		>
+			{m.site_tree_link()}
+		</a>
 	</header>
 
 	<section class="flex flex-col gap-3">
