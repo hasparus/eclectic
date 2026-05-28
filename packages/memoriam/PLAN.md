@@ -237,6 +237,16 @@ tenant routing.
       isolated `.e2e-data` directory wiped per suite. The DB helper
       reads magic-link and invite tokens directly from the platform
       SQLite. `bun run e2e` runs the suite.
+- [x] **App UI translation (EN + PL) via Paraglide JS.** All
+      user-facing strings live in `messages/{en,pl}.json`; Paraglide
+      compiles them to tree-shakable typed functions in
+      `src/lib/paraglide/`. Strategy is cookie-based
+      (`PARAGLIDE_LOCALE`) — no URL prefix, so user-content slugs
+      don't collide with locale segments. `LocaleSwitcher.svelte` is
+      a small button pair (EN · PL) rendered on `/signin` and
+      `/sites`; e2e covers the round-trip. The previous user-facing
+      noun "memorial" was renamed to **"site"** across the UI
+      strings (DB / URL / variable names stay as `sites`).
 
 ## Phase 3 — Multiplayer + local-first via Automerge (3-4 weeks)
 

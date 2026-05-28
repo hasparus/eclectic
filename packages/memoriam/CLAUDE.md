@@ -19,6 +19,41 @@ decisions live in [PLAN.md](./PLAN.md).
 - Sentence case for comments and commit messages.
 - Sacrifice grammar for concision.
 
+## Naming
+
+User-visible noun for a site is **"site"** (not "memorial"),
+matching the DB table (`sites`) and URL (`/sites/[id]`). The
+product is still "Memoriam"; only the per-tenant unit got renamed.
+Existing comments / variable names that say "memorial site" are
+fine — they're accurate description. Don't drive-by rename them.
+
+## i18n
+
+Paraglide JS. Messages live in `messages/{en,pl}.json`; compiled
+output in `src/lib/paraglide/` is **generated** (gitignored).
+Strategy is cookie-based (`PARAGLIDE_LOCALE`), no URL prefix —
+user content lives at `/`, `/<slug>` etc. without colliding with
+locale paths.
+
+Adding a string:
+
+1. Add the key to `messages/en.json` and `messages/pl.json`.
+2. Run `bunx paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide`
+   (or just `bun run dev` — the Vite plugin recompiles on save).
+3. Import via `import { m } from '$lib/paraglide/messages'` and
+   call `m.your_key()` (with `{}` parameters for placeholders).
+
+Key naming: `<feature>_<context>`, e.g. `signin_email_label`,
+`sites_create_submit`. Reuse `common_*` for cross-feature labels
+(roles, visibility, etc.). When a key shows in two places at
+different lengths, add both (`common_visibility_public` and
+`common_visibility_short_public`) — runtime string-splitting is
+fragile across translations.
+
+E2e tests pin to the base locale (English) by default — no
+cookie set means `baseLocale`. `e2e/i18n.e2e.ts` exercises the
+switcher round-trip; other suites assert on English strings.
+
 ## Server
 
 Per-site SQLite is reached via `event.locals.db` (set in

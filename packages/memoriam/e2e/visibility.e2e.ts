@@ -11,7 +11,7 @@ test.describe('private site visibility', () => {
 		await signInAs(page, ownerEmail, '/sites');
 		await page.getByPlaceholder(/display name/i).fill('Family only');
 		await page.getByRole('combobox').selectOption({ label: 'Private — only invited members' });
-		await page.getByRole('button', { name: /create memorial/i }).click();
+		await page.getByRole('button', { name: /create site/i }).click();
 		await page.getByRole('link', { name: /family only/i }).click();
 
 		await expect(page).toHaveURL(/\/sites\/[a-z0-9]+/);
@@ -33,7 +33,7 @@ test.describe('private site visibility', () => {
 		await signInAs(page, ownerEmail, '/sites');
 		await page.getByPlaceholder(/display name/i).fill('Open memorial');
 		await page.getByRole('combobox').selectOption({ label: 'Public — anyone with the link' });
-		await page.getByRole('button', { name: /create memorial/i }).click();
+		await page.getByRole('button', { name: /create site/i }).click();
 		await expect(page.getByRole('link', { name: /open memorial/i })).toBeVisible();
 		await signOut(page);
 

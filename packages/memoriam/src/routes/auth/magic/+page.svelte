@@ -1,23 +1,33 @@
 <script lang="ts">
+	import { m } from '$lib/paraglide/messages';
+
 	interface Props {
 		data: { ok: boolean; reason?: string };
 	}
 	let { data }: Props = $props();
 
-	const reason_message: Record<string, string> = {
-		missing_token: 'No sign-in token was provided.',
-		unknown: 'This sign-in link is not recognized.',
-		expired: 'This sign-in link has expired. Request a new one.',
-		already_consumed: 'This sign-in link has already been used.'
-	};
+	function reasonMessage(reason: string | undefined): string {
+		switch (reason) {
+			case 'missing_token':
+				return m.auth_magic_error_missing_token();
+			case 'unknown':
+				return m.auth_magic_error_unknown();
+			case 'expired':
+				return m.auth_magic_error_expired();
+			case 'already_consumed':
+				return m.auth_magic_error_already_consumed();
+			default:
+				return m.auth_magic_error_generic();
+		}
+	}
 </script>
 
-<svelte:head><title>Sign in</title></svelte:head>
+<svelte:head><title>{m.auth_magic_error_heading()}</title></svelte:head>
 
 <main class="mx-auto flex max-w-md flex-col gap-4 px-6 py-24 text-center text-(--foreground)">
-	<h1 class="m-0 text-xl font-medium">Sign-in link error</h1>
+	<h1 class="m-0 text-xl font-medium">{m.auth_magic_error_heading()}</h1>
 	<p class="m-0 text-sm text-[color-mix(in_oklch,var(--foreground)_64%,transparent)]">
-		{reason_message[data.reason ?? 'unknown'] ?? 'Could not sign you in.'}
+		{reasonMessage(data.reason)}
 	</p>
-	<a href="/" class="text-sm text-(--svedit-editing-stroke) underline">Go back home</a>
+	<a href="/" class="text-sm text-(--svedit-editing-stroke) underline">{m.common_back_home()}</a>
 </main>

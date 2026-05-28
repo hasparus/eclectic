@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
+	import { m } from '$lib/paraglide/messages';
 
 	interface Member {
 		site_id: string;
@@ -41,6 +42,22 @@
 	let qr_pending = $state(false);
 	let qr_error = $state('');
 
+	function roleLabel(role: 'owner' | 'editor' | 'viewer'): string {
+		return role === 'owner'
+			? m.common_role_owner()
+			: role === 'editor'
+				? m.common_role_editor()
+				: m.common_role_viewer();
+	}
+
+	function visibilityLabel(v: string): string {
+		return v === 'public'
+			? m.common_visibility_short_public()
+			: v === 'unlisted'
+				? m.common_visibility_short_unlisted()
+				: m.common_visibility_short_private();
+	}
+
 	async function mint_short_code() {
 		if (qr_pending) return;
 		qr_pending = true;
@@ -51,12 +68,12 @@
 				| { ok: true; short_code: ShortCodeEntry }
 				| { ok: false; code: string; message: string };
 			if (result.ok === false) {
-				qr_error = result.message || 'Could not mint code.';
+				qr_error = result.message || m.qr_generate_error();
 				return;
 			}
 			await invalidateAll();
 		} catch (err) {
-			qr_error = err instanceof Error ? err.message : 'Could not mint code.';
+			qr_error = err instanceof Error ? err.message : m.qr_generate_error();
 		} finally {
 			qr_pending = false;
 		}
@@ -72,7 +89,7 @@
 		if (invite_pending) return;
 		const trimmed = invite_email.trim();
 		if (!trimmed || !trimmed.includes('@')) {
-			invite_error = 'Enter a valid email.';
+			invite_error = m.invite_error_invalid_email();
 			return;
 		}
 		invite_pending = true;
@@ -87,14 +104,14 @@
 				| { ok: true; invite_token: string; email: string }
 				| { ok: false; code: string; message: string };
 			if (result.ok === false) {
-				invite_error = result.message || 'Could not invite.';
+				invite_error = result.message || m.invite_error_generic();
 				return;
 			}
 			invite_sent_to = trimmed;
 			invite_email = '';
 			await invalidateAll();
 		} catch (err) {
-			invite_error = err instanceof Error ? err.message : 'Could not invite.';
+			invite_error = err instanceof Error ? err.message : m.invite_error_generic();
 		} finally {
 			invite_pending = false;
 		}
@@ -130,7 +147,7 @@
 	}
 
 	async function transfer(to_user_id: string) {
-		if (!confirm('Transfer ownership? You will become an editor on this site.')) return;
+		if (!confirm(m.site_members_transfer_confirm())) return;
 		const api = await import('$lib/api.remote.js');
 		const result = (await api.transferSiteOwnership({
 			site_id: data.site.site_id,
@@ -144,48 +161,48 @@
 	}
 </script>
 
-<svelte:head><title>{data.site.display_name || data.site.site_id} — members</title></svelte:head>
+<svelte:head><title>{data.site.display_name || data.site.site_id}</title></svelte:head>
 
 <main class="mx-auto flex max-w-2xl flex-col gap-8 px-6 py-12 text-(--foreground)">
 	<header class="flex flex-col gap-1">
 		<a href="/sites" class="text-sm text-[color-mix(in_oklch,var(--foreground)_60%,transparent)] underline">
-			← All memorials
+			← {m.common_back_to_sites()}
 		</a>
 		<h1 class="m-0 text-2xl font-medium">{data.site.display_name || data.site.site_id}</h1>
 		<p class="m-0 text-sm text-[color-mix(in_oklch,var(--foreground)_60%,transparent)]">
-			{data.site.site_id} · {data.site.visibility}
+			{m.site_meta_line({ siteId: data.site.site_id, visibility: visibilityLabel(data.site.visibility) })}
 		</p>
 	</header>
 
 	<section class="flex flex-col gap-3">
-		<h2 class="m-0 text-lg font-medium">Members</h2>
+		<h2 class="m-0 text-lg font-medium">{m.site_members_heading()}</h2>
 		<ul class="flex flex-col divide-y divide-[color-mix(in_oklch,var(--foreground)_15%,transparent)] border-y border-[color-mix(in_oklch,var(--foreground)_15%,transparent)]">
-			{#each data.members as m (m.user_id)}
+			{#each data.members as member (member.user_id)}
 				<li class="flex items-center justify-between py-3">
 					<div class="flex flex-col gap-0.5">
-						<span class="font-medium">{m.email ?? m.user_id}</span>
+						<span class="font-medium">{member.email ?? member.user_id}</span>
 						<span class="text-xs text-[color-mix(in_oklch,var(--foreground)_55%,transparent)]">
-							{m.role}{m.user_id === data.current_user_id ? ' · you' : ''}
+							{roleLabel(member.role)}{member.user_id === data.current_user_id ? m.site_members_you_suffix() : ''}
 						</span>
 					</div>
 					<div class="flex items-center gap-2 text-sm">
-						{#if is_owner && m.user_id !== data.current_user_id}
+						{#if is_owner && member.user_id !== data.current_user_id}
 							<select
-								value={m.role}
-								onchange={(e) => void change_role(m.user_id, (e.currentTarget as HTMLSelectElement).value as any)}
+								value={member.role}
+								onchange={(e) => void change_role(member.user_id, (e.currentTarget as HTMLSelectElement).value as any)}
 								class="border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-2 py-1"
 							>
-								<option value="owner">owner</option>
-								<option value="editor">editor</option>
-								<option value="viewer">viewer</option>
+								<option value="owner">{m.common_role_owner()}</option>
+								<option value="editor">{m.common_role_editor()}</option>
+								<option value="viewer">{m.common_role_viewer()}</option>
 							</select>
-							{#if m.role !== 'owner'}
-								<button class="underline" onclick={() => void transfer(m.user_id)}>Make owner</button>
+							{#if member.role !== 'owner'}
+								<button class="underline" onclick={() => void transfer(member.user_id)}>{m.site_members_make_owner()}</button>
 							{/if}
-							<button class="underline text-red-600" onclick={() => void remove(m.user_id)}>Remove</button>
+							<button class="underline text-red-600" onclick={() => void remove(member.user_id)}>{m.site_members_remove()}</button>
 						{/if}
-						{#if m.user_id === data.current_user_id && (m.role !== 'owner' || data.members.filter((x) => x.role === 'owner').length > 1)}
-							<button class="underline text-red-600" onclick={() => void remove(m.user_id)}>Leave</button>
+						{#if member.user_id === data.current_user_id && (member.role !== 'owner' || data.members.filter((x) => x.role === 'owner').length > 1)}
+							<button class="underline text-red-600" onclick={() => void remove(member.user_id)}>{m.site_members_leave()}</button>
 						{/if}
 					</div>
 				</li>
@@ -195,11 +212,11 @@
 
 	{#if is_owner}
 		<section class="flex flex-col gap-3">
-			<h2 class="m-0 text-lg font-medium">Invite someone</h2>
+			<h2 class="m-0 text-lg font-medium">{m.invite_section_heading()}</h2>
 			<div class="flex items-stretch gap-2">
 				<input
 					type="email"
-					placeholder="email@example.com"
+					placeholder={m.invite_email_placeholder()}
 					bind:value={invite_email}
 					class="flex-1 border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-3 py-2 text-base"
 				/>
@@ -207,8 +224,8 @@
 					bind:value={invite_role}
 					class="border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-3 py-2 text-base"
 				>
-					<option value="editor">editor</option>
-					<option value="viewer">viewer</option>
+					<option value="editor">{m.common_role_editor()}</option>
+					<option value="viewer">{m.common_role_viewer()}</option>
 				</select>
 				<button
 					type="button"
@@ -216,28 +233,28 @@
 					disabled={invite_pending}
 					class="border border-(--svedit-editing-stroke) bg-(--background) px-4 py-2 text-sm font-semibold text-(--svedit-editing-stroke) disabled:opacity-50"
 				>
-					{invite_pending ? 'Sending…' : 'Send invite'}
+					{invite_pending ? m.invite_submit_pending() : m.invite_submit()}
 				</button>
 			</div>
 			{#if invite_sent_to}
-				<div class="text-sm text-(--svedit-editing-stroke)">Invite sent to {invite_sent_to}.</div>
+				<div class="text-sm text-(--svedit-editing-stroke)">{m.invite_sent_confirmation({ email: invite_sent_to })}</div>
 			{/if}
 			{#if invite_error}
 				<div class="text-sm text-red-600">{invite_error}</div>
 			{/if}
 
 			{#if data.invites.length > 0}
-				<h3 class="m-0 mt-3 text-base font-medium">Pending invites</h3>
+				<h3 class="m-0 mt-3 text-base font-medium">{m.invite_pending_heading()}</h3>
 				<ul class="flex flex-col divide-y divide-[color-mix(in_oklch,var(--foreground)_15%,transparent)] border-y border-[color-mix(in_oklch,var(--foreground)_15%,transparent)]">
 					{#each data.invites as inv (inv.invite_token)}
 						<li class="flex items-center justify-between py-3 text-sm">
 							<div class="flex flex-col gap-0.5">
 								<span>{inv.email}</span>
 								<span class="text-xs text-[color-mix(in_oklch,var(--foreground)_55%,transparent)]">
-									{inv.role} · expires {new Date(inv.expires_at).toLocaleDateString()}
+									{m.invite_pending_expires({ role: roleLabel(inv.role), date: new Date(inv.expires_at).toLocaleDateString() })}
 								</span>
 							</div>
-							<button class="underline text-red-600" onclick={() => void revoke(inv.invite_token)}>Revoke</button>
+							<button class="underline text-red-600" onclick={() => void revoke(inv.invite_token)}>{m.invite_revoke()}</button>
 						</li>
 					{/each}
 				</ul>
@@ -246,11 +263,9 @@
 	{/if}
 
 	<section class="flex flex-col gap-3">
-		<h2 class="m-0 text-lg font-medium">QR codes</h2>
+		<h2 class="m-0 text-lg font-medium">{m.qr_section_heading()}</h2>
 		<p class="m-0 text-sm text-[color-mix(in_oklch,var(--foreground)_60%,transparent)]">
-			Each code resolves to this memorial via the short URL
-			<code>/r/&lt;code&gt;</code>
-			and is meant to be printed — on a marker, a card, a plaque. Codes are permanent.
+			{m.qr_section_intro()}
 		</p>
 
 		<div>
@@ -260,7 +275,7 @@
 				disabled={qr_pending}
 				class="border border-(--svedit-editing-stroke) bg-(--background) px-4 py-2 text-sm font-semibold text-(--svedit-editing-stroke) disabled:opacity-50"
 			>
-				{qr_pending ? 'Minting…' : 'Generate QR code'}
+				{qr_pending ? m.qr_generate_submit_pending() : m.qr_generate_submit()}
 			</button>
 		</div>
 		{#if qr_error}
@@ -288,17 +303,29 @@
 								download={`${sc.code}.svg`}
 								class="underline"
 							>
-								SVG
+								{m.qr_download_svg()}
 							</a>
-							{#each [['card', '25 mm'], ['plaque', '50 mm'], ['headstone', '80 mm']] as [size, label]}
-								<a
-									href={`/sites/${data.site.site_id}/qr/${sc.code}?format=pdf&size=${size}`}
-									download={`${sc.code}-${size}.pdf`}
-									class="underline"
-								>
-									PDF · {label}
-								</a>
-							{/each}
+							<a
+								href={`/sites/${data.site.site_id}/qr/${sc.code}?format=pdf&size=card`}
+								download={`${sc.code}-card.pdf`}
+								class="underline"
+							>
+								{m.qr_download_pdf_card()}
+							</a>
+							<a
+								href={`/sites/${data.site.site_id}/qr/${sc.code}?format=pdf&size=plaque`}
+								download={`${sc.code}-plaque.pdf`}
+								class="underline"
+							>
+								{m.qr_download_pdf_plaque()}
+							</a>
+							<a
+								href={`/sites/${data.site.site_id}/qr/${sc.code}?format=pdf&size=headstone`}
+								download={`${sc.code}-headstone.pdf`}
+								class="underline"
+							>
+								{m.qr_download_pdf_headstone()}
+							</a>
 						</div>
 					</li>
 				{/each}

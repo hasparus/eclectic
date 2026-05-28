@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { m } from '$lib/paraglide/messages';
+	import LocaleSwitcher from '$lib/LocaleSwitcher.svelte';
 
 	let email = $state('');
 	let pending = $state(false);
@@ -15,7 +17,7 @@
 		if (pending) return;
 		const trimmed = email.trim();
 		if (!trimmed || !trimmed.includes('@')) {
-			error = 'Enter a valid email address.';
+			error = m.signin_error_invalid_email();
 			return;
 		}
 		pending = true;
@@ -33,12 +35,12 @@
 				})
 				.updates()) as { ok: true } | { ok: false; code: string; message: string };
 			if (result.ok === false) {
-				error = result.message || 'Could not send link.';
+				error = result.message || m.signin_error_generic();
 				return;
 			}
 			sent_to = trimmed;
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Could not send link.';
+			error = err instanceof Error ? err.message : m.signin_error_generic();
 		} finally {
 			pending = false;
 		}
@@ -51,32 +53,36 @@
 	}
 </script>
 
-<svelte:head><title>Sign in</title></svelte:head>
+<svelte:head><title>{m.signin_title()}</title></svelte:head>
 
 <main class="mx-auto flex max-w-md flex-col gap-8 px-6 py-24 text-(--foreground)">
+	<div class="flex justify-end">
+		<LocaleSwitcher />
+	</div>
+
 	<header class="flex flex-col items-center gap-2 text-center">
-		<h1 class="m-0 text-2xl font-medium">Sign in</h1>
+		<h1 class="m-0 text-2xl font-medium">{m.signin_title()}</h1>
 		<p class="m-0 text-sm text-[color-mix(in_oklch,var(--foreground)_60%,transparent)]">
-			We'll email you a link to sign in.
+			{m.signin_subtitle()}
 		</p>
 	</header>
 
 	{#if sent_to}
 		<section aria-live="polite" class="flex flex-col items-center gap-2 text-center">
-			<p class="m-0 text-base">Check your email.</p>
+			<p class="m-0 text-base">{m.signin_check_email_heading()}</p>
 			<p class="m-0 text-sm text-[color-mix(in_oklch,var(--foreground)_60%,transparent)]">
-				We sent a sign-in link to <strong class="text-(--foreground)">{sent_to}</strong>.
+				{m.signin_check_email_body({ email: sent_to })}
 			</p>
 		</section>
 	{:else}
 		<div class="flex flex-col gap-3">
 			<label class="flex flex-col gap-1 text-sm">
-				<span>Email</span>
+				<span>{m.signin_email_label()}</span>
 				<input
 					type="email"
 					name="email"
 					bind:value={email}
-					placeholder="you@example.com"
+					placeholder={m.signin_email_placeholder()}
 					autocomplete="email"
 					onkeydown={handle_keydown}
 					class="border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-3 py-2 text-base"
@@ -89,7 +95,7 @@
 				disabled={pending}
 				class="self-stretch border border-(--svedit-editing-stroke) bg-(--background) px-4 py-2 text-sm font-semibold text-(--svedit-editing-stroke) disabled:opacity-50"
 			>
-				{pending ? 'Sending…' : 'Send link'}
+				{pending ? m.signin_submit_pending() : m.signin_submit()}
 			</button>
 
 			{#if error}

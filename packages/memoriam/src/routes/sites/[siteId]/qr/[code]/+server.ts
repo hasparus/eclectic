@@ -50,7 +50,10 @@ export const GET: RequestHandler = async ({ params, url, locals }) => {
 			size,
 			title: site?.display_name ?? undefined
 		});
-		return new Response(pdf, {
+		// `Buffer` isn't structurally a `BodyInit` in @types/node, but
+		// it's a `Uint8Array` subclass at runtime and fetch accepts it.
+		// `new Uint8Array(buffer)` shares the underlying memory.
+		return new Response(new Uint8Array(pdf), {
 			headers: {
 				'Content-Type': 'application/pdf',
 				// Filename hints the engraver at the intended size when

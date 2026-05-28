@@ -1,3 +1,4 @@
+import { sequence } from '@sveltejs/kit/hooks';
 import { env } from '$env/dynamic/private';
 import { getPlatformDb } from '$lib/server/platform_db.js';
 import { resolveSiteIdFromUrl } from '$lib/server/site_resolution.js';
@@ -13,9 +14,11 @@ import {
 import { getUser } from '$lib/server/users.js';
 import { userCanEditSite, getSite, getSiteMember } from '$lib/server/sites.js';
 import { ensureDefaultSite } from '$lib/server/seed.js';
+import { getTextDirection } from '$lib/paraglide/runtime';
+import { paraglideMiddleware } from '$lib/paraglide/server';
+import type { Handle, ServerInit } from '@sveltejs/kit';
 
-/** @type {import('@sveltejs/kit').ServerInit} */
-export async function init() {
+export const init: ServerInit = async () => {
 	// Eagerly initialize the platform DB so its migrations run at startup.
 	// Per-site DBs still migrate lazily on first getDb(siteId) call.
 	getPlatformDb();
@@ -25,10 +28,18 @@ export async function init() {
 	if (env.MEMORIAM_DEFAULT_SITE_ID) {
 		ensureDefaultSite();
 	}
-}
+};
 
-/** @type {import('@sveltejs/kit').Handle} */
-export const handle = async ({ event, resolve }) => {
+const handleParaglide: Handle = ({ event, resolve }) =>
+	paraglideMiddleware(event.request, ({ request, locale }) => {
+		event.request = request;
+		return resolve(event, {
+			transformPageChunk: ({ html }) =>
+				html.replace('%paraglide.lang%', locale).replace('%paraglide.dir%', getTextDirection(locale))
+		});
+	});
+
+const handleSession: Handle = async ({ event, resolve }) => {
 	event.locals.platformDb = getPlatformDb();
 	event.locals.siteId = null;
 	event.locals.db = null;
@@ -89,6 +100,10 @@ export const handle = async ({ event, resolve }) => {
 		event.locals.isAdmin = userCanEditSite(event.locals.siteId, event.locals.userId);
 	}
 
-	const response = await resolve(event);
-	return response;
+	return resolve(event);
 };
+
+// Paraglide runs first so the active locale (resolved from the
+// `PARAGLIDE_LOCALE` cookie) is available everywhere downstream,
+// including the platform-session handler and any server load.
+export const handle: Handle = sequence(handleParaglide, handleSession);

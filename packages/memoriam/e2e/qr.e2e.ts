@@ -7,7 +7,7 @@ test.describe('qr codes', () => {
 
 		await signInAs(page, ownerEmail, '/sites');
 		await page.getByPlaceholder(/display name/i).fill('Marble plaque');
-		await page.getByRole('button', { name: /create memorial/i }).click();
+		await page.getByRole('button', { name: /create site/i }).click();
 		await page.getByRole('link', { name: /marble plaque/i }).click();
 		await expect(page.getByRole('heading', { name: /marble plaque/i })).toBeVisible();
 
@@ -38,7 +38,7 @@ test.describe('qr codes', () => {
 
 		await signInAs(page, ownerEmail, '/sites');
 		await page.getByPlaceholder(/display name/i).fill('Bronze plaque');
-		await page.getByRole('button', { name: /create memorial/i }).click();
+		await page.getByRole('button', { name: /create site/i }).click();
 		await page.getByRole('link', { name: /bronze plaque/i }).click();
 		await page.getByRole('button', { name: /generate qr code/i }).click();
 
@@ -70,7 +70,7 @@ test.describe('qr codes', () => {
 		const ownerEmail = uniqueEmail('qr-bad-size');
 		await signInAs(page, ownerEmail, '/sites');
 		await page.getByPlaceholder(/display name/i).fill('Whatever');
-		await page.getByRole('button', { name: /create memorial/i }).click();
+		await page.getByRole('button', { name: /create site/i }).click();
 		await page.getByRole('link', { name: /whatever/i }).click();
 		await page.getByRole('button', { name: /generate qr code/i }).click();
 
@@ -88,7 +88,7 @@ test.describe('qr codes', () => {
 		// Owner mints a code on their site.
 		await signInAs(page, ownerEmail, '/sites');
 		await page.getByPlaceholder(/display name/i).fill('Restricted memorial');
-		await page.getByRole('button', { name: /create memorial/i }).click();
+		await page.getByRole('button', { name: /create site/i }).click();
 		await page.getByRole('link', { name: /restricted memorial/i }).click();
 		await page.getByRole('button', { name: /generate qr code/i }).click();
 		const qrImg = page.getByRole('img', { name: /qr code/i });

@@ -6,7 +6,7 @@ test.describe('site listing + creation', () => {
 		const email = uniqueEmail('newuser');
 		await signInAs(page, email, '/sites');
 
-		await expect(page.getByText(/you don't have any memorials yet/i)).toBeVisible();
+		await expect(page.getByText(/you don't have any sites yet/i)).toBeVisible();
 
 		await page
 			.getByPlaceholder(/display name/i)
@@ -17,7 +17,7 @@ test.describe('site listing + creation', () => {
 		const visibility = page.getByRole('combobox');
 		await visibility.selectOption({ label: 'Unlisted — link required, not searchable' });
 
-		await page.getByRole('button', { name: /create memorial/i }).click();
+		await page.getByRole('button', { name: /create site/i }).click();
 
 		// The new memorial appears in the listing as a link. Follow it
 		// to the per-site page — the listing is the system of record.
@@ -40,7 +40,7 @@ test.describe('site listing + creation', () => {
 			await safeGoto(page, '/sites');
 			await page.waitForLoadState('networkidle');
 			await page.getByPlaceholder(/display name/i).fill(name);
-			await page.getByRole('button', { name: /create memorial/i }).click();
+			await page.getByRole('button', { name: /create site/i }).click();
 			await expect(page.getByRole('link', { name })).toBeVisible();
 		}
 

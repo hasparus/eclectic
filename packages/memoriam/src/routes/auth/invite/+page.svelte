@@ -1,25 +1,37 @@
 <script lang="ts">
+	import { m } from '$lib/paraglide/messages';
+
 	interface Props {
 		data: { ok: boolean; reason?: string };
 	}
 	let { data }: Props = $props();
 
-	const reason_message: Record<string, string> = {
-		missing_token: 'No invite token was provided.',
-		unknown: 'This invite is not recognized.',
-		expired: 'This invite has expired. Ask for a new one.',
-		already_consumed: 'This invite has already been used.',
-		email_mismatch: 'This invite was sent to a different email address. Sign out and sign back in with the invited email.',
-		unknown_user: 'Your account was not found.'
-	};
+	function reasonMessage(reason: string | undefined): string {
+		switch (reason) {
+			case 'missing_token':
+				return m.auth_invite_error_missing_token();
+			case 'unknown':
+				return m.auth_invite_error_unknown();
+			case 'expired':
+				return m.auth_invite_error_expired();
+			case 'already_consumed':
+				return m.auth_invite_error_already_consumed();
+			case 'email_mismatch':
+				return m.auth_invite_error_email_mismatch();
+			case 'unknown_user':
+				return m.auth_invite_error_unknown_user();
+			default:
+				return m.auth_invite_error_generic();
+		}
+	}
 </script>
 
-<svelte:head><title>Invite</title></svelte:head>
+<svelte:head><title>{m.auth_invite_error_heading()}</title></svelte:head>
 
 <main class="mx-auto flex max-w-md flex-col gap-4 px-6 py-24 text-center text-(--foreground)">
-	<h1 class="m-0 text-xl font-medium">Couldn't accept invite</h1>
+	<h1 class="m-0 text-xl font-medium">{m.auth_invite_error_heading()}</h1>
 	<p class="m-0 text-sm text-[color-mix(in_oklch,var(--foreground)_64%,transparent)]">
-		{reason_message[data.reason ?? 'unknown'] ?? 'Something went wrong.'}
+		{reasonMessage(data.reason)}
 	</p>
-	<a href="/sites" class="text-sm text-(--svedit-editing-stroke) underline">Your memorials</a>
+	<a href="/sites" class="text-sm text-(--svedit-editing-stroke) underline">{m.auth_invite_back_link()}</a>
 </main>

@@ -27,13 +27,13 @@ test.describe('sign in', () => {
 		await page.goto('/sites');
 
 		await expect(page).toHaveURL(/\/sites$/);
-		await expect(page.getByRole('heading', { name: /your memorials/i })).toBeVisible();
+		await expect(page.getByRole('heading', { name: /your sites/i })).toBeVisible();
 	});
 
 	test('signing in then signing out clears the session', async ({ page }) => {
 		const email = uniqueEmail('bob');
 		await signInAs(page, email, '/sites');
-		await expect(page.getByRole('heading', { name: /your memorials/i })).toBeVisible();
+		await expect(page.getByRole('heading', { name: /your sites/i })).toBeVisible();
 
 		await signOut(page);
 

@@ -11,7 +11,7 @@ test.describe('member invitations', () => {
 		// from the listing to land on the member-management page.
 		await signInAs(page, ownerEmail, '/sites');
 		await page.getByPlaceholder(/display name/i).fill('Family memorial');
-		await page.getByRole('button', { name: /create memorial/i }).click();
+		await page.getByRole('button', { name: /create site/i }).click();
 		await page.getByRole('link', { name: /family memorial/i }).click();
 		await expect(page.getByRole('heading', { name: /family memorial/i })).toBeVisible();
 
@@ -60,7 +60,7 @@ test.describe('member invitations', () => {
 
 		await signInAs(page, ownerEmail, '/sites');
 		await page.getByPlaceholder(/display name/i).fill('Locked memorial');
-		await page.getByRole('button', { name: /create memorial/i }).click();
+		await page.getByRole('button', { name: /create site/i }).click();
 		await page.getByRole('link', { name: /locked memorial/i }).click();
 		await expect(page.getByRole('heading', { name: /locked memorial/i })).toBeVisible();
 		await page.getByPlaceholder(/email@example\.com/i).fill(intendedEmail);
@@ -88,7 +88,7 @@ test.describe('member invitations', () => {
 
 		await signInAs(page, ownerEmail, '/sites');
 		await page.getByPlaceholder(/display name/i).fill('Revoke memorial');
-		await page.getByRole('button', { name: /create memorial/i }).click();
+		await page.getByRole('button', { name: /create site/i }).click();
 		await page.getByRole('link', { name: /revoke memorial/i }).click();
 		await expect(page.getByRole('heading', { name: /revoke memorial/i })).toBeVisible();
 
