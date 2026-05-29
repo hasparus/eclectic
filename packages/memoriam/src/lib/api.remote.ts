@@ -847,8 +847,19 @@ export const getSharedDocuments = query(v.void(), async () => {
 // to bypass the per-email cap). The response is uniform regardless of
 // rate-limit state so attackers can't use the endpoint to fingerprint
 // registered emails.
-const MAGIC_LINK_RATE_PER_EMAIL = { max: 5, windowMs: 60 * 60 * 1000 };
-const MAGIC_LINK_RATE_PER_IP = { max: 30, windowMs: 60 * 60 * 1000 };
+// Rate caps live in env so the e2e suite (one IP, dozens of sign-ins
+// per run) can crank `MEMORIAM_MAGIC_LINK_RATE_PER_IP` without
+// loosening the production defaults. Production keeps 5 emails / 30 IP
+// per hour; dev/test override via `.env` or `playwright.config.ts`.
+import { env as privateEnv } from '$env/dynamic/private';
+const MAGIC_LINK_RATE_PER_EMAIL = {
+	max: Number(privateEnv.MEMORIAM_MAGIC_LINK_RATE_PER_EMAIL ?? 5),
+	windowMs: 60 * 60 * 1000
+};
+const MAGIC_LINK_RATE_PER_IP = {
+	max: Number(privateEnv.MEMORIAM_MAGIC_LINK_RATE_PER_IP ?? 30),
+	windowMs: 60 * 60 * 1000
+};
 
 /**
  * Issue a magic-link token for the given email and send the sign-in

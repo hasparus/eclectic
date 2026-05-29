@@ -249,7 +249,6 @@
 			<!-- Tree canvas. -->
 			<div class="flex-1 overflow-auto border border-[color-mix(in_oklch,var(--foreground)_15%,transparent)] p-4">
 				<svg
-					data-testid="tree-canvas"
 					viewBox={`0 0 ${Math.max(layout.width, 400)} ${Math.max(layout.height, 200)}`}
 					class="block h-auto w-full"
 					role="figure"
@@ -293,8 +292,6 @@
 						{@const isSelected = node.id === selectedId}
 						<g transform={`translate(${node.x - CARD_WIDTH / 2}, ${node.y - CARD_HEIGHT / 2})`}>
 							<rect
-								data-testid="tree-card"
-								data-person-id={node.id}
 								x="0"
 								y="0"
 								width={CARD_WIDTH}

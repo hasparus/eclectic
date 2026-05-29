@@ -255,9 +255,33 @@ tenant routing.
       admins). "+ Parent / + Spouse / + Child" affordances in
       the drawer open a modal that creates the new person and
       wires the appropriate edge / couple in one round-trip.
-      Phase B = inline ghost cards, living-redaction for
-      non-admins, per-edge type chip; Phase C = GEDCOM 7 import
-      + export + fan-chart mobile view.
+- [ ] **Family tree — Phase B (editing UX polish).** Inline ghost
+      cards on the canvas: hover a focal person → "+ parent /
+      + spouse / + child" affordances appear *at the missing slot*
+      (Geni / MyHeritage pattern) instead of only inside the side
+      drawer. Living-relative redaction for non-admin viewers:
+      anyone where `isLikelyLiving(person)` is true renders as
+      "Living relative" with details hidden. Per-edge type chip
+      (bio / adoptive / foster / step) rendered on the parent-child
+      paths — currently we only differentiate solid vs. dashed.
+      Multi-marriage badge: a count above a card with multiple
+      spouses, clicking cycles which spouse renders adjacent.
+      `deletePerson` + `removeCouple` remote functions (Phase A
+      ships `removeParentEdge` but no peer for couples or full
+      person removal). d3-zoom is installed but not wired up —
+      add pan / pinch-zoom to the canvas. URL state for the
+      selected person (`?focus=<id>`) so refresh + share work.
+- [ ] **Family tree — Phase C (interop + mobile).** GEDCOM 7
+      import wizard: upload `.ged`, parse INDI + FAM + dates +
+      places, preview people / relationship counts, confirm.
+      GEDCOM 7 export: walk the platform tree → emit a valid
+      `.ged`. Both lean on `gedcom.io`'s 7.0 spec (UTF-8, no
+      CONT/CONC); 5.5.1 explicitly out of scope. Fan-chart
+      fallback view at viewports <640px — the FamilySearch
+      mobile pattern, compresses generations radially so phones
+      don't horizontally scroll. Optimistic-concurrency check
+      on `tree_person.updated_at` for multi-admin editing (toast
+      on conflict, refetch).
 - [x] **App UI translation (EN + PL) via Paraglide JS.** All
       user-facing strings live in `messages/{en,pl}.json`; Paraglide
       compiles them to tree-shakable typed functions in

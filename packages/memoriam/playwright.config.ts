@@ -36,7 +36,11 @@ export default defineConfig({
 		reuseExistingServer: !process.env.CI,
 		env: {
 			DATA_DIR: dataDir,
-			NODE_ENV: 'development'
+			NODE_ENV: 'development',
+			// All sign-ins come from 127.0.0.1; production's 30/hr would
+			// trip mid-suite. Per-email stays at 5 (each test uses a
+			// unique email anyway).
+			MEMORIAM_MAGIC_LINK_RATE_PER_IP: '500'
 		},
 		stdout: 'pipe',
 		stderr: 'pipe',
