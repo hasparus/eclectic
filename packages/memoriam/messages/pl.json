@@ -141,5 +141,25 @@
 	"tree_edge_kind_step_short": "P",
 	"tree_edge_kind_unknown_short": "?",
 	"tree_couple_count_badge": "× {count}",
-	"tree_couple_count_aria": "{count} małżeństw lub związków"
+	"tree_couple_count_aria": "{count} małżeństw lub związków",
+
+	"tree_import_link": "Importuj GEDCOM",
+	"tree_export_link": "Eksportuj GEDCOM",
+	"tree_import_heading": "Importuj plik GEDCOM",
+	"tree_import_body": "Wybierz plik `.ged` wyeksportowany z Ancestry, MyHeritage, FamilySearch lub innej aplikacji genealogicznej. Plik jest parsowany w przeglądarce i pokażemy podgląd przed zapisem do bazy.",
+	"tree_import_file_label": "Plik GEDCOM",
+	"tree_import_parse_error": "Nie udało się rozpoznać pliku GEDCOM. Czy to plik `.ged`?",
+	"tree_import_preview_heading": "Podgląd",
+	"tree_import_preview_people": "{count} osób",
+	"tree_import_preview_families": "{count} rodzin",
+	"tree_import_confirm": "Importuj",
+	"tree_import_pending": "Importowanie…",
+	"tree_import_cancel": "Wybierz inny plik",
+	"tree_import_success": "Zaimportowano {people} osób, {edges} relacji i {couples} par. {skipped} rekordów pominięto.",
+	"tree_import_back_to_tree": "Wróć do drzewa",
+
+	"tree_view_toggle_label": "Widok",
+	"tree_view_toggle_canvas": "Płótno",
+	"tree_view_toggle_fan": "Wykres wachlarzowy",
+	"tree_view_fan_aria": "Wachlarz przodków"
 }

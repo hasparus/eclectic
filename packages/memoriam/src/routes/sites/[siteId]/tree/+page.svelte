@@ -2,7 +2,15 @@
 	import { invalidateAll, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
 	import { m } from '$lib/paraglide/messages';
-	import { layoutTree, formatLifespan, CARD_WIDTH, CARD_HEIGHT } from '$lib/tree_layout';
+	import {
+		layoutTree,
+		fanLayoutTree,
+		fanWedgePath,
+		fanWedgeLabelPosition,
+		formatLifespan,
+		CARD_WIDTH,
+		CARD_HEIGHT
+	} from '$lib/tree_layout';
 	import { treeZoom } from '$lib/tree_zoom.svelte';
 	import type { Person, Sex, ParentKind, TreePayload } from '$lib/people_types';
 
@@ -64,7 +72,25 @@
 	}
 	let { data }: Props = $props();
 
-	let layout = $derived(data.tree ? layoutTree(data.tree) : null);
+	// Which view is showing on the canvas. Defaults to "canvas"; the
+	// fan chart is opt-in. URL-mirrored so reload + share preserves
+	// — the `?view=fan` parameter is a sibling to `?focus`.
+	type ViewMode = 'canvas' | 'fan';
+	let view = $state<ViewMode>(page.url.searchParams.get('view') === 'fan' ? 'fan' : 'canvas');
+	function setView(next: ViewMode) {
+		view = next;
+		const url = new URL(page.url);
+		if (next === 'fan') url.searchParams.set('view', 'fan');
+		else url.searchParams.delete('view');
+		replaceState(url, page.state);
+	}
+
+	let layout = $derived(view === 'canvas' && data.tree ? layoutTree(data.tree) : null);
+	let fanLayout = $derived(
+		view === 'fan' && data.tree && data.subject
+			? fanLayoutTree(data.tree, data.subject.person_id, 4)
+			: null
+	);
 
 	// Per-person couple count. >1 surfaces the multi-marriage badge on
 	// the card — both as a visual cue and as a real number for the
@@ -86,9 +112,11 @@
 	// `replaceState` doesn't update `page.url` reactively, so we
 	// can't `$derived` straight from the URL.
 	let selectedId = $state<string | null>(page.url.searchParams.get('focus'));
+	// Resolve from `data.tree.people` not `layout.nodes` so the drawer
+	// works in fan-chart mode too (where `layout` is null).
 	let selected = $derived.by(() => {
-		if (!selectedId || !layout) return null;
-		return layout.nodes.find((n) => n.id === selectedId)?.person ?? null;
+		if (!selectedId || !data.tree) return null;
+		return data.tree.people.find((p) => p.person_id === selectedId) ?? null;
 	});
 
 	function selectPerson(id: string | null) {
@@ -394,6 +422,52 @@
 				</p>
 			{/if}
 		</div>
+		<div class="flex items-center gap-3 text-sm">
+			{#if data.tree && data.tree.people.length > 0}
+				<fieldset
+					class="flex items-baseline gap-2 border-0 p-0 text-[color-mix(in_oklch,var(--foreground)_60%,transparent)]"
+					aria-label={m.tree_view_toggle_label()}
+				>
+					<legend class="sr-only">{m.tree_view_toggle_label()}</legend>
+					<button
+						type="button"
+						class="underline"
+						class:font-medium={view === 'canvas'}
+						class:no-underline={view === 'canvas'}
+						aria-pressed={view === 'canvas'}
+						onclick={() => setView('canvas')}
+					>
+						{m.tree_view_toggle_canvas()}
+					</button>
+					<span aria-hidden="true">·</span>
+					<button
+						type="button"
+						class="underline"
+						class:font-medium={view === 'fan'}
+						class:no-underline={view === 'fan'}
+						aria-pressed={view === 'fan'}
+						onclick={() => setView('fan')}
+					>
+						{m.tree_view_toggle_fan()}
+					</button>
+				</fieldset>
+			{/if}
+			{#if data.can_edit}
+				<a
+					href={`/sites/${data.site.site_id}/tree/import`}
+					class="text-[color-mix(in_oklch,var(--foreground)_60%,transparent)] underline"
+				>
+					{m.tree_import_link()}
+				</a>
+			{/if}
+			<a
+				href={`/sites/${data.site.site_id}/tree/export.ged`}
+				download
+				class="text-[color-mix(in_oklch,var(--foreground)_60%,transparent)] underline"
+			>
+				{m.tree_export_link()}
+			</a>
+		</div>
 	</header>
 
 	{#if !data.subject}
@@ -438,16 +512,64 @@
 				</form>
 			{/if}
 		</section>
-	{:else if layout && layout.nodes.length > 0}
-		<div class="flex flex-1 gap-4">
-			<div class="relative flex-1 overflow-hidden border border-[color-mix(in_oklch,var(--foreground)_15%,transparent)]">
-				<svg
-					use:treeZoom
-					viewBox={`0 0 ${Math.max(layout.width, 400)} ${Math.max(layout.height, 200)}`}
-					class="block h-[60vh] w-full cursor-grab active:cursor-grabbing"
-					role="figure"
-					aria-label={m.tree_page_title()}
+	{:else if (view === 'canvas' && layout && layout.nodes.length > 0) || (view === 'fan' && fanLayout && fanLayout.wedges.length > 0)}
+		<div class="flex flex-1 flex-col gap-4 md:flex-row">
+			{#if view === 'fan' && fanLayout}
+				<div
+					class="relative flex-1 overflow-hidden border border-[color-mix(in_oklch,var(--foreground)_15%,transparent)]"
 				>
+					<svg
+						viewBox={`0 0 ${fanLayout.size} ${fanLayout.size}`}
+						class="block h-[60vh] w-full"
+						role="figure"
+						aria-label={m.tree_view_fan_aria()}
+					>
+						{#each fanLayout.wedges as wedge (wedge.person.person_id)}
+							{@const isSelected = wedge.person.person_id === selectedId}
+							{@const label = fanWedgeLabelPosition(wedge, fanLayout.center)}
+							{@const name = displayName(wedge.person)}
+							<g class="fan-wedge-group">
+								<path
+									d={fanWedgePath(wedge, fanLayout.center)}
+									class="cursor-pointer fill-(--background) stroke-current"
+									class:stroke-2={isSelected}
+									stroke-width={isSelected ? 2 : 1}
+									onclick={() => selectPerson(wedge.person.person_id)}
+									onkeydown={(e) => {
+										if (e.key === 'Enter' || e.key === ' ') {
+											e.preventDefault();
+											selectPerson(wedge.person.person_id);
+										}
+									}}
+									role="button"
+									tabindex="0"
+									aria-label={name}
+								/>
+								<text
+									x={label.x}
+									y={label.y}
+									text-anchor="middle"
+									transform={`rotate(${label.rotate} ${label.x} ${label.y})`}
+									class="pointer-events-none select-none fill-current text-[11px]"
+									class:italic={wedge.person.is_redacted}
+								>
+									{truncate(name, wedge.generation === 0 ? 18 : 14)}
+								</text>
+							</g>
+						{/each}
+					</svg>
+				</div>
+			{:else if view === 'canvas' && layout}
+				<div
+					class="relative flex-1 overflow-hidden border border-[color-mix(in_oklch,var(--foreground)_15%,transparent)]"
+				>
+					<svg
+						use:treeZoom
+						viewBox={`0 0 ${Math.max(layout.width, 400)} ${Math.max(layout.height, 200)}`}
+						class="block h-[60vh] w-full cursor-grab active:cursor-grabbing"
+						role="figure"
+						aria-label={m.tree_page_title()}
+					>
 					<!-- The zoomable group is what the action transforms.
 					     Everything that pans/zooms with the canvas lives
 					     inside it. -->
@@ -691,6 +813,7 @@
 					</g>
 				</svg>
 			</div>
+			{/if}
 
 			{#if selected}
 				{@const sel = selected}

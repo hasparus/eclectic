@@ -106,6 +106,23 @@ the caller passed in and grant the caller `person_access.owner`.
 Types live in `src/lib/people_types.ts` (client-safe) — never
 `type`-import from `$lib/server/people` outside server files.
 
+**GEDCOM 7 interop.** `src/lib/gedcom.ts` is the
+browser-safe parser + reducer + exporter — the import wizard
+parses client-side and posts the structured payload to
+`importGedcom`. The exporter at `/sites/[siteId]/tree/export.ged`
+emits the full subgraph (every person linked to the site via
+`person_memorials`), synthesising a FAM record per couple + per
+distinct parent-set since GEDCOM is family-record-centric.
+Hand-rolled because the format is small enough that a dependency
+costs more than it saves; the subset we care about is
+INDI / FAM and a handful of date phrases.
+
+**Fan-chart view.** `fanLayoutTree` in `tree_layout.ts` is a
+Sosa-Stradonitz half-circle ancestor wheel; `fanWedgePath`
+builds each annular sector. Opt-in via `?view=fan` — the canvas
+(Sugiyama) is the default. Only renders ancestors; descendants
+stay in the canvas view.
+
 Tree visualisation: d3-dag's Sugiyama layout (parent-child DAG)
 → Svelte 5 SVG cards positioned in `src/lib/tree_layout.ts`.
 Couples are rendered as a thin dashed line between the two

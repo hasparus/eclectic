@@ -738,6 +738,142 @@ test.describe('family tree — Phase B (living-relative redaction)', () => {
 	});
 });
 
+test.describe('family tree — Phase C (GEDCOM + fan chart)', () => {
+	test('export.ged downloads valid GEDCOM 7 containing the seeded subject', async ({ page }) => {
+		const siteId = await bootSiteAndOpenTree(page, 'export', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+
+		// The export endpoint is a regular HTTP GET — drive it via the
+		// shared APIRequestContext so cookies match the page session.
+		const response = await page.context().request.get(
+			`/sites/${siteId}/tree/export.ged`
+		);
+		expect(response.status()).toBe(200);
+		expect(response.headers()['content-type']).toContain('familysearch.gedcom');
+		expect(response.headers()['content-disposition']).toMatch(/attachment; filename=/);
+		const body = await response.text();
+		expect(body).toContain('0 HEAD');
+		expect(body).toContain('2 VERS 7.0');
+		expect(body).toContain('1 NAME Grandma Edith');
+		expect(body).toContain('0 TRLR');
+	});
+
+	test('import wizard: upload + preview + confirm round-trips into the canvas', async ({
+		page
+	}) => {
+		await bootSiteAndOpenTree(page, 'import', 'Grandma Edith');
+		// Don't seed a subject — the import auto-sets the first
+		// imported individual as the site's subject_person_id when
+		// none is set. That lets the imported tree become the
+		// canvas root.
+
+		// Follow the "Import GEDCOM" header link.
+		await page.getByRole('link', { name: /import gedcom/i }).click();
+		await expect(page).toHaveURL(/\/sites\/[a-z0-9]+\/tree\/import$/);
+
+		// Set the file input with an in-memory GEDCOM blob. Tree of
+		// three: Edith (focal) with Marek + Anna as her parents.
+		const ged = `0 HEAD
+1 GEDC
+2 VERS 7.0
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME Edith /Holloway/
+1 SEX F
+1 BIRT
+2 DATE 1925
+0 @I2@ INDI
+1 NAME Marek /Holloway/
+1 SEX M
+1 BIRT
+2 DATE 1898
+0 @I3@ INDI
+1 NAME Anna /Kowalska/
+1 SEX F
+1 BIRT
+2 DATE 1900
+0 @F1@ FAM
+1 HUSB @I2@
+1 WIFE @I3@
+1 CHIL @I1@
+1 MARR
+2 DATE 1923
+0 TRLR
+`;
+		await page.locator('input[type="file"]').setInputFiles({
+			name: 'sample.ged',
+			mimeType: 'text/plain',
+			buffer: Buffer.from(ged, 'utf-8')
+		});
+
+		// Preview surfaces the structured counts before any write.
+		await expect(page.getByRole('heading', { name: /preview/i })).toBeVisible();
+		await expect(page.getByText(/3 people/i)).toBeVisible();
+		await expect(page.getByText(/1 families/i)).toBeVisible();
+
+		await page.getByRole('button', { name: /^import$/i }).click();
+		await expect(
+			page.getByRole('status').filter({ hasText: /imported.*people/i })
+		).toBeVisible();
+
+		// Back to the tree — all three imported people render via
+		// the inferred parent edges: Edith is the auto-set subject,
+		// Marek + Anna are her parents.
+		await page.getByRole('link', { name: /back to the tree/i }).click();
+		await expect(page).toHaveURL(/\/sites\/[a-z0-9]+\/tree$/);
+		await expect(card(page, /edith holloway/i)).toBeVisible();
+		await expect(card(page, /marek holloway/i)).toBeVisible();
+		await expect(card(page, /anna kowalska/i)).toBeVisible();
+	});
+
+	test('view toggle switches to the fan chart and persists in the URL', async ({ page }) => {
+		await bootSiteAndOpenTree(page, 'fan', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+		await (await selectPersonOnCanvas(page, /grandma edith/i))
+			.getByRole('button', { name: /\+ parent/i })
+			.click();
+		await modal(page).getByLabel(/display name/i).fill('Father');
+		await modal(page).getByRole('button', { name: /^add$/i }).click();
+		await expect(card(page, /father/i)).toBeVisible();
+
+		// Switch to the fan view.
+		await page.getByRole('button', { name: /^fan chart$/i }).click();
+		await expect(page).toHaveURL(/\?.*view=fan/);
+
+		// The figure label changes to the fan-chart-specific accessible
+		// name; both ancestors render as wedge buttons.
+		const fan = page.getByRole('figure', { name: /ancestor fan chart|wachlarz/i });
+		await expect(fan).toBeVisible();
+		await expect(fan.getByRole('button', { name: /grandma edith/i })).toBeVisible();
+		await expect(fan.getByRole('button', { name: /^father$/i })).toBeVisible();
+
+		// Reload — the URL preserves the view choice.
+		await page.reload();
+		await expect(page.getByRole('figure', { name: /ancestor fan chart/i })).toBeVisible();
+
+		// Toggle back to canvas; URL parameter dropped.
+		await page.getByRole('button', { name: /^canvas$/i }).click();
+		await expect(page).not.toHaveURL(/view=fan/);
+		await expect(treeCanvas(page)).toBeVisible();
+	});
+
+	test('fan-chart wedge click opens the drawer for that ancestor', async ({ page }) => {
+		await bootSiteAndOpenTree(page, 'fan-click', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+		await (await selectPersonOnCanvas(page, /grandma edith/i))
+			.getByRole('button', { name: /\+ parent/i })
+			.click();
+		await modal(page).getByLabel(/display name/i).fill('Ancestor');
+		await modal(page).getByRole('button', { name: /^add$/i }).click();
+		await expect(card(page, /ancestor/i)).toBeVisible();
+
+		await page.getByRole('button', { name: /^fan chart$/i }).click();
+		const fan = page.getByRole('figure', { name: /ancestor fan chart/i });
+		await fan.getByRole('button', { name: /^ancestor$/i }).click();
+		await expect(drawer(page).getByRole('heading', { name: /^ancestor$/i })).toBeVisible();
+	});
+});
+
 test.describe('family tree — i18n', () => {
 	test('Polish locale renders the tree page and drawer in Polish', async ({ page }) => {
 		await bootSiteAndOpenTree(page, 'pl-tree', 'Babcia Helena');

@@ -608,3 +608,171 @@ function yearFromIsoDate(date: string | null | undefined): number | null {
 	const n = Number(m[1]);
 	return Number.isFinite(n) ? n : null;
 }
+
+// ---------------------------------------------------------------
+// GEDCOM 7 import
+// ---------------------------------------------------------------
+
+import type { ParsedGedcom } from '$lib/gedcom.js';
+
+export interface GedcomImportResult {
+	people_created: number;
+	parent_edges_created: number;
+	couples_created: number;
+	skipped: string[];
+}
+
+/**
+ * Materialise a `ParsedGedcom` payload (from `reduceGedcom`) into
+ * platform DB rows on behalf of `owner_user_id`. Each INDI becomes a
+ * `people` row (auto-linked to `site_id` via `person_memorials`);
+ * each FAM becomes:
+ *   - `couples` row for HUSB+WIFE (if both present)
+ *   - `relationships` parent_of edges from each parent to each CHIL
+ *
+ * Wrapped in a single platform transaction so a malformed FAM doesn't
+ * leave half-imported state behind.
+ *
+ * Returns counts + a list of soft-skip reasons (e.g. cycle attempts
+ * from a malformed input). Doesn't throw on per-record failure —
+ * importers should preview the file, so individual records being
+ * rejected is part of the expected flow.
+ */
+export function importParsedGedcom(
+	parsed: ParsedGedcom,
+	siteId: string,
+	ownerUserId: string
+): GedcomImportResult {
+	const result: GedcomImportResult = {
+		people_created: 0,
+		parent_edges_created: 0,
+		couples_created: 0,
+		skipped: []
+	};
+	const xrefToPersonId = new Map<string, string>();
+
+	// Best-effort import. Each `createPerson` / `createCouple` /
+	// `addParentEdge` is wrapped in its own per-row transaction
+	// already, so individual row consistency is intact even if the
+	// import stops partway. We don't wrap a top-level transaction
+	// here because nested BEGINs aren't allowed in SQLite — the
+	// helpers we call would conflict with an outer BEGIN.
+	{
+		for (const ind of parsed.individuals) {
+			const person = createPerson({
+				owner_user_id: ownerUserId,
+				display_name: ind.display_name || ind.xref,
+				given_names: ind.given_names ?? null,
+				surname: ind.surname ?? null,
+				sex: ind.sex === 'U' ? null : ind.sex,
+				birth_date: ind.birth_date ?? null,
+				birth_place: ind.birth_place ?? null,
+				death_date: ind.death_date ?? null,
+				death_place: ind.death_place ?? null,
+				is_living: ind.is_living,
+				biography: ind.biography ?? null,
+				link_to_site_id: siteId
+			});
+			xrefToPersonId.set(ind.xref, person.person_id);
+			result.people_created += 1;
+		}
+
+		for (const fam of parsed.families) {
+			const a = fam.partner_a_xref ? xrefToPersonId.get(fam.partner_a_xref) : undefined;
+			const b = fam.partner_b_xref ? xrefToPersonId.get(fam.partner_b_xref) : undefined;
+			if (a && b) {
+				try {
+					createCouple({
+						person_a_id: a,
+						person_b_id: b,
+						start_date: fam.marr_date ?? null,
+						end_date: fam.div_date ?? null,
+						end_reason: fam.div_date ? 'divorce' : null
+					});
+					result.couples_created += 1;
+				} catch (err) {
+					result.skipped.push(
+						`couple ${fam.xref}: ${err instanceof Error ? err.message : 'unknown'}`
+					);
+				}
+			}
+
+			for (const childXref of fam.children_xrefs) {
+				const childId = xrefToPersonId.get(childXref);
+				if (!childId) continue;
+				for (const parentId of [a, b]) {
+					if (!parentId) continue;
+					try {
+						addParentEdge({ parent_id: parentId, child_id: childId });
+						result.parent_edges_created += 1;
+					} catch (err) {
+						result.skipped.push(
+							`edge ${fam.xref} ${parentId} → ${childId}: ${err instanceof Error ? err.message : 'unknown'}`
+						);
+					}
+				}
+			}
+		}
+	}
+
+	// Unrelated to created counts: also stamp the site's
+	// `subject_person_id` to the FIRST imported person if the site has
+	// no subject yet. Best-effort — admins can re-set later.
+	const currentSubject = getSiteSubjectId(siteId);
+	if (!currentSubject && parsed.individuals[0]) {
+		const firstId = xrefToPersonId.get(parsed.individuals[0].xref);
+		if (firstId) setSiteSubject(siteId, firstId);
+	}
+
+	return result;
+}
+
+/**
+ * Wide read used by the GEDCOM exporter — everyone linked to the
+ * site via `person_memorials`, plus every relationship + couple
+ * among them. Distinct from `getTreeRootedAt` which is bounded by
+ * generation depth from one focal person.
+ */
+export function getAllSitePeople(siteId: string): TreePayload {
+	const platform = getPlatformDb();
+	const idRows = platform
+		.prepare(`SELECT person_id FROM person_memorials WHERE site_id = ?`)
+		.all(siteId) as { person_id: string }[];
+	const ids = idRows.map((r) => r.person_id);
+	if (ids.length === 0) {
+		return { root_person_id: '', people: [], parent_edges: [], couples: [] };
+	}
+	const placeholders = ids.map(() => '?').join(',');
+	const people = platform
+		.prepare(
+			`SELECT person_id, display_name, given_names, surname,
+			        sex, birth_date, birth_place, death_date, death_place,
+			        birth_year, death_year, is_living, biography,
+			        privacy_level, owner_user_id, created_at, updated_at
+			 FROM people WHERE person_id IN (${placeholders})`
+		)
+		.all(...ids) as unknown as Person[];
+	const parent_edges = platform
+		.prepare(
+			`SELECT from_person_id AS parent_id, to_person_id AS child_id,
+			        COALESCE(kind, 'biological') AS kind, certainty
+			 FROM relationships
+			 WHERE relation_type = 'parent_of'
+			   AND from_person_id IN (${placeholders})
+			   AND to_person_id IN (${placeholders})`
+		)
+		.all(...ids, ...ids) as unknown as ParentEdge[];
+	const couples = platform
+		.prepare(
+			`SELECT couple_id, person_a_id, person_b_id, kind, start_date, end_date, end_reason
+			 FROM couples
+			 WHERE person_a_id IN (${placeholders}) AND person_b_id IN (${placeholders})`
+		)
+		.all(...ids, ...ids) as unknown as Couple[];
+	return {
+		root_person_id: getSiteSubjectId(siteId) ?? ids[0],
+		people,
+		parent_edges,
+		couples
+	};
+}

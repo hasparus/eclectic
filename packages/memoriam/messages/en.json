@@ -141,5 +141,25 @@
 	"tree_edge_kind_step_short": "S",
 	"tree_edge_kind_unknown_short": "?",
 	"tree_couple_count_badge": "× {count}",
-	"tree_couple_count_aria": "{count} marriages or partnerships"
+	"tree_couple_count_aria": "{count} marriages or partnerships",
+
+	"tree_import_link": "Import GEDCOM",
+	"tree_export_link": "Export GEDCOM",
+	"tree_import_heading": "Import a GEDCOM file",
+	"tree_import_body": "Pick a `.ged` file exported from Ancestry, MyHeritage, FamilySearch, or any other genealogy app. We parse it in your browser and show a preview before anything writes to the database.",
+	"tree_import_file_label": "GEDCOM file",
+	"tree_import_parse_error": "Couldn't parse this file as GEDCOM. Is it a `.ged` export?",
+	"tree_import_preview_heading": "Preview",
+	"tree_import_preview_people": "{count} people",
+	"tree_import_preview_families": "{count} families",
+	"tree_import_confirm": "Import",
+	"tree_import_pending": "Importing…",
+	"tree_import_cancel": "Choose a different file",
+	"tree_import_success": "Imported {people} people, {edges} relationships, and {couples} couples. {skipped} records skipped.",
+	"tree_import_back_to_tree": "Back to the tree",
+
+	"tree_view_toggle_label": "View",
+	"tree_view_toggle_canvas": "Canvas",
+	"tree_view_toggle_fan": "Fan chart",
+	"tree_view_fan_aria": "Ancestor fan chart"
 }

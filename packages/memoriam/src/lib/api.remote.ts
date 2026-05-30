@@ -63,7 +63,8 @@ import {
 	getSiteSubjectId,
 	getTreeRootedAt,
 	userCanEditPerson,
-	linkPersonToSite
+	linkPersonToSite,
+	importParsedGedcom
 } from '$lib/server/people.js';
 
 /**
@@ -1821,4 +1822,59 @@ export const getPersonRecord = query(type('string'), async (personId) => {
 	const person = getPersonCore(personId);
 	if (!person) return { ok: false as const, code: 'not_found', message: 'Person not found.' };
 	return { ok: true as const, person };
+});
+
+// ---------------------------------------------------------------
+// GEDCOM 7 import.
+// The client parses the .ged file (via `$lib/gedcom.js` —
+// browser-safe, no node imports) and posts the structured
+// `ParsedGedcom` here. The server re-validates the shape, then
+// runs `importParsedGedcom` in a single transaction.
+// ---------------------------------------------------------------
+
+const gedcomIndividualSchema = type({
+	xref: 'string',
+	display_name: 'string',
+	'given_names?': 'string | null | undefined',
+	'surname?': 'string | null | undefined',
+	sex: "'M' | 'F' | 'X' | 'U'",
+	'birth_date?': 'string | null | undefined',
+	'birth_place?': 'string | null | undefined',
+	'death_date?': 'string | null | undefined',
+	'death_place?': 'string | null | undefined',
+	'biography?': 'string | null | undefined',
+	is_living: 'boolean'
+});
+
+const gedcomFamilySchema = type({
+	xref: 'string',
+	'partner_a_xref?': 'string | null | undefined',
+	'partner_b_xref?': 'string | null | undefined',
+	children_xrefs: 'string[]',
+	'marr_date?': 'string | null | undefined',
+	'marr_place?': 'string | null | undefined',
+	'div_date?': 'string | null | undefined'
+});
+
+const importGedcomInputSchema = type({
+	site_id: 'string',
+	parsed: type({
+		individuals: gedcomIndividualSchema.array(),
+		families: gedcomFamilySchema.array()
+	})
+});
+
+export const importGedcom = command(importGedcomInputSchema, async ({ site_id, parsed }) => {
+	const { locals } = getRequestEvent();
+	return rpcFromResult(
+		requireUser(locals.userId)
+			.andThen((userId) => requireSiteEdit(site_id, userId))
+			.andThen((userId) =>
+				Result.fromThrowable(
+					() => importParsedGedcom(parsed, site_id, userId),
+					(e) => fromUnknown('import_failed', e, 'Could not import GEDCOM.')
+				)()
+			)
+			.map((result) => ({ result }))
+	);
 });

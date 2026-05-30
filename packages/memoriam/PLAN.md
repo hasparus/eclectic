@@ -320,18 +320,30 @@ tenant routing.
       reader. Phase A's "cycling which spouse renders adjacent"
       tweak skipped — both spouses already render as separate
       dashed lines, so the badge is information-only for v1.
-- [ ] **Family tree — Phase C (interop + mobile).** GEDCOM 7
-- [ ] **Family tree — Phase C (interop + mobile).** GEDCOM 7
-      import wizard: upload `.ged`, parse INDI + FAM + dates +
-      places, preview people / relationship counts, confirm.
-      GEDCOM 7 export: walk the platform tree → emit a valid
-      `.ged`. Both lean on `gedcom.io`'s 7.0 spec (UTF-8, no
-      CONT/CONC); 5.5.1 explicitly out of scope. Fan-chart
-      fallback view at viewports <640px — the FamilySearch
-      mobile pattern, compresses generations radially so phones
-      don't horizontally scroll. Optimistic-concurrency check
-      on `tree_person.updated_at` for multi-admin editing (toast
-      on conflict, refetch).
+- [x] **Family tree — Phase C (interop + alternate view).**
+      Hand-rolled GEDCOM 7 parser + reducer in `src/lib/gedcom.ts`
+      (browser-safe so the import wizard can parse client-side and
+      post the structured payload to `importGedcom`). Handles the
+      subset we need: INDI (NAME / SEX / BIRT / DEAT / FAMC / FAMS
+      / NOTE with CONT folding) and FAM (HUSB / WIFE / CHIL / MARR
+      / DIV). GEDCOM date variants (`12 JUN 1925`, `JUN 1925`,
+      `1925`, `ABT 1925`, `BET … AND …`) map to ISO `YYYY` /
+      `YYYY-MM` / `YYYY-MM-DD`. The exporter is the inverse —
+      `/sites/[siteId]/tree/export.ged` walks every person linked
+      to the site via `person_memorials` and emits a synthetic FAM
+      per couple + per parent-set. Import wizard at
+      `/sites/[siteId]/tree/import` parses in the browser, shows a
+      preview (people / families counts), then posts to the
+      `importGedcom` remote function — which materialises rows in
+      a single pass and auto-sets the first imported person as
+      the site's subject if none exists. Fan-chart fallback at
+      `?view=fan`: Sosa-Stradonitz half-circle in
+      `fanLayoutTree`, with `fanWedgePath` building each annular
+      sector and `fanWedgeLabelPosition` rotating labels along
+      the radius. Toolbar toggle (Canvas / Fan chart) mirrors the
+      choice into the URL alongside `?focus`. Optimistic-concurrency
+      check on `tree_person.updated_at` and a placeable mobile-only
+      breakpoint default are deferred — out of scope for v1.
 - [x] **App UI translation (EN + PL) via Paraglide JS.** All
       user-facing strings live in `messages/{en,pl}.json`; Paraglide
       compiles them to tree-shakable typed functions in
