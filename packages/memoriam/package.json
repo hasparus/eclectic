@@ -29,6 +29,7 @@
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"@tailwindcss/forms": "^0.5.11",
 		"@tailwindcss/vite": "^4.2.2",
+		"@types/d3-selection": "^3.0.11",
 		"@types/d3-zoom": "^3.0.8",
 		"@types/node": "^25",
 		"@types/pdfkit": "^0.17.6",
@@ -51,15 +52,17 @@
 	"dependencies": {
 		"@jsquash/webp": "^1.5.0",
 		"@sveltejs/adapter-node": "^5.5.4",
+		"arktype": "^2.2.0",
 		"d3-dag": "^1.2.1",
+		"d3-selection": "^3.0.0",
 		"d3-zoom": "^3.0.0",
 		"nanoid": "^5.1.6",
+		"neverthrow": "^8.2.0",
 		"pdfkit": "^0.18.0",
 		"qrcode": "^1.5.4",
 		"resend": "^6.12.4",
 		"slugify": "^1.6.6",
 		"svedit": "^0.9.0",
-		"svg-to-pdfkit": "^0.1.8",
-		"valibot": "^1.2.0"
+		"svg-to-pdfkit": "^0.1.8"
 	}
 }

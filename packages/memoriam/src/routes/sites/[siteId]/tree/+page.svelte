@@ -1,7 +1,9 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
+	import { invalidateAll, replaceState } from '$app/navigation';
+	import { page } from '$app/state';
 	import { m } from '$lib/paraglide/messages';
 	import { layoutTree, formatLifespan, CARD_WIDTH, CARD_HEIGHT } from '$lib/tree_layout';
+	import { treeZoom } from '$lib/tree_zoom.svelte';
 	import type { Person, Sex, ParentKind, TreePayload } from '$lib/people_types';
 
 	function truncate(s: string, max: number): string {
@@ -19,16 +21,30 @@
 	}
 	let { data }: Props = $props();
 
-	// `layout` is a pure derivation from the tree payload — d3-dag's
-	// Sugiyama call is cheap (n ≤ ~50 in practice) and re-running it
-	// on data changes keeps the canvas in sync after edits.
 	let layout = $derived(data.tree ? layoutTree(data.tree) : null);
 
-	let selectedId = $state<string | null>(null);
+	// Selection lives in local `$state` so it's the source of reactive
+	// truth for the drawer. The URL (`?focus=<person_id>`) is a
+	// one-way mirror — written when selection changes so refresh /
+	// share work, seeded from the URL on initial mount.
+	// `replaceState` doesn't update `page.url` reactively, so we
+	// can't `$derived` straight from the URL.
+	let selectedId = $state<string | null>(page.url.searchParams.get('focus'));
 	let selected = $derived.by(() => {
 		if (!selectedId || !layout) return null;
 		return layout.nodes.find((n) => n.id === selectedId)?.person ?? null;
 	});
+
+	function selectPerson(id: string | null) {
+		selectedId = id;
+		// Mirror selection into the URL on click. `replaceState` avoids
+		// pushing a history entry per card tap — back returns to
+		// `/sites/[id]` instead of cycling every selection.
+		const url = new URL(page.url);
+		if (id) url.searchParams.set('focus', id);
+		else url.searchParams.delete('focus');
+		replaceState(url, page.state);
+	}
 
 	// "Add" modal state.
 	type AddMode = 'parent' | 'spouse' | 'child';
@@ -59,6 +75,18 @@
 		addOpen = false;
 	}
 
+	function onWindowKeydown(event: KeyboardEvent) {
+		if (event.key === 'Escape') {
+			if (addOpen) {
+				closeAdd();
+				event.preventDefault();
+			} else if (selectedId) {
+				selectPerson(null);
+				event.preventDefault();
+			}
+		}
+	}
+
 	async function submitAdd() {
 		if (addPending || !addAnchor) return;
 		const name = addDisplayName.trim();
@@ -70,23 +98,19 @@
 		addError = '';
 		try {
 			const api = await import('$lib/api.remote.js');
-			// 1. Create the new person, linked to this site.
 			const personResult = (await api.createPerson({
 				site_id: data.site.site_id,
 				display_name: name,
 				sex: addSex === 'U' ? null : addSex,
 				birth_date: addBirthDate || null,
 				death_date: addDeathDate || null
-			})) as
-				| { ok: true; person: Person }
-				| { ok: false; code: string; message: string };
+			})) as { ok: true; person: Person } | { ok: false; code: string; message: string };
 			if (personResult.ok === false) {
 				addError = personResult.message;
 				return;
 			}
 			const newPerson = personResult.person;
 
-			// 2. Wire up the relationship to the anchor.
 			if (addMode === 'parent') {
 				await api.addParentEdge({
 					parent_id: newPerson.person_id,
@@ -118,7 +142,6 @@
 		}
 	}
 
-	// "Set subject" pending state.
 	let subjectPending = $state(false);
 	async function setSubjectFromSiteName() {
 		if (subjectPending) return;
@@ -141,11 +164,63 @@
 		}
 	}
 
-	// Inline edit form for the selected person.
+	// Controlled edit form. Fields shadow the selected person; the
+	// effect below syncs them when the selection changes. Going
+	// controlled also lets us auto-toggle `is_living` based on
+	// `death_date` — the previous uncontrolled FormData approach left
+	// `Living` checked even after a death date was filled.
+	let editFields = $state({
+		display_name: '',
+		given_names: '',
+		surname: '',
+		sex: 'U' as Sex,
+		birth_date: '',
+		birth_place: '',
+		death_date: '',
+		death_place: '',
+		is_living: false,
+		biography: ''
+	});
+	let editSeededFor = $state<string | null>(null);
 	let editPending = $state(false);
 	let editError = $state('');
 
-	async function saveSelected(formData: FormData) {
+	$effect(() => {
+		// Seed the form whenever the selected person changes (by id).
+		// `editSeededFor` guards against the effect re-running while
+		// the user is mid-edit on the same person.
+		if (!selected) {
+			editSeededFor = null;
+			return;
+		}
+		if (selected.person_id === editSeededFor) return;
+		editFields = {
+			display_name: selected.display_name,
+			given_names: selected.given_names ?? '',
+			surname: selected.surname ?? '',
+			sex: (selected.sex ?? 'U') as Sex,
+			birth_date: selected.birth_date ?? '',
+			birth_place: selected.birth_place ?? '',
+			death_date: selected.death_date ?? '',
+			death_place: selected.death_place ?? '',
+			is_living: selected.is_living === 1,
+			biography: selected.biography ?? ''
+		};
+		editSeededFor = selected.person_id;
+		editError = '';
+	});
+
+	// Auto-toggle: filling in a death date implies the person is no
+	// longer living. Clearing the death date alone doesn't flip them
+	// back to living (the user has to opt in explicitly via the
+	// checkbox) — that's safer than guessing intent.
+	$effect(() => {
+		if (editFields.death_date.trim()) {
+			if (editFields.is_living) editFields.is_living = false;
+		}
+	});
+
+	async function saveSelected() {
 		if (!selected || editPending) return;
 		editPending = true;
 		editError = '';
@@ -153,23 +228,25 @@
 			const api = await import('$lib/api.remote.js');
 			const result = (await api.updatePerson({
 				person_id: selected.person_id,
-				display_name: String(formData.get('display_name') || selected.display_name),
-				given_names: stringOrNull(formData.get('given_names')),
-				surname: stringOrNull(formData.get('surname')),
-				sex: ((formData.get('sex') as string) || 'U') === 'U' ? null : (formData.get('sex') as Sex),
-				birth_date: stringOrNull(formData.get('birth_date')),
-				birth_place: stringOrNull(formData.get('birth_place')),
-				death_date: stringOrNull(formData.get('death_date')),
-				death_place: stringOrNull(formData.get('death_place')),
-				is_living: formData.get('is_living') === 'on',
-				biography: stringOrNull(formData.get('biography'))
-			})) as
-				| { ok: true; person: Person }
-				| { ok: false; code: string; message: string };
+				display_name: editFields.display_name,
+				given_names: editFields.given_names || null,
+				surname: editFields.surname || null,
+				sex: editFields.sex === 'U' ? null : editFields.sex,
+				birth_date: editFields.birth_date || null,
+				birth_place: editFields.birth_place || null,
+				death_date: editFields.death_date || null,
+				death_place: editFields.death_place || null,
+				is_living: editFields.is_living,
+				biography: editFields.biography || null
+			})) as { ok: true; person: Person } | { ok: false; code: string; message: string };
 			if (result.ok === false) {
 				editError = result.message;
 				return;
 			}
+			flashSaved();
+			// Re-seed once the load returns so any normalisations
+			// (year columns recomputed) flow back into the form.
+			editSeededFor = null;
 			await invalidateAll();
 		} catch (err) {
 			editError = err instanceof Error ? err.message : m.tree_save_error();
@@ -178,10 +255,36 @@
 		}
 	}
 
-	function stringOrNull(v: FormDataEntryValue | null): string | null {
-		if (v === null) return null;
-		const s = String(v).trim();
-		return s ? s : null;
+	let showSaved = $state(false);
+	let savedTimer: ReturnType<typeof setTimeout> | null = null;
+	function flashSaved() {
+		showSaved = true;
+		if (savedTimer) clearTimeout(savedTimer);
+		savedTimer = setTimeout(() => {
+			showSaved = false;
+			savedTimer = null;
+		}, 2500);
+	}
+
+	let deletePending = $state(false);
+	async function deleteSelected() {
+		if (!selected || deletePending) return;
+		if (!confirm(m.tree_delete_confirm({ name: selected.display_name }))) return;
+		deletePending = true;
+		try {
+			const api = await import('$lib/api.remote.js');
+			const result = (await api.deletePerson({ person_id: selected.person_id })) as
+				| { ok: true }
+				| { ok: false; code: string; message: string };
+			if (result.ok === false) {
+				editError = result.message;
+				return;
+			}
+			selectPerson(null);
+			await invalidateAll();
+		} finally {
+			deletePending = false;
+		}
 	}
 
 	function sexLabel(s: Sex | null): string {
@@ -196,9 +299,12 @@
 				return m.tree_field_sex_unknown();
 		}
 	}
+
 </script>
 
 <svelte:head><title>{m.tree_page_title()}</title></svelte:head>
+
+<svelte:window onkeydown={onWindowKeydown} />
 
 <main class="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 py-8 text-(--foreground)">
 	<header class="flex items-baseline justify-between gap-4">
@@ -219,14 +325,11 @@
 	</header>
 
 	{#if !data.subject}
-		<!-- No subject yet — prompt to seed one from the site display name. -->
 		<section
 			class="flex flex-col items-center gap-3 border border-[color-mix(in_oklch,var(--foreground)_15%,transparent)] px-6 py-12 text-center"
 		>
 			<h2 class="m-0 text-lg font-medium">{m.tree_no_subject_heading()}</h2>
-			<p
-				class="m-0 max-w-prose text-sm text-[color-mix(in_oklch,var(--foreground)_60%,transparent)]"
-			>
+			<p class="m-0 max-w-prose text-sm text-[color-mix(in_oklch,var(--foreground)_60%,transparent)]">
 				{m.tree_no_subject_body()}
 			</p>
 			{#if data.can_edit}
@@ -246,95 +349,98 @@
 		</section>
 	{:else if layout && layout.nodes.length > 0}
 		<div class="flex flex-1 gap-4">
-			<!-- Tree canvas. -->
-			<div class="flex-1 overflow-auto border border-[color-mix(in_oklch,var(--foreground)_15%,transparent)] p-4">
+			<div class="relative flex-1 overflow-hidden border border-[color-mix(in_oklch,var(--foreground)_15%,transparent)]">
 				<svg
+					use:treeZoom
 					viewBox={`0 0 ${Math.max(layout.width, 400)} ${Math.max(layout.height, 200)}`}
-					class="block h-auto w-full"
+					class="block h-[60vh] w-full cursor-grab active:cursor-grabbing"
 					role="figure"
 					aria-label={m.tree_page_title()}
 				>
-					<!-- Parent → child edges first so cards sit on top. -->
-					<g class="text-[color-mix(in_oklch,var(--foreground)_30%,transparent)]">
-						{#each layout.edges as edge (`${edge.from}-${edge.to}`)}
-							<path
-								d={`M ${edge.from_xy[0]} ${edge.from_xy[1] + CARD_HEIGHT / 2}
-								   C ${edge.from_xy[0]} ${(edge.from_xy[1] + edge.to_xy[1]) / 2 + CARD_HEIGHT / 2},
-								     ${edge.to_xy[0]} ${(edge.from_xy[1] + edge.to_xy[1]) / 2 - CARD_HEIGHT / 2},
-								     ${edge.to_xy[0]} ${edge.to_xy[1] - CARD_HEIGHT / 2}`}
-								fill="none"
-								stroke="currentColor"
-								stroke-width="1.5"
-								class:stroke-dashed={edge.kind !== 'biological'}
-							/>
-						{/each}
-					</g>
+					<!-- The zoomable group is what the action transforms.
+					     Everything that pans/zooms with the canvas lives
+					     inside it. -->
+					<g class="zoomable">
+						<g class="text-[color-mix(in_oklch,var(--foreground)_30%,transparent)]">
+							{#each layout.edges as edge (`${edge.from}-${edge.to}`)}
+								<path
+									d={`M ${edge.from_xy[0]} ${edge.from_xy[1] + CARD_HEIGHT / 2}
+									   C ${edge.from_xy[0]} ${(edge.from_xy[1] + edge.to_xy[1]) / 2 + CARD_HEIGHT / 2},
+									     ${edge.to_xy[0]} ${(edge.from_xy[1] + edge.to_xy[1]) / 2 - CARD_HEIGHT / 2},
+									     ${edge.to_xy[0]} ${edge.to_xy[1] - CARD_HEIGHT / 2}`}
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.5"
+									class:stroke-dashed={edge.kind !== 'biological'}
+								/>
+							{/each}
+						</g>
 
-					<!-- Couple links. -->
-					<g class="text-[color-mix(in_oklch,var(--foreground)_45%,transparent)]">
-						{#each layout.couples as couple (couple.couple_id)}
-							<line
-								x1={couple.a_xy[0]}
-								y1={couple.a_xy[1]}
-								x2={couple.b_xy[0]}
-								y2={couple.b_xy[1]}
-								stroke="currentColor"
-								stroke-width="1"
-								stroke-dasharray="4 4"
-							/>
-						{/each}
-					</g>
+						<g class="text-[color-mix(in_oklch,var(--foreground)_45%,transparent)]">
+							{#each layout.couples as couple (couple.couple_id)}
+								<line
+									x1={couple.a_xy[0]}
+									y1={couple.a_xy[1]}
+									x2={couple.b_xy[0]}
+									y2={couple.b_xy[1]}
+									stroke="currentColor"
+									stroke-width="1"
+									stroke-dasharray="4 4"
+								/>
+							{/each}
+						</g>
 
-					<!-- Person cards. -->
-					{#each layout.nodes as node (node.id)}
-						{@const lifespan = formatLifespan(node.person)}
-						{@const isSubject = node.id === data.subject.person_id}
-						{@const isSelected = node.id === selectedId}
-						<g transform={`translate(${node.x - CARD_WIDTH / 2}, ${node.y - CARD_HEIGHT / 2})`}>
-							<rect
-								x="0"
-								y="0"
-								width={CARD_WIDTH}
-								height={CARD_HEIGHT}
-								rx="6"
-								class="cursor-pointer fill-(--background) stroke-current"
-								class:stroke-2={isSelected || isSubject}
-								stroke="currentColor"
-								onclick={() => (selectedId = node.id)}
-								onkeydown={(e) => {
-									if (e.key === 'Enter' || e.key === ' ') {
-										e.preventDefault();
-										selectedId = node.id;
-									}
-								}}
-								role="button"
-								tabindex="0"
-								aria-label={node.person.display_name}
-							/>
-							<text
-								x={CARD_WIDTH / 2}
-								y={lifespan ? 22 : 28}
-								text-anchor="middle"
-								class="pointer-events-none select-none fill-current text-[13px] font-medium"
-							>
-								{truncate(node.person.display_name, 22)}
-							</text>
-							{#if lifespan}
+						{#each layout.nodes as node (node.id)}
+							{@const lifespan = formatLifespan(node.person)}
+							{@const isSubject = node.id === data.subject.person_id}
+							{@const isSelected = node.id === selectedId}
+							<g transform={`translate(${node.x - CARD_WIDTH / 2}, ${node.y - CARD_HEIGHT / 2})`}>
+								<rect
+									x="0"
+									y="0"
+									width={CARD_WIDTH}
+									height={CARD_HEIGHT}
+									rx="6"
+									class="cursor-pointer fill-(--background) stroke-current"
+									class:stroke-2={isSelected || isSubject}
+									stroke="currentColor"
+									onclick={() => selectPerson(node.id)}
+									onkeydown={(e) => {
+										if (e.key === 'Enter' || e.key === ' ') {
+											e.preventDefault();
+											selectPerson(node.id);
+										}
+									}}
+									role="button"
+									tabindex="0"
+									aria-label={lifespan
+										? `${node.person.display_name}, ${lifespan}`
+										: node.person.display_name}
+								/>
 								<text
 									x={CARD_WIDTH / 2}
-									y="44"
+									y={lifespan ? 22 : 28}
 									text-anchor="middle"
-									class="pointer-events-none select-none fill-[color-mix(in_oklch,currentColor_60%,transparent)] text-[11px]"
+									class="pointer-events-none select-none fill-current text-[13px] font-medium"
 								>
-									{lifespan}
+									{truncate(node.person.display_name, 22)}
 								</text>
-							{/if}
-						</g>
-					{/each}
+								{#if lifespan}
+									<text
+										x={CARD_WIDTH / 2}
+										y="44"
+										text-anchor="middle"
+										class="pointer-events-none select-none fill-[color-mix(in_oklch,currentColor_60%,transparent)] text-[11px]"
+									>
+										{lifespan}
+									</text>
+								{/if}
+							</g>
+						{/each}
+					</g>
 				</svg>
 			</div>
 
-			<!-- Side drawer. -->
 			{#if selected}
 				{@const sel = selected}
 				<aside
@@ -346,7 +452,7 @@
 						<button
 							type="button"
 							class="text-xs underline"
-							onclick={() => (selectedId = null)}
+							onclick={() => selectPerson(null)}
 						>
 							{m.tree_drawer_close()}
 						</button>
@@ -381,7 +487,7 @@
 							class="flex flex-col gap-2"
 							onsubmit={(e) => {
 								e.preventDefault();
-								void saveSelected(new FormData(e.currentTarget));
+								void saveSelected();
 							}}
 						>
 							<label class="flex flex-col gap-0.5 text-xs">
@@ -389,8 +495,7 @@
 									{m.tree_field_display_name()}
 								</span>
 								<input
-									name="display_name"
-									value={sel.display_name}
+									bind:value={editFields.display_name}
 									required
 									class="border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-2 py-1"
 								/>
@@ -401,8 +506,7 @@
 										{m.tree_field_given_names()}
 									</span>
 									<input
-										name="given_names"
-										value={sel.given_names ?? ''}
+										bind:value={editFields.given_names}
 										class="border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-2 py-1"
 									/>
 								</label>
@@ -411,8 +515,7 @@
 										{m.tree_field_surname()}
 									</span>
 									<input
-										name="surname"
-										value={sel.surname ?? ''}
+										bind:value={editFields.surname}
 										class="border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-2 py-1"
 									/>
 								</label>
@@ -422,8 +525,7 @@
 									{m.tree_field_sex()}
 								</span>
 								<select
-									name="sex"
-									value={sel.sex ?? 'U'}
+									bind:value={editFields.sex}
 									class="border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-2 py-1"
 								>
 									<option value="U">{m.tree_field_sex_unknown()}</option>
@@ -438,8 +540,7 @@
 										{m.tree_field_birth_date()}
 									</span>
 									<input
-										name="birth_date"
-										value={sel.birth_date ?? ''}
+										bind:value={editFields.birth_date}
 										placeholder="YYYY-MM-DD"
 										class="border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-2 py-1 font-mono text-[12px]"
 									/>
@@ -449,8 +550,7 @@
 										{m.tree_field_death_date()}
 									</span>
 									<input
-										name="death_date"
-										value={sel.death_date ?? ''}
+										bind:value={editFields.death_date}
 										placeholder="YYYY-MM-DD"
 										class="border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-2 py-1 font-mono text-[12px]"
 									/>
@@ -461,8 +561,7 @@
 									{m.tree_field_birth_place()}
 								</span>
 								<input
-									name="birth_place"
-									value={sel.birth_place ?? ''}
+									bind:value={editFields.birth_place}
 									class="border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-2 py-1"
 								/>
 							</label>
@@ -471,16 +570,15 @@
 									{m.tree_field_death_place()}
 								</span>
 								<input
-									name="death_place"
-									value={sel.death_place ?? ''}
+									bind:value={editFields.death_place}
 									class="border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-2 py-1"
 								/>
 							</label>
 							<label class="flex items-center gap-2 text-xs">
 								<input
 									type="checkbox"
-									name="is_living"
-									checked={sel.is_living === 1}
+									bind:checked={editFields.is_living}
+									aria-label={m.tree_field_is_living()}
 								/>
 								{m.tree_field_is_living()}
 							</label>
@@ -489,23 +587,42 @@
 									{m.tree_field_biography()}
 								</span>
 								<textarea
-									name="biography"
-									value={sel.biography ?? ''}
+									bind:value={editFields.biography}
 									rows="3"
 									class="border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-2 py-1"
 								></textarea>
 							</label>
-							<button
-								type="submit"
-								disabled={editPending}
-								class="self-start border border-(--svedit-editing-stroke) bg-(--background) px-3 py-1 text-xs font-semibold text-(--svedit-editing-stroke) disabled:opacity-50"
-							>
-								{editPending ? m.tree_save_pending() : m.tree_save()}
-							</button>
+							<div class="flex items-center gap-3">
+								<button
+									type="submit"
+									disabled={editPending}
+									class="border border-(--svedit-editing-stroke) bg-(--background) px-3 py-1 text-xs font-semibold text-(--svedit-editing-stroke) disabled:opacity-50"
+								>
+									{editPending ? m.tree_save_pending() : m.tree_save()}
+								</button>
+								{#if showSaved}
+									<span
+										class="text-xs text-(--svedit-editing-stroke)"
+										role="status"
+										aria-live="polite"
+									>
+										{m.tree_saved_toast()}
+									</span>
+								{/if}
+							</div>
 							{#if editError}
-								<p class="m-0 text-xs text-red-600">{editError}</p>
+								<p class="m-0 text-xs text-red-600" role="alert">{editError}</p>
 							{/if}
 						</form>
+
+						<button
+							type="button"
+							onclick={() => void deleteSelected()}
+							disabled={deletePending}
+							class="self-start text-xs text-red-600 underline disabled:opacity-50"
+						>
+							{deletePending ? m.tree_delete_pending() : m.tree_delete_person()}
+						</button>
 					{:else}
 						<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
 							<dt class="text-[color-mix(in_oklch,var(--foreground)_60%,transparent)]">
@@ -533,7 +650,6 @@
 
 	{#if addOpen && addAnchor}
 		{@const anchor = addAnchor}
-		<!-- Lightweight modal overlay; covers the page; click outside cancels. -->
 		<div class="fixed inset-0 z-10 flex items-center justify-center bg-black/40 p-4">
 			<div
 				class="flex w-full max-w-sm flex-col gap-3 bg-(--background) p-4 text-sm"

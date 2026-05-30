@@ -255,22 +255,33 @@ tenant routing.
       admins). "+ Parent / + Spouse / + Child" affordances in
       the drawer open a modal that creates the new person and
       wires the appropriate edge / couple in one round-trip.
-- [ ] **Family tree — Phase B (editing UX polish).** Inline ghost
-      cards on the canvas: hover a focal person → "+ parent /
-      + spouse / + child" affordances appear *at the missing slot*
-      (Geni / MyHeritage pattern) instead of only inside the side
-      drawer. Living-relative redaction for non-admin viewers:
-      anyone where `isLikelyLiving(person)` is true renders as
-      "Living relative" with details hidden. Per-edge type chip
-      (bio / adoptive / foster / step) rendered on the parent-child
-      paths — currently we only differentiate solid vs. dashed.
-      Multi-marriage badge: a count above a card with multiple
-      spouses, clicking cycles which spouse renders adjacent.
-      `deletePerson` + `removeCouple` remote functions (Phase A
-      ships `removeParentEdge` but no peer for couples or full
-      person removal). d3-zoom is installed but not wired up —
-      add pan / pinch-zoom to the canvas. URL state for the
-      selected person (`?focus=<id>`) so refresh + share work.
+- [x] **Family tree — bug fixes + Phase B groundwork.** Death-date
+      input now auto-unchecks `is_living`. d3-zoom is wired via a
+      Svelte action on the canvas SVG (pan, pinch, wheel; bounded
+      0.2-3x scale). Save confirmation lives in a `role="status"`
+      span that flashes "Saved." for ~2.5s. Drawer Escape closes
+      the drawer, modal Escape closes the modal — both via a
+      single `<svelte:window onkeydown>` handler. Selected person
+      lives in `?focus=<person_id>` so refresh / share preserve
+      the drawer (local `$state` is the source of truth;
+      `replaceState` mirrors to URL, doesn't push history).
+      `deletePerson` + `removeCouple` remote functions land with
+      explicit cascade (drops every relationship, couple,
+      memorial link, access row, and nulls `sites.subject_person_id`
+      tombstones). The drawer's "Delete person" button drives it
+      with a confirm() dialog.
+- [ ] **Family tree — Phase B remaining (canvas UX polish).** Inline
+      ghost cards on the canvas: hover a focal person → "+ parent
+      / + spouse / + child" affordances appear *at the missing
+      slot* (Geni / MyHeritage pattern) instead of only inside
+      the side drawer. Living-relative redaction for non-admin
+      viewers: anyone where `isLikelyLiving(person)` is true
+      renders as "Living relative" with details hidden. Per-edge
+      type chip (bio / adoptive / foster / step) rendered on the
+      parent-child paths — currently we only differentiate solid
+      vs. dashed. Multi-marriage badge: a count above a card with
+      multiple spouses, clicking cycles which spouse renders
+      adjacent.
 - [ ] **Family tree — Phase C (interop + mobile).** GEDCOM 7
       import wizard: upload `.ged`, parse INDI + FAM + dates +
       places, preview people / relationship counts, confirm.

@@ -1,5 +1,7 @@
 import { customAlphabet } from 'nanoid';
+import { Result, ok, err } from 'neverthrow';
 import { getPlatformDb } from '$lib/server/platform_db.js';
+import { errOf, type AppError } from '$lib/server/app_error.js';
 import type {
 	Person,
 	ParentEdge,
@@ -318,6 +320,62 @@ export function createCouple(input: {
 		end_date: input.end_date ?? null,
 		end_reason: input.end_reason ?? null
 	};
+}
+
+export function getCoupleById(coupleId: string): Couple | null {
+	const row = getPlatformDb()
+		.prepare(
+			`SELECT couple_id, person_a_id, person_b_id, kind, start_date, end_date, end_reason
+			 FROM couples WHERE couple_id = ?`
+		)
+		.get(coupleId) as Couple | undefined;
+	return row ?? null;
+}
+
+export function removeCouple(coupleId: string): void {
+	getPlatformDb()
+		.prepare(`DELETE FROM couples WHERE couple_id = ?`)
+		.run(coupleId);
+}
+
+/**
+ * Permanently delete a person and every edge that touches them.
+ * Cascade is explicit (no SQLite FK ON DELETE) because the
+ * `relationships`, `couples`, `person_memorials`, and `person_access`
+ * rows all need to go.
+ *
+ * Site `subject_person_id` references are nulled to a tombstone state
+ * so the tree page shows the empty-state CTA again — better than a
+ * dangling FK that crashes load.
+ */
+export function deletePerson(personId: string): void {
+	const platform = getPlatformDb();
+	platform.exec('BEGIN IMMEDIATE');
+	try {
+		platform
+			.prepare(`UPDATE sites SET subject_person_id = NULL, updated_at = ? WHERE subject_person_id = ?`)
+			.run(new Date().toISOString(), personId);
+		platform
+			.prepare(`DELETE FROM relationships WHERE from_person_id = ? OR to_person_id = ?`)
+			.run(personId, personId);
+		platform
+			.prepare(`DELETE FROM couples WHERE person_a_id = ? OR person_b_id = ?`)
+			.run(personId, personId);
+		platform
+			.prepare(`DELETE FROM person_aliases WHERE person_id = ?`)
+			.run(personId);
+		platform
+			.prepare(`DELETE FROM person_memorials WHERE person_id = ?`)
+			.run(personId);
+		platform
+			.prepare(`DELETE FROM person_access WHERE person_id = ?`)
+			.run(personId);
+		platform.prepare(`DELETE FROM people WHERE person_id = ?`).run(personId);
+		platform.exec('COMMIT');
+	} catch (err) {
+		platform.exec('ROLLBACK');
+		throw err;
+	}
 }
 
 export function linkPersonToSite(personId: string, siteId: string): void {

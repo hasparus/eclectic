@@ -39,6 +39,10 @@ async function bootSiteAndOpenTree(
 }
 
 async function seedSubject(page: Page, siteName: string): Promise<void> {
+	// Wait for hydration before the click — callers that reach the
+	// tree via `page.goto(/tree)` (not an in-app link) need the
+	// Svelte 5 handlers to attach to the SSR'd seed button first.
+	await page.waitForLoadState('networkidle');
 	const seed = page.getByRole('button', {
 		name: new RegExp(`set ${siteName} as the subject`, 'i')
 	});
@@ -318,6 +322,114 @@ test.describe('family tree — access control', () => {
 		await expect(d.getByRole('button', { name: /^save$/i })).toHaveCount(0);
 
 		await viewerCtx.close();
+	});
+});
+
+test.describe('family tree — Phase B fixes', () => {
+	test('typing a death date auto-unchecks the Living checkbox', async ({ page }) => {
+		await bootSiteAndOpenTree(page, 'living', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+		const d = await selectPersonOnCanvas(page, /grandma edith/i);
+
+		// A freshly-seeded subject is Living by default.
+		await expect(d.getByRole('checkbox', { name: /^living$/i })).toBeChecked();
+
+		// Filling a death date should auto-clear the Living flag — the
+		// previous form left it checked, which the server then trusted.
+		await d.getByLabel(/death date/i).fill('2018-11-03');
+		await expect(d.getByRole('checkbox', { name: /^living$/i })).not.toBeChecked();
+	});
+
+	test('the Saved confirmation appears for a moment after a successful save', async ({ page }) => {
+		await bootSiteAndOpenTree(page, 'toast', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+		const d = await selectPersonOnCanvas(page, /grandma edith/i);
+
+		await d.getByLabel(/birth place/i).fill('Łódź');
+		await d.getByRole('button', { name: /^save$/i }).click();
+
+		// `role="status"` + `aria-live="polite"` is what we render — the
+		// screen-reader-friendly equivalent of a toast. Visible briefly.
+		await expect(page.getByRole('status').filter({ hasText: /saved\.?/i })).toBeVisible();
+	});
+
+	test('reloading the tree page restores the selected person from the URL', async ({ page }) => {
+		await bootSiteAndOpenTree(page, 'urlstate', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+		await card(page, /grandma edith/i).click();
+		await expect(drawer(page)).toBeVisible();
+
+		// URL now carries `?focus=<id>` — assert it's there.
+		await expect(page).toHaveURL(/\?focus=/);
+
+		// Reload. The selection is restored from the query param, no
+		// click needed.
+		await page.reload();
+		await expect(drawer(page).getByRole('heading', { name: /grandma edith/i })).toBeVisible();
+	});
+
+	test('pressing Escape closes the modal without committing', async ({ page }) => {
+		await bootSiteAndOpenTree(page, 'modal-esc', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+		const d = await selectPersonOnCanvas(page, /grandma edith/i);
+
+		await d.getByRole('button', { name: /\+ parent/i }).click();
+		await expect(modal(page)).toBeVisible();
+		await modal(page).getByLabel(/display name/i).fill('Should Not Land');
+
+		await page.keyboard.press('Escape');
+
+		await expect(modal(page)).toHaveCount(0);
+		// And the canvas still has just the subject.
+		await expect(treeCanvas(page).getByRole('button')).toHaveCount(1);
+	});
+
+	test('pressing Escape with no modal closes the drawer', async ({ page }) => {
+		await bootSiteAndOpenTree(page, 'drawer-esc', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+		await selectPersonOnCanvas(page, /grandma edith/i);
+
+		await page.keyboard.press('Escape');
+		await expect(drawer(page)).toHaveCount(0);
+		// And the URL `focus` param is cleared.
+		await expect(page).not.toHaveURL(/\?focus=/);
+	});
+
+	test('Delete person removes the card from the canvas', async ({ page }) => {
+		await bootSiteAndOpenTree(page, 'delete', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+
+		// Add a child so we have something safe to delete (deleting the
+		// subject would null `subject_person_id` and re-show the empty
+		// state — still valid, but a tree of 2 → 1 is a cleaner
+		// assertion).
+		await (await selectPersonOnCanvas(page, /grandma edith/i))
+			.getByRole('button', { name: /\+ child/i })
+			.click();
+		await modal(page).getByLabel(/display name/i).fill('Future Child');
+		await modal(page).getByRole('button', { name: /^add$/i }).click();
+		await expect(treeCanvas(page).getByRole('button')).toHaveCount(2);
+
+		// Open the child's drawer, click Delete person, confirm the
+		// confirm dialog.
+		await card(page, /future child/i).click();
+		page.once('dialog', (dialog) => void dialog.accept());
+		await drawer(page).getByRole('button', { name: /delete person/i }).click();
+
+		await expect(treeCanvas(page).getByRole('button')).toHaveCount(1);
+		// Drawer closes; URL focus is cleared.
+		await expect(drawer(page)).toHaveCount(0);
+	});
+
+	test('the SVG canvas advertises pan/zoom cursors', async ({ page }) => {
+		await bootSiteAndOpenTree(page, 'zoom', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+
+		// We can't assert d3-zoom's transform without inspecting DOM
+		// internals, but the canvas SVG should be tagged with the
+		// pan/zoom cursor classes — proof the action mounted.
+		const svg = treeCanvas(page);
+		await expect(svg).toHaveClass(/cursor-grab/);
 	});
 });
 

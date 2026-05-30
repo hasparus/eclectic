@@ -1,5 +1,16 @@
 import { getRequestEvent, query, command } from '$app/server';
-import * as v from 'valibot';
+import { type } from 'arktype';
+import { Result, ok, err } from 'neverthrow';
+import { errOf, fromUnknown, type AppError } from '$lib/server/app_error.js';
+import { rpcFromResult } from '$lib/server/rpc_result.js';
+
+// Note on optional fields: arktype's `'key?'` means "key may be
+// absent". It does NOT accept `{ key: undefined }`, while SvelteKit's
+// `devalue`-based remote call protocol preserves explicit `undefined`
+// keys. So every optional field must also accept `undefined`:
+//
+//   'next?': 'string | undefined'  ← idiomatic
+//   'next?': 'string'               ← rejects { next: undefined }
 import slugify from 'slugify';
 import crypto from 'node:crypto';
 import { documentSchema } from '$lib/document_schema.js';
@@ -45,6 +56,9 @@ import {
 	addParentEdge as addParentEdgeCore,
 	removeParentEdge as removeParentEdgeCore,
 	createCouple as createCoupleCore,
+	removeCouple as removeCoupleCore,
+	deletePerson as deletePersonCore,
+	getCoupleById,
 	setSiteSubject as setSiteSubjectCore,
 	getSiteSubjectId,
 	getTreeRootedAt,
@@ -66,13 +80,13 @@ function db(): import('node:sqlite').DatabaseSync {
 	return handle;
 }
 
-const requestMagicLinkInputSchema = v.object({
-	email: v.pipe(v.string(), v.email()),
-	next: v.optional(v.string())
+const requestMagicLinkInputSchema = type({
+	email: 'string.email',
+	'next?': 'string | undefined'
 });
 
-const consumeMagicLinkInputSchema = v.object({
-	token: v.string()
+const consumeMagicLinkInputSchema = type({
+	token: 'string'
 });
 
 interface ErrorResult {
@@ -151,19 +165,22 @@ interface PageTreeNode {
 	children: PageTreeNode[];
 }
 
-const saveDocumentInputSchema = v.object({
-	document_id: v.string(),
-	nodes: v.record(v.string(), v.any()),
-	create: v.optional(v.boolean())
+const saveDocumentInputSchema = type({
+	document_id: 'string',
+	// `nodes` is a free-form svedit document tree; the document_schema
+	// validates the shape later. Typed as a permissive record so
+	// downstream access (`nodes[id].nav`, etc.) doesn't trip TS.
+	nodes: type({ '[string]': 'unknown' }).as<Record<string, any>>(),
+	'create?': 'boolean | undefined'
 });
 
-const updatePageSlugInputSchema = v.object({
-	document_id: v.string(),
-	slug: v.string()
+const updatePageSlugInputSchema = type({
+	document_id: 'string',
+	slug: 'string'
 });
 
-const deletePageInputSchema = v.object({
-	document_id: v.string()
+const deletePageInputSchema = type({
+	document_id: 'string'
 });
 
 const sql = (strings: TemplateStringsArray): string => strings.join('');
@@ -784,7 +801,7 @@ function buildPageBrowserData() {
 /**
  * Get a document from the database, stitching in shared documents (nav, footer).
  */
-export const getDocument = query(v.string(), async (slug) => {
+export const getDocument = query(type('string'), async (slug) => {
 	const resolved = resolveSlug(slug);
 
 	if (!resolved) {
@@ -801,7 +818,7 @@ export const getDocument = query(v.string(), async (slug) => {
 /**
  * Resolve the configured home page and return its stitched document.
  */
-export const getHomeDocument = query(v.void(), async () => {
+export const getHomeDocument = query(type('undefined'), async () => {
 	const homePageId = getHomePageIdFromDb();
 
 	if (!homePageId) {
@@ -818,7 +835,7 @@ export const getHomeDocument = query(v.void(), async () => {
 /**
  * Return the current shared nav and footer documents used for composing new pages.
  */
-export const getSharedDocuments = query(v.void(), async () => {
+export const getSharedDocuments = query(type('undefined'), async () => {
 	const homePageId = getHomePageIdFromDb();
 
 	if (!homePageId) {
@@ -911,7 +928,7 @@ export const consumeMagicLinkToken = command(
 	}
 );
 
-export const logout = command(v.void(), async () => {
+export const logout = command(type('undefined'), async () => {
 	const { cookies } = getRequestEvent();
 	const sessionId = cookies.get(platformSessionCookieName);
 
@@ -926,10 +943,10 @@ export const logout = command(v.void(), async () => {
 	};
 });
 
-const createSiteInputSchema = v.object({
-	display_name: v.optional(v.string()),
-	preferred_site_id: v.optional(v.string()),
-	visibility: v.optional(v.picklist(['public', 'unlisted', 'private']))
+const createSiteInputSchema = type({
+	'display_name?': 'string | undefined',
+	'preferred_site_id?': 'string | undefined',
+	'visibility?': "'public' | 'unlisted' | 'private' | undefined"
 });
 
 /**
@@ -955,7 +972,7 @@ export const createSite = command(createSiteInputSchema, async (input) => {
 /**
  * Return page browser data for the pages drawer.
  */
-export const getPageBrowserData = query(v.void(), async () => {
+export const getPageBrowserData = query(type('undefined'), async () => {
 	requireAdminSession(getRequestEvent().locals);
 	return buildPageBrowserData();
 });
@@ -1021,7 +1038,7 @@ export const deletePage = command(deletePageInputSchema, async ({ document_id })
 /**
  * Return a lightweight preview for a simple internal page href like `/some-slug`.
  */
-export const getInternalLinkPreview = query(v.string(), async (href) => {
+export const getInternalLinkPreview = query(type('string'), async (href) => {
 	const parsed = parseInternalPageHref(href);
 	if (!parsed) {
 		return null;
@@ -1405,34 +1422,34 @@ export const updatePageSlug = command(updatePageSlugInputSchema, async (input) =
 
 // --- Site listing + member management ---
 
-const inviteMemberInputSchema = v.object({
-	site_id: v.string(),
-	email: v.pipe(v.string(), v.email()),
-	role: v.picklist(["editor", "viewer"])
+const inviteMemberInputSchema = type({
+	site_id: 'string',
+	email: 'string.email',
+	role: "'editor' | 'viewer'"
 });
 
-const changeMemberRoleInputSchema = v.object({
-	site_id: v.string(),
-	user_id: v.string(),
-	role: v.picklist(["owner", "editor", "viewer"])
+const changeMemberRoleInputSchema = type({
+	site_id: 'string',
+	user_id: 'string',
+	role: "'owner' | 'editor' | 'viewer'"
 });
 
-const removeMemberInputSchema = v.object({
-	site_id: v.string(),
-	user_id: v.string()
+const removeMemberInputSchema = type({
+	site_id: 'string',
+	user_id: 'string'
 });
 
-const revokeInviteInputSchema = v.object({
-	site_id: v.string(),
-	invite_token: v.string()
+const revokeInviteInputSchema = type({
+	site_id: 'string',
+	invite_token: 'string'
 });
 
-const transferOwnershipInputSchema = v.object({
-	site_id: v.string(),
-	to_user_id: v.string()
+const transferOwnershipInputSchema = type({
+	site_id: 'string',
+	to_user_id: 'string'
 });
 
-const siteIdInputSchema = v.object({ site_id: v.string() });
+const siteIdInputSchema = type({ site_id: 'string' });
 
 function requireOwner(siteId: string, userId: string): void {
 	const member = getSiteMember(siteId, userId);
@@ -1447,7 +1464,7 @@ function requireMember(siteId: string, userId: string): void {
 }
 
 /** Sites the current user belongs to. */
-export const listMySites = query(v.void(), async () => {
+export const listMySites = query(type('undefined'), async () => {
 	const { locals } = getRequestEvent();
 	if (!locals.userId) return { ok: false as const, sites: [] };
 	return { ok: true as const, sites: listUserSites(locals.userId) };
@@ -1525,9 +1542,9 @@ export const transferSiteOwnership = command(transferOwnershipInputSchema, async
 });
 
 
-const issueSiteShortCodeInputSchema = v.object({
-	site_id: v.string(),
-	target_path: v.optional(v.string())
+const issueSiteShortCodeInputSchema = type({
+	site_id: 'string',
+	'target_path?': 'string | undefined'
 });
 
 /**
@@ -1551,168 +1568,244 @@ export const issueSiteShortCode = command(issueSiteShortCodeInputSchema, async (
 // Person records live in the platform DB; ACL grants write access
 // to any site owner/editor whose site this person is linked to,
 // plus explicit person_access grants.
+//
+// These handlers compose with `Result<T, AppError>` via neverthrow:
+// authentication → per-person ACL check → DB write. The boundary
+// adapter `rpcFromResult` turns the Result into the discriminated
+// union shape we ship over the wire.
 // =============================================================
 
-const sexSchema = v.picklist(['M', 'F', 'X', 'U']);
-const parentKindSchema = v.picklist(['biological', 'adoptive', 'foster', 'step', 'unknown']);
-const coupleKindSchema = v.picklist(['marriage', 'partnership', 'engagement', 'other']);
-const coupleEndReasonSchema = v.picklist(['divorce', 'death', 'annulment', 'separation']);
-const isoDateSchema = v.pipe(v.string(), v.regex(/^-?\d{4}(-\d{2}(-\d{2})?)?$/));
+// arktype's union-of-string-literals syntax wraps in a quoted string;
+// keeping these as named symbols lets the genealogy schemas read
+// like the underlying type aliases in `people_types.ts`.
+const sexT = "'M' | 'F' | 'X' | 'U'";
+const parentKindT = "'biological' | 'adoptive' | 'foster' | 'step' | 'unknown'";
+const coupleKindT = "'marriage' | 'partnership' | 'engagement' | 'other'";
+const coupleEndReasonT = "'divorce' | 'death' | 'annulment' | 'separation'";
 
-const createPersonInputSchema = v.object({
-	site_id: v.string(),
-	display_name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),
-	given_names: v.optional(v.nullable(v.string())),
-	surname: v.optional(v.nullable(v.string())),
-	sex: v.optional(v.nullable(sexSchema)),
-	birth_date: v.optional(v.nullable(isoDateSchema)),
-	birth_place: v.optional(v.nullable(v.string())),
-	death_date: v.optional(v.nullable(isoDateSchema)),
-	death_place: v.optional(v.nullable(v.string())),
-	is_living: v.optional(v.boolean()),
-	biography: v.optional(v.nullable(v.string()))
+// Loose ISO date: YYYY | YYYY-MM | YYYY-MM-DD. arktype's `narrow`
+// lets us attach a custom predicate with its own diagnostic.
+const isoDate = type('string').narrow(
+	(s, ctx) =>
+		/^-?\d{4}(-\d{2}(-\d{2})?)?$/.test(s) || ctx.mustBe('an ISO date (YYYY, YYYY-MM, or YYYY-MM-DD)')
+);
+
+const createPersonInputSchema = type({
+	site_id: 'string',
+	display_name: '1 <= string <= 200',
+	'given_names?': 'string | null | undefined',
+	'surname?': 'string | null | undefined',
+	'sex?': `${sexT} | null | undefined`,
+	'birth_date?': isoDate.or('null | undefined'),
+	'birth_place?': 'string | null | undefined',
+	'death_date?': isoDate.or('null | undefined'),
+	'death_place?': 'string | null | undefined',
+	'is_living?': 'boolean | undefined',
+	'biography?': 'string | null | undefined'
 });
+
+/**
+ * Resolve the signed-in user's id or fail with a uniform
+ * `unauthenticated` AppError. Threaded through `.andThen` chains.
+ */
+function requireUser(userId: string | null | undefined): Result<string, AppError> {
+	return userId ? ok(userId) : err(errOf('unauthenticated', 'Sign in first.'));
+}
+
+/** Site owner or editor (NOT viewer) can edit site-bound data. */
+function requireSiteEdit(siteId: string, userId: string): Result<string, AppError> {
+	const member = getSiteMember(siteId, userId);
+	return member && (member.role === 'owner' || member.role === 'editor')
+		? ok(userId)
+		: err(errOf('forbidden', 'Editors and owners only.'));
+}
+
+/**
+ * The user must have edit access to every listed person. Threads the
+ * user id through on success so callers can chain further `.andThen`s.
+ */
+function requirePeopleEdit(personIds: string[], userId: string): Result<string, AppError> {
+	for (const id of personIds) {
+		if (!userCanEditPerson(id, userId)) {
+			return err(errOf('forbidden', "You don't have edit access to one of those people."));
+		}
+	}
+	return ok(userId);
+}
 
 export const createPerson = command(createPersonInputSchema, async (input) => {
 	const { locals } = getRequestEvent();
-	if (!locals.userId) return createAuthErrorResult('unauthenticated', 'Sign in first.');
-	requireMember(input.site_id, locals.userId);
-	if (!userCanEditSiteOrError(input.site_id, locals.userId)) {
-		return createAuthErrorResult('forbidden', 'Editors and owners only.');
-	}
-	const person = createPersonCore({
-		owner_user_id: locals.userId,
-		display_name: input.display_name,
-		given_names: input.given_names ?? null,
-		surname: input.surname ?? null,
-		sex: input.sex ?? null,
-		birth_date: input.birth_date ?? null,
-		birth_place: input.birth_place ?? null,
-		death_date: input.death_date ?? null,
-		death_place: input.death_place ?? null,
-		is_living: input.is_living,
-		biography: input.biography ?? null,
-		link_to_site_id: input.site_id
-	});
-	return { ok: true as const, person };
+	return rpcFromResult(
+		requireUser(locals.userId)
+			.andThen((userId) => requireSiteEdit(input.site_id, userId))
+			.map((userId) => ({
+				person: createPersonCore({
+					owner_user_id: userId,
+					display_name: input.display_name,
+					given_names: input.given_names ?? null,
+					surname: input.surname ?? null,
+					sex: input.sex ?? null,
+					birth_date: input.birth_date ?? null,
+					birth_place: input.birth_place ?? null,
+					death_date: input.death_date ?? null,
+					death_place: input.death_place ?? null,
+					is_living: input.is_living,
+					biography: input.biography ?? null,
+					link_to_site_id: input.site_id
+				})
+			}))
+	);
 });
 
-const updatePersonInputSchema = v.object({
-	person_id: v.string(),
-	display_name: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200))),
-	given_names: v.optional(v.nullable(v.string())),
-	surname: v.optional(v.nullable(v.string())),
-	sex: v.optional(v.nullable(sexSchema)),
-	birth_date: v.optional(v.nullable(isoDateSchema)),
-	birth_place: v.optional(v.nullable(v.string())),
-	death_date: v.optional(v.nullable(isoDateSchema)),
-	death_place: v.optional(v.nullable(v.string())),
-	is_living: v.optional(v.boolean()),
-	biography: v.optional(v.nullable(v.string()))
+const updatePersonInputSchema = type({
+	person_id: 'string',
+	'display_name?': '(1 <= string <= 200) | undefined',
+	'given_names?': 'string | null | undefined',
+	'surname?': 'string | null | undefined',
+	'sex?': `${sexT} | null | undefined`,
+	'birth_date?': isoDate.or('null | undefined'),
+	'birth_place?': 'string | null | undefined',
+	'death_date?': isoDate.or('null | undefined'),
+	'death_place?': 'string | null | undefined',
+	'is_living?': 'boolean | undefined',
+	'biography?': 'string | null | undefined'
 });
 
 export const updatePerson = command(updatePersonInputSchema, async ({ person_id, ...patch }) => {
 	const { locals } = getRequestEvent();
-	if (!locals.userId) return createAuthErrorResult('unauthenticated', 'Sign in first.');
-	if (!userCanEditPerson(person_id, locals.userId)) {
-		return createAuthErrorResult('forbidden', "You don't have edit access to that person.");
-	}
-	const person = updatePersonCore(person_id, patch);
-	return { ok: true as const, person };
+	return rpcFromResult(
+		requireUser(locals.userId)
+			.andThen((userId) => requirePeopleEdit([person_id], userId))
+			.map(() => ({ person: updatePersonCore(person_id, patch) }))
+	);
 });
 
-const setSiteSubjectInputSchema = v.object({
-	site_id: v.string(),
-	person_id: v.nullable(v.string())
+const setSiteSubjectInputSchema = type({
+	site_id: 'string',
+	person_id: 'string | null'
 });
 
 export const setSiteSubject = command(setSiteSubjectInputSchema, async ({ site_id, person_id }) => {
 	const { locals } = getRequestEvent();
-	if (!locals.userId) return createAuthErrorResult('unauthenticated', 'Sign in first.');
-	if (!userCanEditSiteOrError(site_id, locals.userId)) {
-		return createAuthErrorResult('forbidden', 'Editors and owners only.');
-	}
-	if (person_id && !userCanEditPerson(person_id, locals.userId)) {
-		return createAuthErrorResult('forbidden', "You don't have edit access to that person.");
-	}
-	setSiteSubjectCore(site_id, person_id);
-	return { ok: true as const };
+	return rpcFromResult(
+		requireUser(locals.userId)
+			.andThen((userId) => requireSiteEdit(site_id, userId))
+			.andThen((userId) => (person_id ? requirePeopleEdit([person_id], userId) : ok(userId)))
+			.map(() => {
+				setSiteSubjectCore(site_id, person_id);
+				return {};
+			})
+	);
 });
 
-const addParentInputSchema = v.object({
-	parent_id: v.string(),
-	child_id: v.string(),
-	kind: v.optional(parentKindSchema),
-	site_id: v.string()
+const addParentInputSchema = type({
+	parent_id: 'string',
+	child_id: 'string',
+	'kind?': `${parentKindT} | undefined`,
+	site_id: 'string'
 });
 
 export const addParentEdge = command(addParentInputSchema, async ({ parent_id, child_id, kind, site_id }) => {
 	const { locals } = getRequestEvent();
-	if (!locals.userId) return createAuthErrorResult('unauthenticated', 'Sign in first.');
-	if (
-		!userCanEditPerson(parent_id, locals.userId) ||
-		!userCanEditPerson(child_id, locals.userId)
-	) {
-		return createAuthErrorResult('forbidden', "You don't have edit access to one of those people.");
-	}
-	try {
-		// Make sure both endpoints are linked to this site so the tree
-		// page can show them. Idempotent.
-		linkPersonToSite(parent_id, site_id);
-		linkPersonToSite(child_id, site_id);
-		const edge = addParentEdgeCore({ parent_id, child_id, kind });
-		return { ok: true as const, edge };
-	} catch (err) {
-		return createAuthErrorResult('edge_failed', err instanceof Error ? err.message : 'Could not add edge.');
-	}
+	return rpcFromResult(
+		requireUser(locals.userId)
+			.andThen((userId) => requirePeopleEdit([parent_id, child_id], userId))
+			.andThen(() =>
+				// Wrap the cycle-check + insert in `Result.fromThrowable`
+				// so a self-edge / cycle becomes `Err` instead of an
+				// uncaught throw. The error code is stable for the UI.
+				Result.fromThrowable(
+					() => {
+						linkPersonToSite(parent_id, site_id);
+						linkPersonToSite(child_id, site_id);
+						return addParentEdgeCore({ parent_id, child_id, kind });
+					},
+					(e) => fromUnknown('edge_failed', e, 'Could not add edge.')
+				)()
+			)
+			.map((edge) => ({ edge }))
+	);
 });
 
-const removeParentInputSchema = v.object({
-	parent_id: v.string(),
-	child_id: v.string()
+const removeParentInputSchema = type({
+	parent_id: 'string',
+	child_id: 'string'
 });
 
 export const removeParentEdge = command(removeParentInputSchema, async ({ parent_id, child_id }) => {
 	const { locals } = getRequestEvent();
-	if (!locals.userId) return createAuthErrorResult('unauthenticated', 'Sign in first.');
-	if (
-		!userCanEditPerson(parent_id, locals.userId) ||
-		!userCanEditPerson(child_id, locals.userId)
-	) {
-		return createAuthErrorResult('forbidden', "You don't have edit access to one of those people.");
-	}
-	removeParentEdgeCore(parent_id, child_id);
-	return { ok: true as const };
+	return rpcFromResult(
+		requireUser(locals.userId)
+			.andThen((userId) => requirePeopleEdit([parent_id, child_id], userId))
+			.map(() => {
+				removeParentEdgeCore(parent_id, child_id);
+				return {};
+			})
+	);
 });
 
-const addCoupleInputSchema = v.object({
-	person_a_id: v.string(),
-	person_b_id: v.string(),
-	kind: v.optional(coupleKindSchema),
-	start_date: v.optional(v.nullable(isoDateSchema)),
-	end_date: v.optional(v.nullable(isoDateSchema)),
-	end_reason: v.optional(v.nullable(coupleEndReasonSchema)),
-	site_id: v.string()
+const addCoupleInputSchema = type({
+	person_a_id: 'string',
+	person_b_id: 'string',
+	'kind?': `${coupleKindT} | undefined`,
+	'start_date?': isoDate.or('null | undefined'),
+	'end_date?': isoDate.or('null | undefined'),
+	'end_reason?': `${coupleEndReasonT} | null | undefined`,
+	site_id: 'string'
 });
 
 export const addCouple = command(addCoupleInputSchema, async ({ site_id, ...input }) => {
 	const { locals } = getRequestEvent();
-	if (!locals.userId) return createAuthErrorResult('unauthenticated', 'Sign in first.');
-	if (
-		!userCanEditPerson(input.person_a_id, locals.userId) ||
-		!userCanEditPerson(input.person_b_id, locals.userId)
-	) {
-		return createAuthErrorResult('forbidden', "You don't have edit access to one of those people.");
-	}
-	linkPersonToSite(input.person_a_id, site_id);
-	linkPersonToSite(input.person_b_id, site_id);
-	const couple = createCoupleCore(input);
-	return { ok: true as const, couple };
+	return rpcFromResult(
+		requireUser(locals.userId)
+			.andThen((userId) => requirePeopleEdit([input.person_a_id, input.person_b_id], userId))
+			.map(() => {
+				linkPersonToSite(input.person_a_id, site_id);
+				linkPersonToSite(input.person_b_id, site_id);
+				return { couple: createCoupleCore(input) };
+			})
+	);
 });
 
-const getTreeInputSchema = v.object({
-	site_id: v.string(),
-	levels: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(10)))
+const removeCoupleInputSchema = type({
+	couple_id: 'string'
+});
+
+export const removeCouple = command(removeCoupleInputSchema, async ({ couple_id }) => {
+	const { locals } = getRequestEvent();
+	return rpcFromResult(
+		requireUser(locals.userId)
+			.andThen((userId) => {
+				const couple = getCoupleById(couple_id);
+				if (!couple) return err(errOf('not_found', 'Couple not found.'));
+				return requirePeopleEdit([couple.person_a_id, couple.person_b_id], userId);
+			})
+			.map(() => {
+				removeCoupleCore(couple_id);
+				return {};
+			})
+	);
+});
+
+const deletePersonInputSchema = type({
+	person_id: 'string'
+});
+
+export const deletePerson = command(deletePersonInputSchema, async ({ person_id }) => {
+	const { locals } = getRequestEvent();
+	return rpcFromResult(
+		requireUser(locals.userId)
+			.andThen((userId) => requirePeopleEdit([person_id], userId))
+			.map(() => {
+				deletePersonCore(person_id);
+				return {};
+			})
+	);
+});
+
+const getTreeInputSchema = type({
+	site_id: 'string',
+	'levels?': '(0 <= number.integer <= 10) | undefined'
 });
 
 export const getSiteTree = query(getTreeInputSchema, async ({ site_id, levels }) => {
@@ -1724,13 +1817,8 @@ export const getSiteTree = query(getTreeInputSchema, async ({ site_id, levels })
 	return { ok: true as const, tree };
 });
 
-export const getPersonRecord = query(v.string(), async (personId) => {
+export const getPersonRecord = query(type('string'), async (personId) => {
 	const person = getPersonCore(personId);
 	if (!person) return { ok: false as const, code: 'not_found', message: 'Person not found.' };
 	return { ok: true as const, person };
 });
-
-function userCanEditSiteOrError(siteId: string, userId: string): boolean {
-	const member = getSiteMember(siteId, userId);
-	return !!member && (member.role === 'owner' || member.role === 'editor');
-}

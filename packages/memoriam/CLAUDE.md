@@ -54,6 +54,36 @@ E2e tests pin to the base locale (English) by default — no
 cookie set means `baseLocale`. `e2e/i18n.e2e.ts` exercises the
 switcher round-trip; other suites assert on English strings.
 
+## Validation + result types
+
+Input schemas use **arktype** (`type({...})`). Optional fields must
+union with `undefined` — SvelteKit's `devalue` round-trip
+preserves `{ key: undefined }`, and arktype's `'key?'` syntax
+alone rejects that. Use `'key?': 'T | undefined'`.
+
+Server-side error composition uses **neverthrow**'s `Result<T,
+AppError>`. The wire format stays as a discriminated union
+(`{ ok: true } & T | { ok: false } & AppError`) because
+neverthrow's class instances lose their methods over JSON; the
+boundary adapter `rpcFromResult(r)` converts at the
+remote-function return point. `AppError` lives in
+`src/lib/server/app_error.ts` (just `{ code, message }` plus the
+`errOf(code, msg)` / `fromUnknown(...)` helpers).
+
+Genealogy handlers are the reference pattern:
+
+```ts
+return rpcFromResult(
+  requireUser(locals.userId)
+    .andThen((userId) => requirePeopleEdit([id1, id2], userId))
+    .map(() => doTheThing())
+);
+```
+
+`requireUser`, `requireSiteEdit`, `requirePeopleEdit` are the
+shared guards — each returns `Result<string, AppError>` threading
+the user id through `.andThen` chains.
+
 ## Genealogy / family tree
 
 People are platform-level. The platform DB owns the canonical
