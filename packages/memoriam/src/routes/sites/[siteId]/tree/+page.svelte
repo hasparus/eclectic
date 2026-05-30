@@ -10,6 +10,12 @@
 		return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 	}
 
+	/** Move focus to the input when it mounts — used by the add-modal so
+	 *  keyboard users don't have to Tab in. */
+	function autofocus(el: HTMLInputElement) {
+		el.focus();
+	}
+
 	interface Props {
 		data: {
 			site: { site_id: string; display_name: string | null };
@@ -91,7 +97,7 @@
 		if (addPending || !addAnchor) return;
 		const name = addDisplayName.trim();
 		if (!name) {
-			addError = 'Display name is required.';
+			addError = m.tree_no_subject_name_required();
 			return;
 		}
 		addPending = true;
@@ -136,29 +142,45 @@
 			addOpen = false;
 			await invalidateAll();
 		} catch (err) {
-			addError = err instanceof Error ? err.message : 'Could not add.';
+			addError = err instanceof Error ? err.message : m.tree_save_error();
 		} finally {
 			addPending = false;
 		}
 	}
 
 	let subjectPending = $state(false);
-	async function setSubjectFromSiteName() {
+	let subjectError = $state('');
+	let subjectName = $state(data.site.display_name?.trim() ?? '');
+	async function seedSubject() {
 		if (subjectPending) return;
+		const name = subjectName.trim();
+		if (!name) {
+			subjectError = m.tree_no_subject_name_required();
+			return;
+		}
 		subjectPending = true;
+		subjectError = '';
 		try {
 			const api = await import('$lib/api.remote.js');
-			const name = data.site.display_name?.trim() || 'Subject';
 			const result = (await api.createPerson({
 				site_id: data.site.site_id,
 				display_name: name
 			})) as { ok: true; person: Person } | { ok: false; code: string; message: string };
-			if (result.ok === false) return;
-			await api.setSiteSubject({
+			if (result.ok === false) {
+				subjectError = result.message;
+				return;
+			}
+			const setResult = (await api.setSiteSubject({
 				site_id: data.site.site_id,
 				person_id: result.person.person_id
-			});
+			})) as { ok: true } | { ok: false; code: string; message: string };
+			if (setResult.ok === false) {
+				subjectError = setResult.message;
+				return;
+			}
 			await invalidateAll();
+		} catch (err) {
+			subjectError = err instanceof Error ? err.message : m.tree_save_error();
 		} finally {
 			subjectPending = false;
 		}
@@ -333,18 +355,37 @@
 				{m.tree_no_subject_body()}
 			</p>
 			{#if data.can_edit}
-				<button
-					type="button"
-					onclick={() => void setSubjectFromSiteName()}
-					disabled={subjectPending}
-					class="border border-(--svedit-editing-stroke) bg-(--background) px-4 py-2 text-sm font-semibold text-(--svedit-editing-stroke) disabled:opacity-50"
+				<form
+					class="flex w-full max-w-sm flex-col items-stretch gap-2"
+					onsubmit={(e) => {
+						e.preventDefault();
+						void seedSubject();
+					}}
 				>
-					{subjectPending
-						? m.tree_no_subject_pending()
-						: data.site.display_name
-							? m.tree_no_subject_set_button({ name: data.site.display_name })
-							: m.tree_no_subject_set_button_generic()}
-				</button>
+					<label class="flex flex-col gap-1 text-left text-xs">
+						<span class="text-[color-mix(in_oklch,var(--foreground)_60%,transparent)]">
+							{m.tree_no_subject_name_label()}
+						</span>
+						<input
+							bind:value={subjectName}
+							placeholder={m.tree_no_subject_name_placeholder()}
+							required
+							class="border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-3 py-2 text-base"
+						/>
+					</label>
+					<button
+						type="submit"
+						disabled={subjectPending}
+						class="self-stretch border border-(--svedit-editing-stroke) bg-(--background) px-4 py-2 text-sm font-semibold text-(--svedit-editing-stroke) disabled:opacity-50"
+					>
+						{subjectPending
+							? m.tree_no_subject_pending()
+							: m.tree_no_subject_create_button()}
+					</button>
+					{#if subjectError}
+						<p class="m-0 text-left text-xs text-red-600" role="alert">{subjectError}</p>
+					{/if}
+				</form>
 			{/if}
 		</section>
 	{:else if layout && layout.nodes.length > 0}
@@ -650,7 +691,18 @@
 
 	{#if addOpen && addAnchor}
 		{@const anchor = addAnchor}
-		<div class="fixed inset-0 z-10 flex items-center justify-center bg-black/40 p-4">
+		<!-- Outer backdrop: clicks on the empty area dismiss; clicks
+		     that bubble from the dialog don't. Window-level Escape
+		     also closes. -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="fixed inset-0 z-10 flex items-center justify-center bg-black/40 p-4"
+			data-tree-backdrop
+			onclick={(e) => {
+				if (e.target === e.currentTarget) closeAdd();
+			}}
+		>
 			<div
 				class="flex w-full max-w-sm flex-col gap-3 bg-(--background) p-4 text-sm"
 				role="dialog"
@@ -668,6 +720,7 @@
 					<span>{m.tree_field_display_name()}</span>
 					<input
 						bind:value={addDisplayName}
+						use:autofocus
 						class="border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-2 py-1"
 						required
 					/>
@@ -677,7 +730,7 @@
 						<span>{m.tree_field_birth_date()}</span>
 						<input
 							bind:value={addBirthDate}
-							placeholder="YYYY"
+							placeholder="YYYY-MM-DD"
 							class="border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-2 py-1 font-mono text-[12px]"
 						/>
 					</label>
@@ -685,7 +738,7 @@
 						<span>{m.tree_field_death_date()}</span>
 						<input
 							bind:value={addDeathDate}
-							placeholder="YYYY"
+							placeholder="YYYY-MM-DD"
 							class="border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-2 py-1 font-mono text-[12px]"
 						/>
 					</label>

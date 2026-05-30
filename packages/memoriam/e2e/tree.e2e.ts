@@ -41,13 +41,15 @@ async function bootSiteAndOpenTree(
 async function seedSubject(page: Page, siteName: string): Promise<void> {
 	// Wait for hydration before the click — callers that reach the
 	// tree via `page.goto(/tree)` (not an in-app link) need the
-	// Svelte 5 handlers to attach to the SSR'd seed button first.
+	// Svelte 5 handlers to attach to the SSR'd form first.
 	await page.waitForLoadState('networkidle');
-	const seed = page.getByRole('button', {
-		name: new RegExp(`set ${siteName} as the subject`, 'i')
-	});
-	await expect(seed).toBeVisible();
-	await seed.click();
+	// The empty-state form pre-fills the subject's name from the
+	// site display name; we override it explicitly to keep tests
+	// independent from whatever the create-site step typed.
+	const nameInput = page.getByLabel(/subject'?s name|imię osoby głównej/i);
+	await expect(nameInput).toBeVisible();
+	await nameInput.fill(siteName);
+	await page.getByRole('button', { name: /create the subject|utwórz osobę główną/i }).click();
 	// The figure appears with one labelled card.
 	await expect(treeCanvas(page)).toBeVisible();
 	await expect(card(page, new RegExp(siteName, 'i'))).toBeVisible();
@@ -107,8 +109,9 @@ test.describe('family tree — seeding the subject', () => {
 
 		// Viewer sees the heading but no CTA to seed a subject.
 		await expect(viewerPage.getByRole('heading', { name: /no subject set/i })).toBeVisible();
+		await expect(viewerPage.getByLabel(/subject'?s name/i)).toHaveCount(0);
 		await expect(
-			viewerPage.getByRole('button', { name: /set.*as the subject/i })
+			viewerPage.getByRole('button', { name: /create the subject/i })
 		).toHaveCount(0);
 
 		await viewerCtx.close();
@@ -430,6 +433,116 @@ test.describe('family tree — Phase B fixes', () => {
 		// pan/zoom cursor classes — proof the action mounted.
 		const svg = treeCanvas(page);
 		await expect(svg).toHaveClass(/cursor-grab/);
+	});
+});
+
+test.describe('family tree — Phase A polish', () => {
+	test('the empty-state form prefills the site name and is editable', async ({ page }) => {
+		await bootSiteAndOpenTree(page, 'prefill', 'Wandering Site Name');
+
+		const nameInput = page.getByLabel(/subject'?s name/i);
+		// Prefilled with the site's display name as a sensible default.
+		await expect(nameInput).toHaveValue('Wandering Site Name');
+
+		// User can clear it and type their own — exercise the override.
+		await nameInput.fill('Edith Holloway');
+		await page.getByRole('button', { name: /create the subject/i }).click();
+		await expect(card(page, /edith holloway/i)).toBeVisible();
+		await expect(treeCanvas(page).getByText(/wandering site name/i)).toHaveCount(0);
+	});
+
+	test('blank subject name shows an inline error instead of creating "Subject"', async ({
+		page
+	}) => {
+		await bootSiteAndOpenTree(page, 'blank', '');
+
+		const nameInput = page.getByLabel(/subject'?s name/i);
+		await expect(nameInput).toHaveValue('');
+
+		const createBtn = page.getByRole('button', { name: /create the subject/i });
+		// The input has `required`, so the browser-level constraint
+		// fires before our handler. Either way, no canvas appears.
+		await createBtn.click();
+		await expect(treeCanvas(page)).toHaveCount(0);
+		// And no person named "Subject" exists.
+		await expect(page.getByText(/^subject$/i)).toHaveCount(0);
+	});
+
+	test('clicking the modal backdrop closes the add-relative modal', async ({ page }) => {
+		await bootSiteAndOpenTree(page, 'backdrop', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+		const d = await selectPersonOnCanvas(page, /grandma edith/i);
+
+		await d.getByRole('button', { name: /\+ parent/i }).click();
+		await expect(modal(page)).toBeVisible();
+
+		// The backdrop is a non-button element (`role` is the inner
+		// dialog's), so we locate it by the data-attribute hook and
+		// click a corner where the dialog isn't. The `e.target ===
+		// e.currentTarget` guard inside the handler skips dialog-
+		// originated clicks.
+		await page
+			.locator('[data-tree-backdrop]')
+			.click({ position: { x: 5, y: 5 } });
+		await expect(modal(page)).toHaveCount(0);
+	});
+
+	test('the modal autofocuses its display-name input', async ({ page }) => {
+		await bootSiteAndOpenTree(page, 'autofocus', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+		const d = await selectPersonOnCanvas(page, /grandma edith/i);
+
+		await d.getByRole('button', { name: /\+ parent/i }).click();
+
+		// `:focus` matches the focused element; combined with the modal
+		// scoping, this asserts the display-name input has focus right
+		// after open without a tab key press.
+		await expect(modal(page).getByLabel(/display name/i)).toBeFocused();
+	});
+
+	test('the add-modal accepts a year-only date (not just YYYY-MM-DD)', async ({ page }) => {
+		// The schema is `isoDate.or('null | undefined')`, where isoDate
+		// allows YYYY / YYYY-MM / YYYY-MM-DD. Both placeholders now say
+		// YYYY-MM-DD but a bare year is still valid.
+		await bootSiteAndOpenTree(page, 'year-only', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+		const d = await selectPersonOnCanvas(page, /grandma edith/i);
+		await d.getByRole('button', { name: /\+ parent/i }).click();
+		const mm = modal(page);
+		await mm.getByLabel(/display name/i).fill('Year Only Parent');
+		await mm.getByLabel(/birth date/i).fill('1898');
+		await mm.getByLabel(/death date/i).fill('1970');
+		await mm.getByRole('button', { name: /^add$/i }).click();
+
+		await expect(card(page, /year only parent/i)).toBeVisible();
+		// The lifespan badge renders from the year extracts of the
+		// stored ISO date strings.
+		await expect(treeCanvas(page).getByText('1898 — 1970')).toBeVisible();
+	});
+
+	test("editing a non-subject person's facts persists across reload", async ({ page }) => {
+		await bootSiteAndOpenTree(page, 'edit-parent', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+
+		await (await selectPersonOnCanvas(page, /grandma edith/i))
+			.getByRole('button', { name: /\+ parent/i })
+			.click();
+		await modal(page).getByLabel(/display name/i).fill('Marek Holloway');
+		await modal(page).getByRole('button', { name: /^add$/i }).click();
+		await expect(card(page, /marek holloway/i)).toBeVisible();
+
+		// Select Marek; edit facts; save.
+		const d = await selectPersonOnCanvas(page, /marek holloway/i);
+		await d.getByLabel(/birth date/i).fill('1898-06-12');
+		await d.getByLabel(/birth place/i).fill('Kraków');
+		await d.getByRole('button', { name: /^save$/i }).click();
+		await expect(page.getByRole('status').filter({ hasText: /saved\.?/i })).toBeVisible();
+
+		// Reload — selection restored from `?focus`, facts persist
+		// from the platform DB.
+		await page.reload();
+		await expect(drawer(page).getByLabel(/birth place/i)).toHaveValue('Kraków');
+		await expect(treeCanvas(page).getByText(/1898/)).toBeVisible();
 	});
 });
 

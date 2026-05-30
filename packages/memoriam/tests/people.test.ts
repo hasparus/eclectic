@@ -179,4 +179,89 @@ describe('people module', () => {
 		linkPersonToSite(person.person_id, site.site_id);
 		expect(userCanEditPerson(person.person_id, otherUser.user_id)).toBe(true);
 	});
+
+	it('removeParentEdge drops only the targeted edge', async () => {
+		const userId = await seedUser();
+		const { createPerson, addParentEdge, removeParentEdge, getTreeRootedAt } = await import(
+			'$lib/server/people.js'
+		);
+		const a = createPerson({ owner_user_id: userId, display_name: 'A' });
+		const b = createPerson({ owner_user_id: userId, display_name: 'B' });
+		const c = createPerson({ owner_user_id: userId, display_name: 'C' });
+		addParentEdge({ parent_id: a.person_id, child_id: b.person_id });
+		addParentEdge({ parent_id: a.person_id, child_id: c.person_id });
+
+		removeParentEdge(a.person_id, b.person_id);
+
+		const tree = getTreeRootedAt(a.person_id, 4);
+		const edgeSet = new Set(tree.parent_edges.map((e) => `${e.parent_id}-${e.child_id}`));
+		expect(edgeSet.has(`${a.person_id}-${b.person_id}`)).toBe(false);
+		expect(edgeSet.has(`${a.person_id}-${c.person_id}`)).toBe(true);
+	});
+
+	it('removeCouple drops only the targeted couple', async () => {
+		const userId = await seedUser();
+		const { createPerson, createCouple, removeCouple, getCoupleById, getTreeRootedAt } =
+			await import('$lib/server/people.js');
+		const a = createPerson({ owner_user_id: userId, display_name: 'A' });
+		const b = createPerson({ owner_user_id: userId, display_name: 'B' });
+		const c = createPerson({ owner_user_id: userId, display_name: 'C' });
+		const ab = createCouple({ person_a_id: a.person_id, person_b_id: b.person_id });
+		const ac = createCouple({ person_a_id: a.person_id, person_b_id: c.person_id });
+		expect(getCoupleById(ab.couple_id)).not.toBeNull();
+
+		removeCouple(ab.couple_id);
+
+		expect(getCoupleById(ab.couple_id)).toBeNull();
+		expect(getCoupleById(ac.couple_id)).not.toBeNull();
+		const tree = getTreeRootedAt(a.person_id, 0);
+		expect(tree.couples.map((c) => c.couple_id)).toEqual([ac.couple_id]);
+	});
+
+	it('deletePerson cascades to relationships, couples, memorials, and nulls subject_person_id', async () => {
+		const userId = await seedUser();
+		const { createSite } = await import('$lib/server/sites.js');
+		const {
+			createPerson,
+			addParentEdge,
+			createCouple,
+			deletePerson,
+			getPerson,
+			getCoupleById,
+			setSiteSubject,
+			getSiteSubjectId,
+			linkPersonToSite,
+			getTreeRootedAt
+		} = await import('$lib/server/people.js');
+
+		const site = createSite({ ownerUserId: userId, displayName: 'Family' });
+		const focal = createPerson({ owner_user_id: userId, display_name: 'Focal' });
+		const parent = createPerson({ owner_user_id: userId, display_name: 'Parent' });
+		const spouse = createPerson({ owner_user_id: userId, display_name: 'Spouse' });
+		addParentEdge({ parent_id: parent.person_id, child_id: focal.person_id });
+		const couple = createCouple({ person_a_id: focal.person_id, person_b_id: spouse.person_id });
+		linkPersonToSite(focal.person_id, site.site_id);
+		setSiteSubject(site.site_id, focal.person_id);
+
+		// Sanity: the focal is the subject + has relationships before
+		// we delete.
+		expect(getSiteSubjectId(site.site_id)).toBe(focal.person_id);
+
+		deletePerson(focal.person_id);
+
+		expect(getPerson(focal.person_id)).toBeNull();
+		// `subject_person_id` is nulled — the tree page can re-prompt
+		// the empty-state CTA instead of crashing.
+		expect(getSiteSubjectId(site.site_id)).toBeNull();
+		// Edges and couples touching the focal are gone.
+		expect(getCoupleById(couple.couple_id)).toBeNull();
+		const remaining = getTreeRootedAt(parent.person_id, 4);
+		const edgeSet = new Set(
+			remaining.parent_edges.map((e) => `${e.parent_id}-${e.child_id}`)
+		);
+		expect(edgeSet.has(`${parent.person_id}-${focal.person_id}`)).toBe(false);
+		// The parent itself survives — only the focal got deleted.
+		expect(getPerson(parent.person_id)).not.toBeNull();
+		expect(getPerson(spouse.person_id)).not.toBeNull();
+	});
 });

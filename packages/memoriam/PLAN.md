@@ -270,6 +270,27 @@ tenant routing.
       memorial link, access row, and nulls `sites.subject_person_id`
       tombstones). The drawer's "Delete person" button drives it
       with a confirm() dialog.
+- [x] **Family tree — Phase A bugfix sweep.** Closed the remaining
+      smoke-test items: modal backdrop click dismisses (using the
+      `e.target === e.currentTarget` pattern, with svelte-ignore
+      on the unavoidable a11y warnings — the window-level Esc
+      handler covers keyboard a11y). Empty-state subject CTA is
+      now an editable name field pre-filled with the site's
+      display name — the previous fallback created a person
+      literally named "Subject" when the site had no display
+      name. Modal autofocuses its display-name input on open.
+      Modal birth/death-date placeholders standardised on
+      `YYYY-MM-DD`. Hardcoded English error strings ("Display
+      name is required", "Could not add.") moved to the message
+      catalogue. Empty-state CTA + add-relative submitAdd now
+      surface server errors instead of swallowing them. Coverage
+      backfill: unit tests for `removeParentEdge`,
+      `removeCouple`, and the full `deletePerson` cascade
+      (subject_person_id nulled, relationships + couples +
+      memorials + access rows dropped, peer people survive); e2e
+      for editing a non-subject person's facts + reload, the
+      year-only date acceptance path, the empty-state error
+      branch, modal backdrop click, and modal autofocus.
 - [ ] **Family tree — Phase B remaining (canvas UX polish).** Inline
       ghost cards on the canvas: hover a focal person → "+ parent
       / + spouse / + child" affordances appear *at the missing
