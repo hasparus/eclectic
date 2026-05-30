@@ -132,5 +132,14 @@
 	"tree_add_modal_kind_label": "Rodzaj",
 	"tree_redacted_living": "Żyjący krewny",
 	"tree_empty_node_label": "Dodaj szczegóły",
-	"tree_dates_format": "{birth}{separator}{death}"
+	"tree_dates_format": "{birth}{separator}{death}",
+	"tree_card_add_parent_of": "Dodaj rodzica osoby {name}",
+	"tree_card_add_spouse_of": "Dodaj współmałżonka osoby {name}",
+	"tree_card_add_child_of": "Dodaj dziecko osoby {name}",
+	"tree_edge_kind_adoptive_short": "A",
+	"tree_edge_kind_foster_short": "Z",
+	"tree_edge_kind_step_short": "P",
+	"tree_edge_kind_unknown_short": "?",
+	"tree_couple_count_badge": "× {count}",
+	"tree_couple_count_aria": "{count} małżeństw lub związków"
 }

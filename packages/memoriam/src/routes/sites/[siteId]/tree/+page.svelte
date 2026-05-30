@@ -16,6 +16,43 @@
 		el.focus();
 	}
 
+	/** Display name with redaction substitution. Redacted people get the
+	 *  "Living relative" placeholder; full records get their real name. */
+	function displayName(p: Person): string {
+		return p.is_redacted ? m.tree_redacted_living() : p.display_name;
+	}
+
+	/** Single-letter glyph for an edge kind chip. Biological edges
+	 *  render as a plain line (no chip) — that's the default. */
+	function edgeKindShort(kind: ParentKind): string | null {
+		switch (kind) {
+			case 'adoptive':
+				return m.tree_edge_kind_adoptive_short();
+			case 'foster':
+				return m.tree_edge_kind_foster_short();
+			case 'step':
+				return m.tree_edge_kind_step_short();
+			case 'unknown':
+				return m.tree_edge_kind_unknown_short();
+			default:
+				return null;
+		}
+	}
+
+	/** Long-form (accessible) label for an edge kind. */
+	function edgeKindLabel(kind: ParentKind): string {
+		switch (kind) {
+			case 'adoptive':
+				return m.tree_add_modal_kind_adoptive();
+			case 'foster':
+				return m.tree_add_modal_kind_foster();
+			case 'step':
+				return m.tree_add_modal_kind_step();
+			default:
+				return m.tree_add_modal_kind_biological();
+		}
+	}
+
 	interface Props {
 		data: {
 			site: { site_id: string; display_name: string | null };
@@ -28,6 +65,19 @@
 	let { data }: Props = $props();
 
 	let layout = $derived(data.tree ? layoutTree(data.tree) : null);
+
+	// Per-person couple count. >1 surfaces the multi-marriage badge on
+	// the card — both as a visual cue and as a real number for the
+	// screen-reader label.
+	let coupleCountById = $derived.by(() => {
+		const m = new Map<string, number>();
+		if (!data.tree) return m;
+		for (const c of data.tree.couples) {
+			m.set(c.person_a_id, (m.get(c.person_a_id) ?? 0) + 1);
+			m.set(c.person_b_id, (m.get(c.person_b_id) ?? 0) + 1);
+		}
+		return m;
+	});
 
 	// Selection lives in local `$state` so it's the source of reactive
 	// truth for the drawer. The URL (`?focus=<person_id>`) is a
@@ -404,6 +454,9 @@
 					<g class="zoomable">
 						<g class="text-[color-mix(in_oklch,var(--foreground)_30%,transparent)]">
 							{#each layout.edges as edge (`${edge.from}-${edge.to}`)}
+								{@const short = edgeKindShort(edge.kind as ParentKind)}
+								{@const midX = (edge.from_xy[0] + edge.to_xy[0]) / 2}
+								{@const midY = (edge.from_xy[1] + edge.to_xy[1]) / 2}
 								<path
 									d={`M ${edge.from_xy[0]} ${edge.from_xy[1] + CARD_HEIGHT / 2}
 									   C ${edge.from_xy[0]} ${(edge.from_xy[1] + edge.to_xy[1]) / 2 + CARD_HEIGHT / 2},
@@ -414,6 +467,30 @@
 									stroke-width="1.5"
 									class:stroke-dashed={edge.kind !== 'biological'}
 								/>
+								{#if short}
+									<!-- Single-letter chip at the edge midpoint, e.g. "A"
+									     for adoptive. <title> gives the long form to a
+									     screen reader. -->
+									<g
+										data-edge-kind={edge.kind}
+										transform={`translate(${midX}, ${midY})`}
+									>
+										<title>{edgeKindLabel(edge.kind as ParentKind)}</title>
+										<circle
+											r="9"
+											class="fill-(--background) stroke-current"
+											stroke-width="1.5"
+										/>
+										<text
+											x="0"
+											y="3"
+											text-anchor="middle"
+											class="pointer-events-none select-none fill-current text-[10px] font-bold"
+										>
+											{short}
+										</text>
+									</g>
+								{/if}
 							{/each}
 						</g>
 
@@ -432,10 +509,16 @@
 						</g>
 
 						{#each layout.nodes as node (node.id)}
-							{@const lifespan = formatLifespan(node.person)}
+							{@const lifespan = node.person.is_redacted ? null : formatLifespan(node.person)}
+							{@const name = displayName(node.person)}
 							{@const isSubject = node.id === data.subject.person_id}
 							{@const isSelected = node.id === selectedId}
-							<g transform={`translate(${node.x - CARD_WIDTH / 2}, ${node.y - CARD_HEIGHT / 2})`}>
+							{@const isRedacted = !!node.person.is_redacted}
+							{@const coupleCount = coupleCountById.get(node.id) ?? 0}
+							<g
+								class="tree-card-group"
+								transform={`translate(${node.x - CARD_WIDTH / 2}, ${node.y - CARD_HEIGHT / 2})`}
+							>
 								<rect
 									x="0"
 									y="0"
@@ -444,6 +527,7 @@
 									rx="6"
 									class="cursor-pointer fill-(--background) stroke-current"
 									class:stroke-2={isSelected || isSubject}
+									class:opacity-60={isRedacted}
 									stroke="currentColor"
 									onclick={() => selectPerson(node.id)}
 									onkeydown={(e) => {
@@ -454,17 +538,16 @@
 									}}
 									role="button"
 									tabindex="0"
-									aria-label={lifespan
-										? `${node.person.display_name}, ${lifespan}`
-										: node.person.display_name}
+									aria-label={lifespan ? `${name}, ${lifespan}` : name}
 								/>
 								<text
 									x={CARD_WIDTH / 2}
 									y={lifespan ? 22 : 28}
 									text-anchor="middle"
 									class="pointer-events-none select-none fill-current text-[13px] font-medium"
+									class:italic={isRedacted}
 								>
-									{truncate(node.person.display_name, 22)}
+									{truncate(name, 22)}
 								</text>
 								{#if lifespan}
 									<text
@@ -475,6 +558,133 @@
 									>
 										{lifespan}
 									</text>
+								{/if}
+
+								{#if coupleCount > 1}
+									<!-- Multi-marriage badge: small chip in the top-right
+									     corner showing the partner count. -->
+									<g
+										data-couple-badge
+										transform={`translate(${CARD_WIDTH - 14}, 14)`}
+										aria-label={m.tree_couple_count_aria({ count: coupleCount })}
+									>
+										<title>{m.tree_couple_count_aria({ count: coupleCount })}</title>
+										<circle r="10" class="fill-(--svedit-editing-stroke)" />
+										<text
+											x="0"
+											y="3"
+											text-anchor="middle"
+											class="pointer-events-none select-none fill-(--background) text-[10px] font-semibold"
+										>
+											{m.tree_couple_count_badge({ count: coupleCount })}
+										</text>
+									</g>
+								{/if}
+
+								{#if data.can_edit && !isRedacted}
+									<!-- Inline ghost cards: + Parent / + Spouse / + Child
+									     buttons at the missing slots. Visible at 30%
+									     opacity by default so they're discoverable on
+									     touch; promoted to 100% on hover/focus of the
+									     card group. -->
+									<g class="tree-affordances">
+										<g
+											class="tree-affordance"
+											role="button"
+											tabindex="0"
+											aria-label={m.tree_card_add_parent_of({ name })}
+											transform={`translate(${CARD_WIDTH / 2}, -14)`}
+											onclick={(e) => {
+												e.stopPropagation();
+												openAdd('parent', node.person);
+											}}
+											onkeydown={(e) => {
+												if (e.key === 'Enter' || e.key === ' ') {
+													e.preventDefault();
+													openAdd('parent', node.person);
+												}
+											}}
+										>
+											<title>{m.tree_card_add_parent_of({ name })}</title>
+											<circle
+												r="11"
+												class="fill-(--background) stroke-(--svedit-editing-stroke)"
+												stroke-width="1.5"
+											/>
+											<text
+												x="0"
+												y="4"
+												text-anchor="middle"
+												class="pointer-events-none select-none fill-(--svedit-editing-stroke) text-[14px] font-bold"
+											>
+												+
+											</text>
+										</g>
+										<g
+											class="tree-affordance"
+											role="button"
+											tabindex="0"
+											aria-label={m.tree_card_add_spouse_of({ name })}
+											transform={`translate(${CARD_WIDTH + 14}, ${CARD_HEIGHT / 2})`}
+											onclick={(e) => {
+												e.stopPropagation();
+												openAdd('spouse', node.person);
+											}}
+											onkeydown={(e) => {
+												if (e.key === 'Enter' || e.key === ' ') {
+													e.preventDefault();
+													openAdd('spouse', node.person);
+												}
+											}}
+										>
+											<title>{m.tree_card_add_spouse_of({ name })}</title>
+											<circle
+												r="11"
+												class="fill-(--background) stroke-(--svedit-editing-stroke)"
+												stroke-width="1.5"
+											/>
+											<text
+												x="0"
+												y="4"
+												text-anchor="middle"
+												class="pointer-events-none select-none fill-(--svedit-editing-stroke) text-[14px] font-bold"
+											>
+												+
+											</text>
+										</g>
+										<g
+											class="tree-affordance"
+											role="button"
+											tabindex="0"
+											aria-label={m.tree_card_add_child_of({ name })}
+											transform={`translate(${CARD_WIDTH / 2}, ${CARD_HEIGHT + 14})`}
+											onclick={(e) => {
+												e.stopPropagation();
+												openAdd('child', node.person);
+											}}
+											onkeydown={(e) => {
+												if (e.key === 'Enter' || e.key === ' ') {
+													e.preventDefault();
+													openAdd('child', node.person);
+												}
+											}}
+										>
+											<title>{m.tree_card_add_child_of({ name })}</title>
+											<circle
+												r="11"
+												class="fill-(--background) stroke-(--svedit-editing-stroke)"
+												stroke-width="1.5"
+											/>
+											<text
+												x="0"
+												y="4"
+												text-anchor="middle"
+												class="pointer-events-none select-none fill-(--svedit-editing-stroke) text-[14px] font-bold"
+											>
+												+
+											</text>
+										</g>
+									</g>
 								{/if}
 							</g>
 						{/each}
@@ -489,7 +699,9 @@
 					aria-label={m.tree_drawer_title()}
 				>
 					<div class="flex items-baseline justify-between">
-						<h2 class="m-0 text-base font-medium">{sel.display_name}</h2>
+						<h2 class="m-0 text-base font-medium" class:italic={sel.is_redacted}>
+							{displayName(sel)}
+						</h2>
 						<button
 							type="button"
 							class="text-xs underline"
@@ -798,5 +1010,26 @@
 <style>
 	.stroke-dashed {
 		stroke-dasharray: 4 4;
+	}
+
+	/* Inline ghost cards on hover. We keep them at 30% opacity by
+	   default so they're discoverable on touch (where there's no
+	   hover), and bump to full on hover or keyboard focus. */
+	.tree-card-group .tree-affordances {
+		opacity: 0.3;
+		transition: opacity 120ms ease-out;
+	}
+	.tree-card-group:hover .tree-affordances,
+	.tree-card-group:focus-within .tree-affordances {
+		opacity: 1;
+	}
+	.tree-affordance {
+		cursor: pointer;
+	}
+	.tree-affordance:focus {
+		outline: none;
+	}
+	.tree-affordance:focus circle {
+		stroke-width: 2.5;
 	}
 </style>

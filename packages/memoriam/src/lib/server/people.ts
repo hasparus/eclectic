@@ -555,6 +555,52 @@ export function isLikelyLiving(p: Pick<Person, 'is_living' | 'death_date' | 'dea
 	return thisYear - p.birth_year < 100;
 }
 
+/**
+ * Strip private fields from `Person` records the viewer isn't
+ * authorised to see, replacing them with `is_redacted: true` plus
+ * nulls. Keeps `person_id`, `is_living`, and `sex` so the tree
+ * layout can still place the card and pick a placeholder icon —
+ * the structural fact that "someone exists here" is the same
+ * whether they're public or not (and on this site they already
+ * have a row in `person_memorials`).
+ *
+ * `keepId` (typically the site's subject) is exempt — the focal
+ * person of a memorial is always shown in full, even if the
+ * is-living heuristic would otherwise hide them (the admin just
+ * hasn't filled in a death date yet).
+ *
+ * Apply server-side at the load boundary; never trust the client
+ * to redact.
+ */
+export function redactLivingPersons(people: Person[], keepId?: string | null): Person[] {
+	return people.map((p) =>
+		p.person_id !== keepId && isLikelyLiving(p)
+			? {
+					...p,
+					display_name: '',
+					given_names: null,
+					surname: null,
+					birth_date: null,
+					birth_place: null,
+					death_date: null,
+					death_place: null,
+					birth_year: null,
+					death_year: null,
+					biography: null,
+					is_redacted: true
+				}
+			: p
+	);
+}
+
+/**
+ * `redactLivingPersons` applied to a full `TreePayload`. Pass the
+ * whole payload through one call at the load boundary.
+ */
+export function redactTree(tree: TreePayload, keepId?: string | null): TreePayload {
+	return { ...tree, people: redactLivingPersons(tree.people, keepId) };
+}
+
 function yearFromIsoDate(date: string | null | undefined): number | null {
 	if (!date) return null;
 	const m = /^(-?\d{4})/.exec(date);

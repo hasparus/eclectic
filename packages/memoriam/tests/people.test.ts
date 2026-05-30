@@ -218,6 +218,66 @@ describe('people module', () => {
 		expect(tree.couples.map((c) => c.couple_id)).toEqual([ac.couple_id]);
 	});
 
+	it('redactLivingPersons drops sensitive fields and marks is_redacted', async () => {
+		const userId = await seedUser();
+		const { createPerson, redactLivingPersons } = await import('$lib/server/people.js');
+
+		const deceased = createPerson({
+			owner_user_id: userId,
+			display_name: 'Old Ancestor',
+			birth_date: '1800-01-01',
+			death_date: '1880-12-12',
+			birth_place: 'Lwów'
+		});
+		const living = createPerson({
+			owner_user_id: userId,
+			display_name: 'Living Nephew',
+			birth_date: '1990-05-04',
+			birth_place: 'Warsaw',
+			biography: 'sensitive notes'
+		});
+
+		const [a, b] = redactLivingPersons([deceased, living]);
+		// Deceased passes through untouched.
+		expect(a.display_name).toBe('Old Ancestor');
+		expect(a.birth_place).toBe('Lwów');
+		expect(a.is_redacted).toBeUndefined();
+		// Living is stripped: display_name → '', dates / places /
+		// biography → null, is_redacted → true. Person_id + sex +
+		// is_living survive so the layout still places the card.
+		expect(b.display_name).toBe('');
+		expect(b.birth_date).toBeNull();
+		expect(b.birth_place).toBeNull();
+		expect(b.biography).toBeNull();
+		expect(b.birth_year).toBeNull();
+		expect(b.is_redacted).toBe(true);
+		expect(b.person_id).toBe(living.person_id);
+		expect(b.is_living).toBe(1);
+	});
+
+	it('redactLivingPersons exempts the keepId (memorial subject) from redaction', async () => {
+		const userId = await seedUser();
+		const { createPerson, redactLivingPersons } = await import('$lib/server/people.js');
+
+		const subject = createPerson({
+			owner_user_id: userId,
+			display_name: 'Memorial Subject',
+			// No death date → heuristic says "likely living", but the
+			// subject of a memorial is always shown in full.
+			birth_date: '1950-01-01'
+		});
+		const other = createPerson({
+			owner_user_id: userId,
+			display_name: 'Living Cousin',
+			birth_date: '1990-01-01'
+		});
+
+		const [s, c] = redactLivingPersons([subject, other], subject.person_id);
+		expect(s.display_name).toBe('Memorial Subject');
+		expect(s.is_redacted).toBeUndefined();
+		expect(c.is_redacted).toBe(true);
+	});
+
 	it('deletePerson cascades to relationships, couples, memorials, and nulls subject_person_id', async () => {
 		const userId = await seedUser();
 		const { createSite } = await import('$lib/server/sites.js');

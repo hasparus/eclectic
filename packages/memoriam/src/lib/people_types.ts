@@ -27,6 +27,16 @@ export interface Person {
 	owner_user_id: string;
 	created_at: string;
 	updated_at: string;
+	/**
+	 * Set by the server when the viewer is not authorised to see this
+	 * person's private fields (typically: viewers of a site looking at
+	 * a relative who's likely still alive). The sensitive fields above
+	 * are nulled; the client renders a "Living relative" placeholder
+	 * keyed off this flag.
+	 *
+	 * Absent on full-fidelity payloads.
+	 */
+	is_redacted?: boolean;
 }
 
 export interface ParentEdge {

@@ -8,7 +8,26 @@ function treeCanvas(page: Page) {
 	return page.getByRole('figure', { name: /family tree|drzewo/i });
 }
 function card(page: Page, name: string | RegExp) {
-	return treeCanvas(page).getByRole('button', { name });
+	// Anchor the name match. The inline "+ Parent of X / + Spouse of X
+	// / + Child of X" affordance buttons embed the person's display
+	// name in their aria-label, so an unanchored `/X/i` regex would
+	// match both the card and its affordances. The card itself uses
+	// `${name}` or `${name}, ${lifespan}` for its aria-label, so we
+	// allow an optional `, <suffix>` after the anchored name.
+	const pattern =
+		name instanceof RegExp
+			? new RegExp(`^${name.source}(,.*)?$`, name.flags)
+			: new RegExp(`^${name}(,.*)?$`, 'i');
+	return treeCanvas(page).getByRole('button', { name: pattern });
+}
+/**
+ * Count-able locator for "person cards on the canvas", excluding the
+ * inline "+ Parent / + Spouse / + Child" affordance buttons. The
+ * negative-lookahead regex against the aria-label drops anything
+ * starting with "Add " (en) or "Dodaj " (pl).
+ */
+function cards(page: Page) {
+	return treeCanvas(page).getByRole('button', { name: /^(?!Add |Dodaj )/ });
 }
 function drawer(page: Page) {
 	return page.getByRole('complementary', { name: /person|osoba/i });
@@ -79,7 +98,7 @@ test.describe('family tree — seeding the subject', () => {
 
 		await seedSubject(page, 'Grandma Edith');
 		// One card, no edges yet.
-		await expect(treeCanvas(page).getByRole('button')).toHaveCount(1);
+		await expect(cards(page)).toHaveCount(1);
 	});
 
 	test('a viewer of a site without a subject sees nothing to edit', async ({ page, browser }) => {
@@ -175,7 +194,7 @@ test.describe('family tree — building out relatives', () => {
 		await m.getByRole('button', { name: /^add$/i }).click();
 
 		// Canvas now has both subject and new parent.
-		await expect(treeCanvas(page).getByRole('button')).toHaveCount(2);
+		await expect(cards(page)).toHaveCount(2);
 		await expect(card(page, /grandma edith/i)).toBeVisible();
 		await expect(card(page, /marek holloway/i)).toBeVisible();
 
@@ -198,7 +217,7 @@ test.describe('family tree — building out relatives', () => {
 
 		// Modal gone, card not created.
 		await expect(modal(page)).toHaveCount(0);
-		await expect(treeCanvas(page).getByRole('button')).toHaveCount(1);
+		await expect(cards(page)).toHaveCount(1);
 		await expect(treeCanvas(page).getByText(/should not land/i)).toHaveCount(0);
 	});
 
@@ -212,7 +231,7 @@ test.describe('family tree — building out relatives', () => {
 			.click();
 		await modal(page).getByLabel(/display name/i).fill('Marek Holloway');
 		await modal(page).getByRole('button', { name: /^add$/i }).click();
-		await expect(treeCanvas(page).getByRole('button')).toHaveCount(2);
+		await expect(cards(page)).toHaveCount(2);
 
 		// Subject → + parent Anna.
 		await (await selectPersonOnCanvas(page, /grandma edith/i))
@@ -220,7 +239,7 @@ test.describe('family tree — building out relatives', () => {
 			.click();
 		await modal(page).getByLabel(/display name/i).fill('Anna Holloway');
 		await modal(page).getByRole('button', { name: /^add$/i }).click();
-		await expect(treeCanvas(page).getByRole('button')).toHaveCount(3);
+		await expect(cards(page)).toHaveCount(3);
 
 		// Marek → + spouse Helena (a second wife).
 		await (await selectPersonOnCanvas(page, /marek holloway/i))
@@ -229,7 +248,7 @@ test.describe('family tree — building out relatives', () => {
 		await expect(modal(page).getByRole('heading', { name: /add a spouse of marek holloway/i })).toBeVisible();
 		await modal(page).getByLabel(/display name/i).fill('Helena Kowalska');
 		await modal(page).getByRole('button', { name: /^add$/i }).click();
-		await expect(treeCanvas(page).getByRole('button')).toHaveCount(4);
+		await expect(cards(page)).toHaveCount(4);
 
 		// Every person we created is reachable through their accessible
 		// name — a more strict check than "count 4".
@@ -250,7 +269,7 @@ test.describe('family tree — building out relatives', () => {
 		await modal(page).getByLabel(/birth date/i).fill('1948');
 		await modal(page).getByRole('button', { name: /^add$/i }).click();
 
-		await expect(treeCanvas(page).getByRole('button')).toHaveCount(2);
+		await expect(cards(page)).toHaveCount(2);
 		await expect(card(page, /mother/i)).toBeVisible();
 	});
 
@@ -292,7 +311,7 @@ test.describe('family tree — access control', () => {
 			.click();
 		await modal(page).getByLabel(/display name/i).fill('Niece Helena');
 		await modal(page).getByRole('button', { name: /^add$/i }).click();
-		await expect(treeCanvas(page).getByRole('button')).toHaveCount(2);
+		await expect(cards(page)).toHaveCount(2);
 
 		// Invite a viewer.
 		await page.goto(`/sites/${siteId}`);
@@ -314,7 +333,7 @@ test.describe('family tree — access control', () => {
 
 		// Tree visible, both cards present.
 		await expect(treeCanvas(viewerPage)).toBeVisible();
-		await expect(treeCanvas(viewerPage).getByRole('button')).toHaveCount(2);
+		await expect(cards(viewerPage)).toHaveCount(2);
 
 		// Open the drawer — no edit affordances visible.
 		await card(viewerPage, /aunt margaret/i).click();
@@ -384,7 +403,7 @@ test.describe('family tree — Phase B fixes', () => {
 
 		await expect(modal(page)).toHaveCount(0);
 		// And the canvas still has just the subject.
-		await expect(treeCanvas(page).getByRole('button')).toHaveCount(1);
+		await expect(cards(page)).toHaveCount(1);
 	});
 
 	test('pressing Escape with no modal closes the drawer', async ({ page }) => {
@@ -411,7 +430,7 @@ test.describe('family tree — Phase B fixes', () => {
 			.click();
 		await modal(page).getByLabel(/display name/i).fill('Future Child');
 		await modal(page).getByRole('button', { name: /^add$/i }).click();
-		await expect(treeCanvas(page).getByRole('button')).toHaveCount(2);
+		await expect(cards(page)).toHaveCount(2);
 
 		// Open the child's drawer, click Delete person, confirm the
 		// confirm dialog.
@@ -419,7 +438,7 @@ test.describe('family tree — Phase B fixes', () => {
 		page.once('dialog', (dialog) => void dialog.accept());
 		await drawer(page).getByRole('button', { name: /delete person/i }).click();
 
-		await expect(treeCanvas(page).getByRole('button')).toHaveCount(1);
+		await expect(cards(page)).toHaveCount(1);
 		// Drawer closes; URL focus is cleared.
 		await expect(drawer(page)).toHaveCount(0);
 	});
@@ -543,6 +562,179 @@ test.describe('family tree — Phase A polish', () => {
 		await page.reload();
 		await expect(drawer(page).getByLabel(/birth place/i)).toHaveValue('Kraków');
 		await expect(treeCanvas(page).getByText(/1898/)).toBeVisible();
+	});
+});
+
+test.describe('family tree — Phase B (canvas UX)', () => {
+	test('inline ghost cards open the add modal with the correct anchor', async ({ page }) => {
+		await bootSiteAndOpenTree(page, 'ghost', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+
+		// The inline "+ Parent of Grandma Edith" affordance lives on the
+		// canvas, NOT in the side drawer — opens the same modal as the
+		// drawer button would, but without first selecting the card.
+		await treeCanvas(page)
+			.getByRole('button', { name: /add a parent of grandma edith/i })
+			.click();
+
+		await expect(
+			modal(page).getByRole('heading', { name: /add a parent of grandma edith/i })
+		).toBeVisible();
+		// Submit the modal — assert it wired the new person to Grandma
+		// Edith, not to whoever happened to be selected before.
+		await modal(page).getByLabel(/display name/i).fill('Inline Parent');
+		await modal(page).getByRole('button', { name: /^add$/i }).click();
+
+		await expect(cards(page)).toHaveCount(2);
+		await expect(card(page, /inline parent/i)).toBeVisible();
+	});
+
+	test('an adoptive parent edge renders a single-letter "A" chip', async ({ page }) => {
+		await bootSiteAndOpenTree(page, 'adoptive', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+		await (await selectPersonOnCanvas(page, /grandma edith/i))
+			.getByRole('button', { name: /\+ parent/i })
+			.click();
+		await modal(page).getByLabel(/display name/i).fill('Adoptive Parent');
+		// Select Adoptive in the relationship dropdown — that's the
+		// edge kind we expect to surface on the canvas.
+		await modal(page)
+			.getByRole('combobox', { name: /^relationship$/i })
+			.selectOption({ value: 'adoptive' });
+		await modal(page).getByRole('button', { name: /^add$/i }).click();
+		await expect(card(page, /adoptive parent/i)).toBeVisible();
+
+		// The chip is a tiny <g> at the edge midpoint, tagged with
+		// `data-edge-kind="adoptive"`. We assert the data attribute +
+		// the accessible <title> rather than the visible "A" glyph
+		// (which would change if we translate the short form).
+		const chip = treeCanvas(page).locator('[data-edge-kind="adoptive"]');
+		await expect(chip).toHaveCount(1);
+		await expect(chip).toContainText('A');
+	});
+
+	test('a biological parent does not render an edge chip', async ({ page }) => {
+		await bootSiteAndOpenTree(page, 'bio-no-chip', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+		await (await selectPersonOnCanvas(page, /grandma edith/i))
+			.getByRole('button', { name: /\+ parent/i })
+			.click();
+		await modal(page).getByLabel(/display name/i).fill('Bio Parent');
+		// Default kind is biological; submit without changing.
+		await modal(page).getByRole('button', { name: /^add$/i }).click();
+		await expect(card(page, /bio parent/i)).toBeVisible();
+
+		await expect(treeCanvas(page).locator('[data-edge-kind]')).toHaveCount(0);
+	});
+
+	test('a second spouse triggers the multi-marriage count badge', async ({ page }) => {
+		await bootSiteAndOpenTree(page, 'multi', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+
+		// First spouse: no badge.
+		await (await selectPersonOnCanvas(page, /grandma edith/i))
+			.getByRole('button', { name: /\+ spouse/i })
+			.click();
+		await modal(page).getByLabel(/display name/i).fill('First Spouse');
+		await modal(page).getByRole('button', { name: /^add$/i }).click();
+		await expect(card(page, /first spouse/i)).toBeVisible();
+		await expect(treeCanvas(page).locator('[data-couple-badge]')).toHaveCount(0);
+
+		// Second spouse: badge appears on both Grandma Edith's card and
+		// — well, only on her card, since only she's in 2 couples (each
+		// spouse is in 1). The aria-label is "2 marriages or
+		// partnerships".
+		await (await selectPersonOnCanvas(page, /grandma edith/i))
+			.getByRole('button', { name: /\+ spouse/i })
+			.click();
+		await modal(page).getByLabel(/display name/i).fill('Second Spouse');
+		await modal(page).getByRole('button', { name: /^add$/i }).click();
+		await expect(card(page, /second spouse/i)).toBeVisible();
+
+		const badge = treeCanvas(page).locator('[data-couple-badge]');
+		await expect(badge).toHaveCount(1);
+		await expect(badge).toContainText(/×\s*2/);
+	});
+});
+
+test.describe('family tree — Phase B (living-relative redaction)', () => {
+	test('viewer sees "Living relative" for an admin-added living parent', async ({
+		page,
+		browser
+	}) => {
+		const ownerEmail = uniqueEmail('redact-owner');
+		const viewerEmail = uniqueEmail('redact-viewer');
+
+		// Owner: site → subject (with a death date so the subject is
+		// treated as deceased) → add a relative WITHOUT dates (defaults
+		// to living per `isLikelyLiving` heuristic).
+		await signInAs(page, ownerEmail, '/sites');
+		await page.getByPlaceholder(/display name/i).fill('Grandma Edith');
+		await page.getByRole('button', { name: /create site/i }).click();
+		await page.getByRole('link', { name: /grandma edith/i }).click();
+		await expect(page).toHaveURL(/\/sites\/[a-z0-9]+$/);
+		const siteId = new URL(page.url()).pathname.split('/')[2];
+		await page.goto(`/sites/${siteId}/tree`);
+		await seedSubject(page, 'Grandma Edith');
+
+		// Give the subject a death date — otherwise the subject is also
+		// counted "likely living" by the heuristic (the redactor exempts
+		// the subject so it'd still show, but we want to verify the
+		// general rule too).
+		const sd = await selectPersonOnCanvas(page, /grandma edith/i);
+		await sd.getByLabel(/death date/i).fill('2018-11-03');
+		await sd.getByRole('button', { name: /^save$/i }).click();
+
+		// Add a living relative — no dates, so defaults to is_living=1.
+		await sd.getByRole('button', { name: /\+ child/i }).click();
+		await modal(page).getByLabel(/display name/i).fill('Living Daughter');
+		await modal(page).getByRole('button', { name: /^add$/i }).click();
+		await expect(card(page, /living daughter/i)).toBeVisible();
+
+		// Owner sees the real name on their canvas. `.first()` skips
+		// the affordance <title> elements that also contain the name.
+		await expect(treeCanvas(page).getByText('Living Daughter').first()).toBeVisible();
+
+		// Invite a viewer.
+		await page.goto(`/sites/${siteId}`);
+		await page.getByPlaceholder(/email@example\.com/i).fill(viewerEmail);
+		await page.getByRole('combobox').last().selectOption({ value: 'viewer' });
+		await page.getByRole('button', { name: /send invite/i }).click();
+		await expect(page.getByRole('listitem').filter({ hasText: viewerEmail })).toBeVisible();
+		const token = latestInviteToken(viewerEmail);
+
+		const viewerCtx = await browser.newContext();
+		const viewerPage = await viewerCtx.newPage();
+		await signInAs(viewerPage, viewerEmail);
+		await viewerPage.context().request.get(
+			`/auth/invite?token=${encodeURIComponent(token)}`,
+			{ maxRedirects: 0 }
+		);
+		await viewerPage.goto(`/sites/${siteId}/tree`);
+
+		// Viewer: subject is shown in full, the living relative is
+		// redacted. Both still appear as cards on the canvas — only
+		// their private fields are hidden.
+		await expect(cards(viewerPage)).toHaveCount(2);
+		await expect(treeCanvas(viewerPage).getByText('Grandma Edith')).toBeVisible();
+		await expect(treeCanvas(viewerPage).getByText('Living relative')).toBeVisible();
+		await expect(treeCanvas(viewerPage).getByText('Living Daughter')).toHaveCount(0);
+
+		await viewerCtx.close();
+	});
+
+	test('admins see full names even when the heuristic would redact', async ({ page }) => {
+		await bootSiteAndOpenTree(page, 'admin-no-redact', 'Grandma Edith');
+		await seedSubject(page, 'Grandma Edith');
+		await (await selectPersonOnCanvas(page, /grandma edith/i))
+			.getByRole('button', { name: /\+ child/i })
+			.click();
+		await modal(page).getByLabel(/display name/i).fill('Definitely Alive');
+		await modal(page).getByRole('button', { name: /^add$/i }).click();
+
+		// Admin sees the real name; no "Living relative" placeholder.
+		await expect(treeCanvas(page).getByText('Definitely Alive').first()).toBeVisible();
+		await expect(treeCanvas(page).getByText('Living relative')).toHaveCount(0);
 	});
 });
 

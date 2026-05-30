@@ -291,18 +291,36 @@ tenant routing.
       for editing a non-subject person's facts + reload, the
       year-only date acceptance path, the empty-state error
       branch, modal backdrop click, and modal autofocus.
-- [ ] **Family tree — Phase B remaining (canvas UX polish).** Inline
-      ghost cards on the canvas: hover a focal person → "+ parent
-      / + spouse / + child" affordances appear *at the missing
-      slot* (Geni / MyHeritage pattern) instead of only inside
-      the side drawer. Living-relative redaction for non-admin
-      viewers: anyone where `isLikelyLiving(person)` is true
-      renders as "Living relative" with details hidden. Per-edge
-      type chip (bio / adoptive / foster / step) rendered on the
-      parent-child paths — currently we only differentiate solid
-      vs. dashed. Multi-marriage badge: a count above a card with
-      multiple spouses, clicking cycles which spouse renders
-      adjacent.
+- [x] **Family tree — Phase B (canvas UX + privacy).** Four
+      features landed together because they all touch the SVG
+      render path:
+      *Inline ghost cards* — every card sprouts three "+"
+      affordances (top: parent, right: spouse, bottom: child) at
+      30% opacity, bumping to full on hover or keyboard focus.
+      Each is a proper `role="button"` with an
+      `aria-label="Add a parent of {name}"` for screen readers
+      and opens the existing add modal with the right anchor.
+      *Living-relative redaction* — server-side at the load
+      boundary (`redactTree(payload, subjectId)` in `people.ts`).
+      `isLikelyLiving(person)` decides; the memorial subject is
+      always exempt. Redacted records get `is_redacted: true`
+      plus nulls for every sensitive field — `person_id`,
+      `is_living`, and `sex` survive so the layout still places
+      the card. The client renders the "Living relative"
+      placeholder keyed off the flag. Viewers see redacted;
+      owners and editors see full fidelity.
+      *Per-edge type chip* — a single-letter glyph in a circle
+      at each non-biological parent edge's midpoint. `A` for
+      adoptive, `F` foster, `S` step, `?` unknown. Biological
+      edges stay chip-less (default). The `<title>` element
+      carries the long form for screen readers.
+      *Multi-marriage badge* — a count badge in the top-right
+      corner of any card whose person is in 2+ couples. Reads
+      "× 2" visually, "2 marriages or partnerships" to a screen
+      reader. Phase A's "cycling which spouse renders adjacent"
+      tweak skipped — both spouses already render as separate
+      dashed lines, so the badge is information-only for v1.
+- [ ] **Family tree — Phase C (interop + mobile).** GEDCOM 7
 - [ ] **Family tree — Phase C (interop + mobile).** GEDCOM 7
       import wizard: upload `.ged`, parse INDI + FAM + dates +
       places, preview people / relationship counts, confirm.

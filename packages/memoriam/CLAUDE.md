@@ -116,8 +116,13 @@ in sync.
 
 `isLikelyLiving(person)` is the redaction heuristic: returns true
 if `is_living=1`, or if no death date is recorded AND birth was
-<100y ago. The drawer / card-render path will swap in a
-"Living relative" placeholder for non-admin viewers (Phase B).
+<100y ago. Server-side `redactTree(payload, subjectId)` (in
+`people.ts`) is called from the tree's `+page.server.ts` for
+viewers; admins get full fidelity. Redacted records keep
+`person_id` / `is_living` / `sex` so the layout still places the
+card, and gain `is_redacted: true`. The page renders the
+"Living relative" placeholder keyed off the flag. The memorial
+subject is always exempt — pass its id as `keepId`.
 
 ## Server
 
