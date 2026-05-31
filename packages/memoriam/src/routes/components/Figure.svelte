@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { SveditCtx } from './types';
 	import { getContext } from 'svelte';
-	import { Node } from 'svedit';
+	import { Node } from '$lib/svedit';
 	import { TW_LIMITER, TW_PAGE_PADDING_X } from '../tailwind_theme.js';
 	import MediaProperty from './MediaProperty.svelte';
 

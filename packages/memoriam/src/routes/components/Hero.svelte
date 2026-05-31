@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { SveditCtx } from './types';
 	import { getContext } from 'svelte';
-	import { Node, NodeArrayProperty, AnnotatedTextProperty } from 'svedit';
+	import { Node, NodeArrayProperty, AnnotatedTextProperty } from '$lib/svedit';
 	import { TW_PAGE_PADDING_X, TW_MOBILE_LEFT_INSET, TW_LIMITER } from '../tailwind_theme.js';
 	import { reveal } from '../reveal.js';
 

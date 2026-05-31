@@ -1,4 +1,4 @@
-import { Command, is_selection_collapsed } from 'svedit';
+import { Command, is_selection_collapsed } from '$lib/svedit';
 import {
 	getClosestSwitchableLayout,
 	getColorsetNode,

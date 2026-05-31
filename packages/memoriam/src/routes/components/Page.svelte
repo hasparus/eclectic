@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { SveditCtx } from './types';
   import { getContext } from 'svelte';
-  import { AnnotatedTextProperty, Node, NodeArrayProperty } from 'svedit';
+  import { AnnotatedTextProperty, Node, NodeArrayProperty } from '$lib/svedit';
   import Nav from './Nav.svelte';
   import Footer from './Footer.svelte';
   import MediaProperty from './MediaProperty.svelte';

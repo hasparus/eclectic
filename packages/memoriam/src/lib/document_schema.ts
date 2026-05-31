@@ -1,4 +1,4 @@
-import { define_document_schema } from 'svedit';
+import { define_document_schema } from '$lib/svedit';
 
 const ALL_ANNOTATIONS = ['strong', 'emphasis', 'highlight', 'link'];
 const MINIMAL_ANNOTATIONS = ['emphasis', 'highlight'];

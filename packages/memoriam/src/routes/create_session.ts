@@ -9,7 +9,7 @@ import {
 	UndoCommand,
 	RedoCommand,
 	SelectParentCommand
-} from 'svedit';
+} from '$lib/svedit';
 import nanoid from './nanoid.js';
 import {
 	CycleLayoutCommand,
@@ -20,7 +20,7 @@ import {
 	ReplaceMediaCommand,
 	EditImageCommand
 } from './commands.svelte.js';
-// Command imported from 'svedit' above
+// Command imported from '$lib/svedit' above
 
 // System components
 import Overlays from './components/Overlays.svelte';
@@ -55,7 +55,7 @@ import Link from './components/Link.svelte';
 import { documentSchema } from '$lib/document_schema.js';
 import { startProcessing } from '$lib/client/asset_upload.js';
 import { MEDIA_DEFAULTS } from '$lib/config.js';
-import { set_properties } from 'svedit';
+import { set_properties } from '$lib/svedit';
 import { getMediaDimensions } from '$lib/client/media_dimensions.js';
 
 function get_media_type(file: File): 'image' | 'video' {

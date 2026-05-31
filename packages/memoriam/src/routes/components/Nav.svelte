@@ -2,7 +2,7 @@
 	import type { SveditCtx } from './types';
 	import { getContext } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { NodeArrayProperty, Node } from 'svedit';
+	import { NodeArrayProperty, Node } from '$lib/svedit';
 	import { slide } from 'svelte/transition';
 	import { TW_LIMITER, TW_PAGE_PADDING_X } from '../tailwind_theme.js';
 	import MediaProperty from './MediaProperty.svelte';

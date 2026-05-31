@@ -2,7 +2,7 @@
 	import { setContext } from 'svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { Svedit, KeyMapper, Command, define_keymap } from 'svedit';
+	import { Svedit, KeyMapper, Command, define_keymap } from '$lib/svedit';
 	import Toolbar from './Toolbar.svelte';
 	import SaveProgressModal from './SaveProgressModal.svelte';
 

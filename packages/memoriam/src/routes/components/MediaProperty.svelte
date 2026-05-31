@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { SveditCtx } from './types';
 	import { getContext } from 'svelte';
-	import { CustomProperty } from 'svedit';
+	import { CustomProperty } from '$lib/svedit';
 	import Media from './Media.svelte';
 
 	const svedit = getContext<SveditCtx>('svedit');

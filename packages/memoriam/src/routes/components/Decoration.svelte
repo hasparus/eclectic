@@ -5,7 +5,7 @@
 <script lang="ts">
 	import type { SveditCtx } from './types';
 	import { getContext } from 'svelte';
-	import { Node } from 'svedit';
+	import { Node } from '$lib/svedit';
 	import MediaProperty from './MediaProperty.svelte';
 	import SizableViewbox from './SizableViewbox.svelte';
 

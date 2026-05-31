@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Node } from 'svedit';
+	import { Node } from '$lib/svedit';
 	import MediaProperty from './MediaProperty.svelte';
 	import { reveal } from '../reveal.js';
 	let { path } = $props();

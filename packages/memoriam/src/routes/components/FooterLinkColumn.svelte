@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { SveditCtx } from './types';
 	import { getContext } from 'svelte';
-	import { AnnotatedTextProperty, NodeArrayProperty, Node } from 'svedit';
+	import { AnnotatedTextProperty, NodeArrayProperty, Node } from '$lib/svedit';
 	const svedit = getContext<SveditCtx>('svedit');
 
 	let { path } = $props();

@@ -5,7 +5,7 @@
 // be useful here; we lean on `any` for the field access surface and let
 // runtime checks catch mistakes.
 
-import type { Session } from 'svedit';
+import type { Session } from '$lib/svedit';
 
 export interface SveditCtx {
 	session: Session & Record<string, any>;

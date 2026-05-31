@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { SveditCtx } from './types';
 	import { getContext } from 'svelte';
-	import { Node, AnnotatedTextProperty } from 'svedit';
+	import { Node, AnnotatedTextProperty } from '$lib/svedit';
 	import { reveal } from '../reveal.js';
 
 	const svedit = getContext<SveditCtx>('svedit');

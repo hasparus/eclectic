@@ -2,7 +2,7 @@
 // Stored as a single merged document so you can paste console.logged JSON directly.
 // NAV_1, FOOTER_1, PAGE_1 are extracted automatically using svedit's traverse utility.
 
-import { traverse } from 'svedit';
+import { traverse } from '$lib/svedit';
 import { documentSchema } from '$lib/document_schema.js';
 
 const FULL_DOC = {

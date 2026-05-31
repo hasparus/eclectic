@@ -1,4 +1,4 @@
-import type { Session } from 'svedit';
+import type { Session } from '$lib/svedit';
 
 type Path = (string | number)[];
 

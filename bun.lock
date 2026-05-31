@@ -77,7 +77,6 @@
         "qrcode": "^1.5.4",
         "resend": "^6.12.4",
         "slugify": "^1.6.6",
-        "svedit": "^0.9.0",
         "svg-to-pdfkit": "^0.1.8",
         "vite-plugin-top-level-await": "^1.6.0",
         "vite-plugin-wasm": "^3.6.0",
@@ -1896,8 +1895,6 @@
     "supports-color": ["supports-color@7.2.0", "", { "dependencies": { "has-flag": "^4.0.0" } }, "sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw=="],
 
     "supports-preserve-symlinks-flag": ["supports-preserve-symlinks-flag@1.0.0", "", {}, "sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w=="],
-
-    "svedit": ["svedit@0.9.0", "", { "peerDependencies": { "svelte": "^5.0.0" } }, "sha512-F1fcssrLF1k1bFOacgvWhtMkII2bouYhqciF1KpRBP50FGc8lK4kGzUo0EY4Qv7Ryns6AeK6GEjk+u8IiSDSSw=="],
 
     "svelte": ["svelte@5.55.9", "", { "dependencies": { "@jridgewell/remapping": "^2.3.4", "@jridgewell/sourcemap-codec": "^1.5.0", "@sveltejs/acorn-typescript": "^1.0.10", "@types/estree": "^1.0.5", "@types/trusted-types": "^2.0.7", "acorn": "^8.12.1", "aria-query": "5.3.1", "axobject-query": "^4.1.0", "clsx": "^2.1.1", "devalue": "^5.8.1", "esm-env": "^1.2.1", "esrap": "^2.2.9", "is-reference": "^3.0.3", "locate-character": "^3.0.0", "magic-string": "^0.30.11", "zimmerframe": "^1.1.2" } }, "sha512-fTjjT8cHLDwigcu2j3pv7Jq04LklXevPB8uBgyHNiTXv+RMNvVnrjS4UEYrLMkhuq1vpCodHjiW+z/95SDs/fg=="],
 
