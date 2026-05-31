@@ -51,6 +51,7 @@ export function getAutomergeRepo(): Repo {
 export function closeAutomergeRepo(): void {
 	repoSingleton = null;
 	handleCache.clear();
+	pageHandleCache.clear();
 }
 
 /**
@@ -226,6 +227,81 @@ export function refreshSiteTreeDoc(siteId: string): void {
 		for (const c of tree.couples) {
 			doc.couples[c.couple_id] = coupleToDoc(c);
 		}
+	});
+}
+
+// ---------------------------------------------------------------
+// Per-site page-broadcast Automerge doc.
+//
+// Distinct from the per-site *tree* doc (above) — the only field
+// in it is `updated_at`, used purely as a broadcast tick so every
+// connected tab on the same site can `invalidateAll()` after any
+// `saveDocument` call. We don't try to project the full page
+// document into the doc yet (that's the Phase-3.2 "Session reads
+// from Automerge" refactor of svedit's transaction layer).
+// ---------------------------------------------------------------
+
+interface PageBroadcastDoc {
+	site_id: string;
+	updated_at: string;
+}
+
+const pageHandleCache = new Map<string, DocHandle<PageBroadcastDoc>>();
+
+/**
+ * Resolve (and lazily create) the Automerge URL for a site's
+ * page-broadcast document. Same cache-then-create pattern as the
+ * tree doc.
+ */
+export async function ensureSitePageBroadcastDoc(siteId: string): Promise<AutomergeUrl> {
+	const cached = pageHandleCache.get(siteId);
+	if (cached) return cached.url;
+
+	const db = getPlatformDb();
+	const existing = db
+		.prepare(`SELECT doc_url FROM site_page_automerge_docs WHERE site_id = ?`)
+		.get(siteId) as { doc_url: string } | undefined;
+
+	const repo = getAutomergeRepo();
+
+	if (existing) {
+		const url = existing.doc_url;
+		if (!isValidAutomergeUrl(url)) {
+			throw new Error(`stored page-broadcast url invalid for site ${siteId}: ${url}`);
+		}
+		const handle = await repo.find<PageBroadcastDoc>(url);
+		pageHandleCache.set(siteId, handle);
+		return url;
+	}
+
+	const handle = repo.create<PageBroadcastDoc>({
+		site_id: siteId,
+		updated_at: new Date().toISOString()
+	});
+	pageHandleCache.set(siteId, handle);
+
+	db.prepare(
+		`INSERT INTO site_page_automerge_docs (site_id, doc_url, created_at)
+		 VALUES (?, ?, ?)`
+	).run(siteId, handle.url, new Date().toISOString());
+
+	return handle.url;
+}
+
+/**
+ * Tick the page-broadcast doc — called from `saveDocument` after
+ * the SQLite write. Other tabs subscribed to this doc get a
+ * `change` event and reload the page.
+ *
+ * Best-effort: if no doc exists yet (no one has opened the editor
+ * in this process), we don't materialise one — the next visitor's
+ * load will lazy-create it.
+ */
+export function refreshSitePageBroadcastDoc(siteId: string): void {
+	const handle = pageHandleCache.get(siteId);
+	if (!handle) return;
+	handle.change((doc) => {
+		doc.updated_at = new Date().toISOString();
 	});
 }
 

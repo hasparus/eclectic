@@ -384,6 +384,45 @@ tenant routing.
       connected tab to refetch. E2e covers the cross-context
       flow: owner adds a child via inline ghost card → editor's
       tab sees the new card without manual reload.
+- [x] **Page-edit broadcast via Automerge (svedit Phase 3 MVP).**
+      Per-site Automerge "broadcast" document holding only
+      `{ site_id, updated_at }`. `saveDocument` / `updatePageSlug`
+      / `deletePage` all tick it after their SQLite write; every
+      other tab on the same site subscribes via WebSocket and
+      calls `invalidateAll()` on the change event. New
+      `site_page_automerge_docs` platform table maps each site
+      to its broadcast doc URL. Same WebSocket plumbing as the
+      tree feature; the client subscribe (`page_doc_client
+      .svelte.ts`) is structurally identical to the tree's.
+      Layout exposes `site_id` so the route pages can wire the
+      subscription. This is the "multiplayer feel" layer — tab
+      A saves, tab B's rendered HTML refreshes without a manual
+      reload — without touching svedit's Session / Transaction
+      internals. The character-by-character CRDT merge that
+      lets two users co-type the same paragraph is a separate
+      undertaking (Phase 3.2 below).
+- [ ] **svedit ↔ Automerge real binding (Phase 3.2 — explicit
+      architectural commit needed).** The broadcast above is
+      end-of-save replay; this is the inside-svedit refactor.
+      Open decisions before starting:
+      *(a) fork svedit into the memoriam tree* so we own
+      `Session.apply` and can replace its in-memory tree with
+      `Automerge.change(doc, d => ...)`. Then the per-page doc
+      shape per the original PLAN: `nodes` keyed by id,
+      `node_array` props as Automerge lists of string ids,
+      `annotated_text` as Automerge RichText with mark values.
+      *(b) wrap svedit externally* — diff Session.document
+      against the materialised Automerge doc and replay deltas
+      both ways. Less invasive, weaker merge semantics under
+      true concurrency (last-write-wins on whole nodes).
+      *(c) replace svedit* with a different editor whose
+      multiplayer story is solved (Tiptap + Y.Doc with
+      `automerge-prosemirror`, or roll our own block editor on
+      Automerge primitives — `annotated_text` becomes RichText
+      directly).
+      Each path is multi-week and forecloses parts of the
+      others. Pick before starting; the broadcast layer above
+      buys time without picking.
 - [ ] **Tree multiplayer — Phase 3 v2 (CRDT-authoritative).**
 
 The biggest *addition*, not a migration — there is no existing

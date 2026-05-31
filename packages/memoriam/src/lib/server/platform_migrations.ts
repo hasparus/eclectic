@@ -278,6 +278,28 @@ const migrations: Migration[] = [
 				FOREIGN KEY (site_id) REFERENCES sites(site_id)
 			);
 		`);
+	},
+
+	function add_page_broadcast_doc_index({ db }) {
+		// Per-site Automerge document for the page-edit broadcast
+		// channel. Separate from `site_automerge_docs` (tree) so
+		// the two streams don't tangle — the only shared field is
+		// `updated_at` and the only consumer is the page route's
+		// `invalidateAll()` trigger.
+		//
+		// One doc per site (not per document) — every page save
+		// bumps the same doc and every reader of any page on the
+		// site listens to it. That keeps the wiring trivial and
+		// matches the current single-tenant-per-site UX where a
+		// user typically has one editor open at a time.
+		db.exec(sql`
+			CREATE TABLE site_page_automerge_docs (
+				site_id TEXT NOT NULL PRIMARY KEY,
+				doc_url TEXT NOT NULL UNIQUE,
+				created_at TEXT NOT NULL,
+				FOREIGN KEY (site_id) REFERENCES sites(site_id)
+			);
+		`);
 	}
 ];
 

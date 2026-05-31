@@ -123,6 +123,18 @@ builds each annular sector. Opt-in via `?view=fan` — the canvas
 (Sugiyama) is the default. Only renders ancestors; descendants
 stay in the canvas view.
 
+**Page-edit broadcast.** Parallel to the tree multiplayer
+layer: per-site Automerge "broadcast" doc holds only
+`{ site_id, updated_at }`. Every page mutation
+(`saveDocument`, `updatePageSlug`, `deletePage`) ticks
+`refreshSitePageBroadcastDoc(siteId)` after its SQLite write;
+every other tab on the same site subscribes via
+`subscribeToPageBroadcast` and calls `invalidateAll()` on the
+change event. svedit's Session / Transaction layer is
+untouched — the broadcast just drives the SvelteKit page
+reload. Real character-merge CRDT (Phase 3.2) is a separate
+architectural commit (see PLAN.md).
+
 **Multiplayer sync via Automerge.** Per-site Automerge doc
 mirrors the SQLite tree state for live cross-tab / cross-user
 updates. Server-side: `src/lib/server/automerge_server.ts` owns

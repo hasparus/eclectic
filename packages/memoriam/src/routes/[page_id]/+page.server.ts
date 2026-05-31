@@ -17,10 +17,16 @@ export const load: PageServerLoad = async ({ params, parent, locals }) => {
 			throw redirect(301, `/${result.redirect_to_slug}`);
 		}
 
+		// Per-site page-edit broadcast doc — see the root
+		// `+page.server.ts` for the design note.
+		const { ensureSitePageBroadcastDoc } = await import('$lib/server/automerge_server.js');
+		const page_doc_url = await ensureSitePageBroadcastDoc(locals.siteId);
+
 		return {
 			document: result.document,
 			slug: result.slug,
-			is_admin: isAdmin
+			is_admin: isAdmin,
+			page_doc_url
 		};
 	} catch (err) {
 		if (err && typeof err === 'object' && 'status' in err) {

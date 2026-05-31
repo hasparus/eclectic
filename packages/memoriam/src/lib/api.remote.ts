@@ -68,7 +68,8 @@ import {
 } from '$lib/server/people.js';
 import {
 	refreshSiteTreeDoc,
-	refreshTreeDocsForPerson
+	refreshTreeDocsForPerson,
+	refreshSitePageBroadcastDoc
 } from '$lib/server/automerge_server.js';
 import { getPlatformDb } from '$lib/server/platform_db.js';
 
@@ -1035,6 +1036,9 @@ export const deletePage = command(deletePageInputSchema, async ({ document_id })
 		throw err;
 	}
 
+	const siteIdForBroadcast = getRequestEvent().locals.siteId;
+	if (siteIdForBroadcast) refreshSitePageBroadcastDoc(siteIdForBroadcast);
+
 	return {
 		ok: true,
 		document_id
@@ -1280,6 +1284,13 @@ export const saveDocument = command(saveDocumentInputSchema, async (combinedDoc)
 		throw err;
 	}
 
+	// Broadcast to every other tab on this site that a page
+	// document changed. Fire-and-forget — the page renders
+	// correctly without sync if no doc is loaded yet (no live
+	// readers).
+	const siteIdForBroadcast = getRequestEvent().locals.siteId;
+	if (siteIdForBroadcast) refreshSitePageBroadcastDoc(siteIdForBroadcast);
+
 	return {
 		ok: true,
 		document_id: combinedDoc.document_id,
@@ -1417,6 +1428,9 @@ export const updatePageSlug = command(updatePageSlugInputSchema, async (input) =
 		`);
 		throw err;
 	}
+
+	const siteIdForBroadcast = getRequestEvent().locals.siteId;
+	if (siteIdForBroadcast) refreshSitePageBroadcastDoc(siteIdForBroadcast);
 
 	return {
 		ok: true,
