@@ -17,16 +17,23 @@ export const load: PageServerLoad = async ({ params, parent, locals }) => {
 			throw redirect(301, `/${result.redirect_to_slug}`);
 		}
 
-		// Per-site page-edit broadcast doc — see the root
-		// `+page.server.ts` for the design note.
-		const { ensureSitePageBroadcastDoc } = await import('$lib/server/automerge_server.js');
+		// Per-site page broadcast + per-document Automerge doc.
+		// See the root `+page.server.ts` for the design note.
+		const { ensureSitePageBroadcastDoc, ensureDocumentDoc } = await import(
+			'$lib/server/automerge_server.js'
+		);
 		const page_doc_url = await ensureSitePageBroadcastDoc(locals.siteId);
+		const document_doc_url = await ensureDocumentDoc(
+			locals.siteId,
+			result.document.document_id
+		);
 
 		return {
 			document: result.document,
 			slug: result.slug,
 			is_admin: isAdmin,
-			page_doc_url
+			page_doc_url,
+			document_doc_url
 		};
 	} catch (err) {
 		if (err && typeof err === 'object' && 'status' in err) {

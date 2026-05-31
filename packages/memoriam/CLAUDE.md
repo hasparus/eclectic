@@ -123,6 +123,27 @@ builds each annular sector. Opt-in via `?view=fan` — the canvas
 (Sugiyama) is the default. Only renders ancestors; descendants
 stay in the canvas view.
 
+**Svedit ↔ Automerge binding.** Svedit is vendored at
+`src/lib/svedit/` (was an npm package; copied so we can edit the
+Session class directly). `Session.svelte.js` exposes
+`attach_automerge_handle(handle)` and
+`detach_automerge_handle()`. When attached, every `Session.apply`
+mirrors the transaction's `ops` into the bound Automerge doc via
+`handle.change(d => …)`; the change subscription replaces
+`this.doc` with the materialised state when remote peers push
+patches. Re-entry is guarded by `#applying_remote` so the local
+echo doesn't loop. The doc shape is `{ document_id, nodes }` —
+svedit's op format (`['set', [node_id, property], value]`,
+`['create', node]`, `['delete', node_id]`) maps 1:1 to map
+mutations. One Automerge doc per `documents` row (page, nav,
+footer separately); URL stored in `document_automerge_docs`
+platform table; bootstrapped from SQLite on first connection.
+Client side, `attachSessionToDocumentDoc(siteId, docUrl,
+session)` in `session_automerge_client.svelte.ts` wires the
+handle into the active session and returns a cleanup; the App
+component runs it from a `$effect` so it tears down on session
+swap.
+
 **Page-edit broadcast.** Parallel to the tree multiplayer
 layer: per-site Automerge "broadcast" doc holds only
 `{ site_id, updated_at }`. Every page mutation

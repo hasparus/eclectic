@@ -55,6 +55,28 @@ export default class Session {
 	commands = $state.raw({});
 	keymap = $state.raw({});
 
+	/**
+	 * Automerge binding. When attached, every local `apply` mirrors
+	 * its `ops` into the bound document via `handle.change(...)`;
+	 * remote patches arriving on the same handle replace the local
+	 * `doc` with the materialised Automerge state.
+	 *
+	 * `#applying_remote` is the re-entry guard — the remote patch
+	 * handler updates `this.doc` directly, which would otherwise
+	 * trigger another local `apply` and echo back to Automerge.
+	 *
+	 * @type {null | {
+	 *   change: (fn: (d: any) => void) => void,
+	 *   doc: () => any,
+	 *   on: (event: 'change', fn: () => void) => void,
+	 *   off: (event: 'change', fn: () => void) => void
+	 * }}
+	 */
+	#automerge_handle = null;
+	#applying_remote = false;
+	/** @type {(() => void) | null} */
+	#automerge_change_listener = null;
+
 	// Reactive helpers for UI state
 	can_undo = $derived(this.history_index >= 0);
 	can_redo = $derived(this.history_index < this.history.length - 1);
@@ -201,6 +223,14 @@ export default class Session {
 		this.doc = transaction.doc;
 		// Make sure selection gets a new reference (is rerendered)
 		this.selection = structuredClone(transaction.selection);
+
+		// Mirror to the bound Automerge doc, if any. Skip when we're
+		// inside a remote-patch application — otherwise we'd echo
+		// the remote change back to peers and ping-pong forever.
+		if (this.#automerge_handle && !this.#applying_remote) {
+			this.#mirror_ops_to_automerge(transaction.ops);
+		}
+
 		if (this.history_index < this.history.length - 1) {
 			this.history = this.history.slice(0, this.history_index + 1);
 		}
@@ -535,4 +565,131 @@ export default class Session {
 		// Extract IDs and exclude the last element (root node)
 		return traversed_nodes.slice(0, -1).map((node) => node.id);
 	}
+
+	// =============================================================
+	// Automerge binding
+	// =============================================================
+
+	/**
+	 * Attach an Automerge `DocHandle` to this session. Sync becomes
+	 * bidirectional:
+	 *   • local `apply()` mirrors the transaction's `ops` into the
+	 *     handle via `change(d => ...)`.
+	 *   • remote `change` events on the handle replace `this.doc`
+	 *     with the materialised Automerge state (guarded against
+	 *     echoing back via `#applying_remote`).
+	 *
+	 * The handle's doc shape is expected to be `{ nodes: { id: node } }`
+	 * — the same shape the local doc carries, minus svedit metadata
+	 * like `document_id`. Bootstrapping the handle (writing the
+	 * initial `nodes` map) is the caller's job; this method just
+	 * subscribes.
+	 *
+	 * @param {object} handle - Automerge DocHandle
+	 */
+	attach_automerge_handle(handle) {
+		this.detach_automerge_handle();
+		this.#automerge_handle = handle;
+		const listener = () => this.#on_automerge_change();
+		this.#automerge_change_listener = listener;
+		handle.on('change', listener);
+	}
+
+	/**
+	 * Tear down the Automerge subscription. Idempotent.
+	 */
+	detach_automerge_handle() {
+		if (this.#automerge_handle && this.#automerge_change_listener) {
+			this.#automerge_handle.off('change', this.#automerge_change_listener);
+		}
+		this.#automerge_handle = null;
+		this.#automerge_change_listener = null;
+	}
+
+	/**
+	 * Apply a list of svedit ops to the bound Automerge doc. The op
+	 * formats — `['set', [node_id, property], value]`, `['create',
+	 * node]`, `['delete', node_id]` — translate 1:1 to Automerge map
+	 * mutations. Unknown op types are ignored (svedit may add more
+	 * op kinds upstream; we don't want to crash on them).
+	 *
+	 * @param {Array<unknown>} ops
+	 */
+	#mirror_ops_to_automerge(ops) {
+		const handle = this.#automerge_handle;
+		if (!handle || !ops || ops.length === 0) return;
+		handle.change((/** @type {any} */ d) => {
+			if (!d.nodes) d.nodes = {};
+			for (const op of ops) {
+				const [type, ...args] = /** @type {[string, ...any[]]} */ (op);
+				if (type === 'set') {
+					const [node_id, property] = args[0];
+					const value = structuredClone(args[1]);
+					if (!d.nodes[node_id]) {
+						// `set` against a node we haven't created yet —
+						// initialise the entry so concurrent peers see
+						// a partial node rather than throw.
+						d.nodes[node_id] = { id: node_id };
+					}
+					d.nodes[node_id][property] = value;
+				} else if (type === 'create') {
+					const node = structuredClone(args[0]);
+					d.nodes[node.id] = node;
+				} else if (type === 'delete') {
+					const node_id = args[0];
+					delete d.nodes[node_id];
+				}
+			}
+		});
+	}
+
+	/**
+	 * Re-materialise local `doc` from the bound Automerge handle.
+	 * Called whenever the handle fires `change` — both for our own
+	 * local mirror (debounced no-op) and remote peer updates.
+	 */
+	#on_automerge_change() {
+		const handle = this.#automerge_handle;
+		if (!handle) return;
+		const next = handle.doc();
+		if (!next || !next.nodes) return;
+		// Skip if the materialised nodes match what we already render
+		// — saves a $state reassignment + downstream rerender on
+		// every local echo.
+		try {
+			if (this.doc && this.doc.nodes && shallowEqualNodes(this.doc.nodes, next.nodes)) {
+				return;
+			}
+		} catch {
+			// fall through to update
+		}
+		this.#applying_remote = true;
+		try {
+			// Preserve everything `this.doc` carries that's NOT under
+			// `nodes` (document_id, type, etc.) so consumers reading
+			// those fields don't break.
+			this.doc = { ...this.doc, nodes: structuredClone(next.nodes) };
+		} finally {
+			this.#applying_remote = false;
+		}
+	}
+}
+
+/**
+ * Cheap structural equality for the node map. JSON.stringify is
+ * fine here — node payloads are small JSON-friendly trees and
+ * this only runs on Automerge `change` events. Wrapped in
+ * try/catch by the caller; we don't worry about circular refs.
+ *
+ * @param {Record<string, unknown>} a
+ * @param {Record<string, unknown>} b
+ */
+function shallowEqualNodes(a, b) {
+	const ak = Object.keys(a);
+	const bk = Object.keys(b);
+	if (ak.length !== bk.length) return false;
+	for (const k of ak) {
+		if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) return false;
+	}
+	return true;
 }

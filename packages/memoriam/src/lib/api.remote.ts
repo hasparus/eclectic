@@ -69,7 +69,8 @@ import {
 import {
 	refreshSiteTreeDoc,
 	refreshTreeDocsForPerson,
-	refreshSitePageBroadcastDoc
+	refreshSitePageBroadcastDoc,
+	refreshDocumentDoc
 } from '$lib/server/automerge_server.js';
 import { getPlatformDb } from '$lib/server/platform_db.js';
 
@@ -1284,12 +1285,22 @@ export const saveDocument = command(saveDocumentInputSchema, async (combinedDoc)
 		throw err;
 	}
 
-	// Broadcast to every other tab on this site that a page
-	// document changed. Fire-and-forget — the page renders
-	// correctly without sync if no doc is loaded yet (no live
-	// readers).
+	// Live multiplayer:
+	//   * Per-document Automerge doc gets the post-save snapshot so
+	//     any peer with this document's Session attached merges in
+	//     the change at the op level.
+	//   * Per-site broadcast doc ticks so peers viewing other pages
+	//     on this site re-fetch the page list / nav / footer.
 	const siteIdForBroadcast = getRequestEvent().locals.siteId;
-	if (siteIdForBroadcast) refreshSitePageBroadcastDoc(siteIdForBroadcast);
+	if (siteIdForBroadcast) {
+		// Refresh the page document, the nav, and the footer — each
+		// is a separate `documents` row that `saveDocument` might
+		// have touched.
+		refreshDocumentDoc(siteIdForBroadcast, combinedDoc.document_id);
+		if (navRootId) refreshDocumentDoc(siteIdForBroadcast, navRootId);
+		if (footerRootId) refreshDocumentDoc(siteIdForBroadcast, footerRootId);
+		refreshSitePageBroadcastDoc(siteIdForBroadcast);
+	}
 
 	return {
 		ok: true,

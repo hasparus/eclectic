@@ -12,17 +12,21 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
 	const { getHomeDocument } = await import('$lib/api.remote.js');
 	const result = await getHomeDocument();
 
-	// Per-site page-edit broadcast doc — every other tab on this
-	// site subscribes via WebSocket and calls `invalidateAll()`
-	// when this doc ticks (i.e. when any page is saved / renamed /
-	// deleted). Same Automerge plumbing as the tree feature; the
-	// doc itself is intentionally tiny (`{ updated_at }`).
-	const { ensureSitePageBroadcastDoc } = await import('$lib/server/automerge_server.js');
+	// Per-site page-edit broadcast doc (drives `invalidateAll()`).
+	// Plus per-document Automerge doc for THIS page — svedit's
+	// Session attaches to the handle and mirrors local ops, so
+	// concurrent editors see each other's edits at the op level
+	// (without a full page reload).
+	const { ensureSitePageBroadcastDoc, ensureDocumentDoc } = await import(
+		'$lib/server/automerge_server.js'
+	);
 	const page_doc_url = await ensureSitePageBroadcastDoc(locals.siteId);
+	const document_doc_url = await ensureDocumentDoc(locals.siteId, result.document.document_id);
 
 	return {
 		...result,
 		is_admin: isAdmin,
-		page_doc_url
+		page_doc_url,
+		document_doc_url
 	};
 };

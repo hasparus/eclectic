@@ -300,6 +300,26 @@ const migrations: Migration[] = [
 				FOREIGN KEY (site_id) REFERENCES sites(site_id)
 			);
 		`);
+	},
+
+	function add_document_automerge_doc_index({ db }) {
+		// Per-document Automerge doc — one per `documents` row.
+		// Holds the live editing state as `{ document_id, nodes }`.
+		// svedit's Session binds to this handle: local ops mirror
+		// into the doc, remote changes flow back into the rendered
+		// state. The broadcast layer above stays for nav/footer +
+		// page-list invalidations; this one carries the real
+		// content-level CRDT.
+		db.exec(sql`
+			CREATE TABLE document_automerge_docs (
+				site_id TEXT NOT NULL,
+				document_id TEXT NOT NULL,
+				doc_url TEXT NOT NULL UNIQUE,
+				created_at TEXT NOT NULL,
+				PRIMARY KEY (site_id, document_id),
+				FOREIGN KEY (site_id) REFERENCES sites(site_id)
+			);
+		`);
 	}
 ];
 

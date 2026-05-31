@@ -32,6 +32,7 @@ import { NodeFSStorageAdapter } from '@automerge/automerge-repo-storage-nodefs';
 import { DATA_DIR } from '$lib/server_config.js';
 import { getPlatformDb } from '$lib/server/platform_db.js';
 import { getAllSitePeople, getSiteSubjectId } from '$lib/server/people.js';
+import { getDb } from '$lib/server/db.js';
 import type { TreeDoc, TreeDocPerson, TreeDocCouple } from '$lib/tree_doc.js';
 
 let repoSingleton: Repo | null = null;
@@ -52,6 +53,7 @@ export function closeAutomergeRepo(): void {
 	repoSingleton = null;
 	handleCache.clear();
 	pageHandleCache.clear();
+	documentHandleCache.clear();
 }
 
 /**
@@ -302,6 +304,113 @@ export function refreshSitePageBroadcastDoc(siteId: string): void {
 	if (!handle) return;
 	handle.change((doc) => {
 		doc.updated_at = new Date().toISOString();
+	});
+}
+
+// ---------------------------------------------------------------
+// Per-document (page / nav / footer) Automerge doc.
+//
+// The bound Session in the editor mirrors local ops here; remote
+// peers' changes flow back the other way. The doc shape is just
+// `{ document_id, nodes }` — the same `nodes` map svedit's
+// `apply_op` mutates, with no svedit metadata.
+// ---------------------------------------------------------------
+
+interface DocumentAutomergeDoc {
+	document_id: string;
+	nodes: Record<string, unknown>;
+}
+
+const documentHandleCache = new Map<string, DocHandle<DocumentAutomergeDoc>>();
+
+function documentKey(siteId: string, documentId: string): string {
+	return `${siteId}::${documentId}`;
+}
+
+/**
+ * Resolve (and lazily create + bootstrap) the Automerge URL for a
+ * specific `documents` row. Same pattern as the tree doc: stored
+ * URL in the `document_automerge_docs` table; first connection
+ * populates the doc from SQLite.
+ */
+export async function ensureDocumentDoc(siteId: string, documentId: string): Promise<AutomergeUrl> {
+	const key = documentKey(siteId, documentId);
+	const cached = documentHandleCache.get(key);
+	if (cached) return cached.url;
+
+	const db = getPlatformDb();
+	const existing = db
+		.prepare(
+			`SELECT doc_url FROM document_automerge_docs WHERE site_id = ? AND document_id = ?`
+		)
+		.get(siteId, documentId) as { doc_url: string } | undefined;
+
+	const repo = getAutomergeRepo();
+
+	if (existing) {
+		const url = existing.doc_url;
+		if (!isValidAutomergeUrl(url)) {
+			throw new Error(
+				`stored document automerge url invalid for ${key}: ${url}`
+			);
+		}
+		const handle = await repo.find<DocumentAutomergeDoc>(url);
+		documentHandleCache.set(key, handle);
+		return url;
+	}
+
+	const handle = repo.create<DocumentAutomergeDoc>({
+		document_id: documentId,
+		nodes: {}
+	});
+	bootstrapDocumentDocFromSql(siteId, documentId, handle);
+	documentHandleCache.set(key, handle);
+
+	db.prepare(
+		`INSERT INTO document_automerge_docs (site_id, document_id, doc_url, created_at)
+		 VALUES (?, ?, ?, ?)`
+	).run(siteId, documentId, handle.url, new Date().toISOString());
+
+	return handle.url;
+}
+
+function bootstrapDocumentDocFromSql(
+	siteId: string,
+	documentId: string,
+	handle: DocHandle<DocumentAutomergeDoc>
+): void {
+	// Pull the row from the per-site documents table. The DB
+	// accessor `getDb` lives in `$lib/server/db.js`.
+	const db = getDb(siteId);
+	const row = db
+		.prepare(`SELECT data FROM documents WHERE document_id = ?`)
+		.get(documentId) as { data: string } | undefined;
+	if (!row) return;
+	const parsed = JSON.parse(row.data) as { nodes?: Record<string, unknown> };
+	if (!parsed.nodes) return;
+	handle.change((doc) => {
+		doc.nodes = structuredClone(parsed.nodes!);
+	});
+}
+
+/**
+ * Re-project a single `documents` row into its Automerge doc.
+ * Called after `saveDocument` so peers see the post-write state
+ * without depending on the editor's own mirror path. Best-effort
+ * — if no doc has been opened in this process yet, skip.
+ */
+export function refreshDocumentDoc(siteId: string, documentId: string): void {
+	const handle = documentHandleCache.get(documentKey(siteId, documentId));
+	if (!handle) return;
+	const db = getDb(siteId);
+	const row = db
+		.prepare(`SELECT data FROM documents WHERE document_id = ?`)
+		.get(documentId) as { data: string } | undefined;
+	if (!row) return;
+	const parsed = JSON.parse(row.data) as { nodes?: Record<string, unknown> };
+	if (!parsed.nodes) return;
+	handle.change((doc) => {
+		doc.nodes = structuredClone(parsed.nodes!);
 	});
 }
 

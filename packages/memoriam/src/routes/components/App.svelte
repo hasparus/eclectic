@@ -8,6 +8,8 @@
 
 	import { createSession } from '../create_session.js';
 	import { create_page_browser, set_page_browser } from './page_browser_context.svelte.js';
+	import { page as pageState } from '$app/state';
+	import { attachSessionToDocumentDoc } from '$lib/session_automerge_client.svelte';
 
 	interface Props {
 		document?: any;
@@ -15,12 +17,14 @@
 		is_new?: boolean;
 		is_admin?: boolean;
 		origin?: string | null;
+		document_doc_url?: string;
 	}
 	let {
 		document: doc,
 		is_new = false,
 		is_admin: server_is_admin = false,
-		origin = null
+		origin = null,
+		document_doc_url
 	}: Props = $props();
 
 	let initial_doc = $derived(doc);
@@ -463,6 +467,26 @@
 		if (is_new) {
 			editable = true;
 		}
+	});
+
+	// Bind the active `Session` to its per-document Automerge handle
+	// so local ops mirror over the WebSocket and remote peers'
+	// changes flow back into `session.doc`. We depend on
+	// `session` + `document_doc_url` + the layout's `site_id`; any
+	// of those changing re-attaches a fresh handle.
+	$effect(() => {
+		const url = document_doc_url;
+		const siteId = pageState.data.site_id as string | null;
+		if (!url || !siteId || !session) return;
+		const cleanup = attachSessionToDocumentDoc(
+			siteId,
+			url,
+			session as unknown as {
+				attach_automerge_handle: (h: unknown) => void;
+				detach_automerge_handle: () => void;
+			}
+		);
+		return cleanup;
 	});
 
 	$effect(() => {

@@ -401,28 +401,34 @@ tenant routing.
       internals. The character-by-character CRDT merge that
       lets two users co-type the same paragraph is a separate
       undertaking (Phase 3.2 below).
-- [ ] **svedit ↔ Automerge real binding (Phase 3.2 — explicit
-      architectural commit needed).** The broadcast above is
-      end-of-save replay; this is the inside-svedit refactor.
-      Open decisions before starting:
-      *(a) fork svedit into the memoriam tree* so we own
-      `Session.apply` and can replace its in-memory tree with
-      `Automerge.change(doc, d => ...)`. Then the per-page doc
-      shape per the original PLAN: `nodes` keyed by id,
-      `node_array` props as Automerge lists of string ids,
-      `annotated_text` as Automerge RichText with mark values.
-      *(b) wrap svedit externally* — diff Session.document
-      against the materialised Automerge doc and replay deltas
-      both ways. Less invasive, weaker merge semantics under
-      true concurrency (last-write-wins on whole nodes).
-      *(c) replace svedit* with a different editor whose
-      multiplayer story is solved (Tiptap + Y.Doc with
-      `automerge-prosemirror`, or roll our own block editor on
-      Automerge primitives — `annotated_text` becomes RichText
-      directly).
-      Each path is multi-week and forecloses parts of the
-      others. Pick before starting; the broadcast layer above
-      buys time without picking.
+- [x] **svedit ↔ Automerge binding (Phase 3.2 / Option A).**
+      Vendored svedit's `src/lib/` into `packages/memoriam/src/lib
+      /svedit/`; updated 25 import sites; dropped the `svedit`
+      npm dep. `Session.svelte.js` gained
+      `attach_automerge_handle(handle)` / `detach_automerge_handle()`
+      and an `#applying_remote` re-entry guard. The
+      `Session.apply` path mirrors every transaction's `ops` into
+      the bound doc via `handle.change()`; the change subscription
+      replaces `this.doc` with the materialised Automerge state
+      when remote peers push patches (`#on_automerge_change` →
+      `shallowEqualNodes` dedup → `this.doc = {...this.doc, nodes:
+      structuredClone(next.nodes)}`).
+      Svedit's op format —
+      `['set', [node_id, property], value]`,
+      `['create', node]`,
+      `['delete', node_id]` —
+      translates 1:1 to Automerge map mutations; the wrap is
+      ~60 LOC. Per-document Automerge doc lives in a new
+      `document_automerge_docs` platform table; the server
+      bootstraps from SQLite on first `ensureDocumentDoc(siteId,
+      documentId)` and re-projects on `saveDocument` via
+      `refreshDocumentDoc`. Both page routes (`/+page.server.ts`
+      and `/[page_id]/+page.server.ts`) surface
+      `document_doc_url`; `App.svelte` attaches it to the active
+      `Session` via the new `session_automerge_client.svelte.ts`.
+      The per-site broadcast layer (above) stays in place — it
+      handles nav / footer / page-list invalidations the
+      per-document binding doesn't.
 - [ ] **Tree multiplayer — Phase 3 v2 (CRDT-authoritative).**
 
 The biggest *addition*, not a migration — there is no existing
