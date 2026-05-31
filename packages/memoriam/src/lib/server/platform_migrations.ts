@@ -256,6 +256,28 @@ const migrations: Migration[] = [
 		// owner sets it (or accepts the auto-suggestion built from
 		// site.display_name).
 		db.exec(sql`ALTER TABLE sites ADD COLUMN subject_person_id TEXT REFERENCES people(person_id);`);
+	},
+
+	function add_automerge_doc_index({ db }) {
+		// Per-site Automerge document used for real-time
+		// multiplayer editing of the tree. The actual doc binary
+		// lives on disk (handled by automerge-repo's nodefs
+		// storage adapter at `data/automerge/`); this row only
+		// maps the site to its Automerge document URL so the
+		// server can find / lazily-create the doc when a client
+		// connects.
+		//
+		// Stored at the platform level rather than per-site so a
+		// future migration to a different storage layout doesn't
+		// have to touch every per-site DB.
+		db.exec(sql`
+			CREATE TABLE site_automerge_docs (
+				site_id TEXT NOT NULL PRIMARY KEY,
+				doc_url TEXT NOT NULL UNIQUE,
+				created_at TEXT NOT NULL,
+				FOREIGN KEY (site_id) REFERENCES sites(site_id)
+			);
+		`);
 	}
 ];
 

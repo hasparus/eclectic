@@ -355,7 +355,36 @@ tenant routing.
       noun "memorial" was renamed to **"site"** across the UI
       strings (DB / URL / variable names stay as `sites`).
 
-## Phase 3 — Multiplayer + local-first via Automerge (3-4 weeks)
+## Phase 3 — Multiplayer + local-first via Automerge
+
+- [x] **Tree multiplayer via Automerge (Phase 3 MVP).** Per-site
+      Automerge document holds the tree's people / edges / couples
+      as a CRDT mirror of SQLite. New platform table
+      `site_automerge_docs` maps each `site_id` to its
+      `AutomergeUrl`; the doc itself lives in `data/automerge/`
+      via `automerge-repo`'s NodeFS storage adapter.
+      Bootstrapping reads the per-site tree once and writes it
+      into a fresh doc; refresh re-projects SQLite into the doc
+      after every genealogy mutation in `api.remote.ts`
+      (`createPerson`, `updatePerson`, `setSiteSubject`,
+      `addParentEdge`, `removeParentEdge`, `addCouple`,
+      `removeCouple`, `deletePerson`, `importGedcom`). A Vite
+      plugin (`vite-plugin-automerge.ts`) mounts a WebSocket
+      sync endpoint at `/ws/automerge?site=<id>`; one
+      `WebSocketServer` is attached to the repo via a single
+      `NodeWSServerAdapter`. The upgrade handler validates the
+      platform session cookie + site membership before letting
+      a peer join — invalid → 401/403. Client-side
+      (`tree_doc_client.svelte.ts`) creates a `Repo` with the
+      `WebSocketClientAdapter` + `IndexedDBStorageAdapter` and
+      subscribes via `repo.find(url)`; every doc-change event
+      triggers a debounced `invalidateAll()`. The tree page
+      stays SQLite-rendered (load function reads the platform
+      DB); Automerge is the broadcast channel that drives every
+      connected tab to refetch. E2e covers the cross-context
+      flow: owner adds a child via inline ghost card → editor's
+      tab sees the new card without manual reload.
+- [ ] **Tree multiplayer — Phase 3 v2 (CRDT-authoritative).**
 
 The biggest *addition*, not a migration — there is no existing
 multiplayer or sync layer to migrate from. Adding Automerge brings

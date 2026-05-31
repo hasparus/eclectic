@@ -123,6 +123,34 @@ builds each annular sector. Opt-in via `?view=fan` — the canvas
 (Sugiyama) is the default. Only renders ancestors; descendants
 stay in the canvas view.
 
+**Multiplayer sync via Automerge.** Per-site Automerge doc
+mirrors the SQLite tree state for live cross-tab / cross-user
+updates. Server-side: `src/lib/server/automerge_server.ts` owns
+a single repo singleton (NodeFS storage at `data/automerge/`).
+`ensureSiteTreeDoc(siteId)` lazy-creates + bootstraps from
+SQLite; `refreshSiteTreeDoc(siteId)` re-projects on every
+remote-function write. `vite-plugin-automerge.ts` mounts a
+WebSocket sync endpoint at `/ws/automerge?site=<id>` — one
+`WebSocketServer` attached via a single `NodeWSServerAdapter`,
+session-cookie + member-role checked before upgrade. Client:
+`tree_doc_client.svelte.ts` lazy-loads automerge-repo + the
+WebSocket / IndexedDB adapters (every Automerge import is
+dynamic so the SSR pass never reaches the WASM module). The
+tree page's `$effect` watches the doc's fingerprint and
+debounces an `invalidateAll()` whenever it shifts — that
+absorbs the local-write echo and reacts to remote-tab changes
+in the same handler. SQLite is still the rendering source of
+truth; the doc is just the broadcast channel.
+
+If the client-side dynamic imports fail (Vite CJS interop
+regressions in `eventemitter3` / `bs58check` / `@noble/hashes`),
+`subscribeToTreeDoc` catches the error and renders without
+live sync — the page works, multiplayer just isn't active. The
+`optimizeDeps.include` list in `vite.config.js` forces those
+CJS packages through Vite's prebundle so their named exports
+work; expand the list if a future Automerge upgrade pulls in
+more.
+
 Tree visualisation: d3-dag's Sugiyama layout (parent-child DAG)
 → Svelte 5 SVG cards positioned in `src/lib/tree_layout.ts`.
 Couples are rendered as a thin dashed line between the two

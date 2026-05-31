@@ -6,9 +6,10 @@ import {
 	getPerson,
 	redactTree
 } from '$lib/server/people.js';
+import { ensureSiteTreeDoc } from '$lib/server/automerge_server.js';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = ({ locals, params, url }) => {
+export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (!locals.userId) {
 		throw redirect(303, `/signin?next=${encodeURIComponent(url.pathname)}`);
 	}
@@ -32,12 +33,19 @@ export const load: PageServerLoad = ({ locals, params, url }) => {
 	// date yet, and hiding it would render the page meaningless.
 	const tree = rawTree && !canEdit ? redactTree(rawTree, subjectId) : rawTree;
 
+	// Materialise (or load) the per-site Automerge doc — the client
+	// will subscribe via WebSocket so live changes from other tabs /
+	// users appear without an HTTP round-trip. The URL is the only
+	// thing the client needs to find the doc in its local repo.
+	const doc_url = await ensureSiteTreeDoc(params.siteId);
+
 	return {
 		site,
 		current_user_id: locals.userId,
 		current_user_role: member.role,
 		can_edit: canEdit,
 		subject,
-		tree
+		tree,
+		doc_url
 	};
 };

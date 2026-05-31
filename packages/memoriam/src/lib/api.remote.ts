@@ -66,6 +66,11 @@ import {
 	linkPersonToSite,
 	importParsedGedcom
 } from '$lib/server/people.js';
+import {
+	refreshSiteTreeDoc,
+	refreshTreeDocsForPerson
+} from '$lib/server/automerge_server.js';
+import { getPlatformDb } from '$lib/server/platform_db.js';
 
 /**
  * Per-site database accessor. Always resolves to the database for the
@@ -1639,8 +1644,8 @@ export const createPerson = command(createPersonInputSchema, async (input) => {
 	return rpcFromResult(
 		requireUser(locals.userId)
 			.andThen((userId) => requireSiteEdit(input.site_id, userId))
-			.map((userId) => ({
-				person: createPersonCore({
+			.map((userId) => {
+				const person = createPersonCore({
 					owner_user_id: userId,
 					display_name: input.display_name,
 					given_names: input.given_names ?? null,
@@ -1653,8 +1658,10 @@ export const createPerson = command(createPersonInputSchema, async (input) => {
 					is_living: input.is_living,
 					biography: input.biography ?? null,
 					link_to_site_id: input.site_id
-				})
-			}))
+				});
+				refreshSiteTreeDoc(input.site_id);
+				return { person };
+			})
 	);
 });
 
@@ -1677,7 +1684,11 @@ export const updatePerson = command(updatePersonInputSchema, async ({ person_id,
 	return rpcFromResult(
 		requireUser(locals.userId)
 			.andThen((userId) => requirePeopleEdit([person_id], userId))
-			.map(() => ({ person: updatePersonCore(person_id, patch) }))
+			.map(() => {
+				const person = updatePersonCore(person_id, patch);
+				refreshTreeDocsForPerson(person_id);
+				return { person };
+			})
 	);
 });
 
@@ -1694,6 +1705,7 @@ export const setSiteSubject = command(setSiteSubjectInputSchema, async ({ site_i
 			.andThen((userId) => (person_id ? requirePeopleEdit([person_id], userId) : ok(userId)))
 			.map(() => {
 				setSiteSubjectCore(site_id, person_id);
+				refreshSiteTreeDoc(site_id);
 				return {};
 			})
 	);
@@ -1724,7 +1736,10 @@ export const addParentEdge = command(addParentInputSchema, async ({ parent_id, c
 					(e) => fromUnknown('edge_failed', e, 'Could not add edge.')
 				)()
 			)
-			.map((edge) => ({ edge }))
+			.map((edge) => {
+				refreshSiteTreeDoc(site_id);
+				return { edge };
+			})
 	);
 });
 
@@ -1740,6 +1755,8 @@ export const removeParentEdge = command(removeParentInputSchema, async ({ parent
 			.andThen((userId) => requirePeopleEdit([parent_id, child_id], userId))
 			.map(() => {
 				removeParentEdgeCore(parent_id, child_id);
+				refreshTreeDocsForPerson(parent_id);
+				refreshTreeDocsForPerson(child_id);
 				return {};
 			})
 	);
@@ -1763,7 +1780,9 @@ export const addCouple = command(addCoupleInputSchema, async ({ site_id, ...inpu
 			.map(() => {
 				linkPersonToSite(input.person_a_id, site_id);
 				linkPersonToSite(input.person_b_id, site_id);
-				return { couple: createCoupleCore(input) };
+				const couple = createCoupleCore(input);
+				refreshSiteTreeDoc(site_id);
+				return { couple };
 			})
 	);
 });
@@ -1774,15 +1793,21 @@ const removeCoupleInputSchema = type({
 
 export const removeCouple = command(removeCoupleInputSchema, async ({ couple_id }) => {
 	const { locals } = getRequestEvent();
+	// Capture the partners *before* deletion so we know which docs
+	// to refresh afterwards. `removeCouple` itself drops the row.
+	const couple = getCoupleById(couple_id);
 	return rpcFromResult(
 		requireUser(locals.userId)
 			.andThen((userId) => {
-				const couple = getCoupleById(couple_id);
 				if (!couple) return err(errOf('not_found', 'Couple not found.'));
 				return requirePeopleEdit([couple.person_a_id, couple.person_b_id], userId);
 			})
 			.map(() => {
 				removeCoupleCore(couple_id);
+				if (couple) {
+					refreshTreeDocsForPerson(couple.person_a_id);
+					refreshTreeDocsForPerson(couple.person_b_id);
+				}
 				return {};
 			})
 	);
@@ -1794,11 +1819,17 @@ const deletePersonInputSchema = type({
 
 export const deletePerson = command(deletePersonInputSchema, async ({ person_id }) => {
 	const { locals } = getRequestEvent();
+	// Capture site ids *before* deletion — `deletePerson` drops the
+	// `person_memorials` rows along with everything else.
+	const linkedSiteRows = getPlatformDb()
+		.prepare(`SELECT site_id FROM person_memorials WHERE person_id = ?`)
+		.all(person_id) as { site_id: string }[];
 	return rpcFromResult(
 		requireUser(locals.userId)
 			.andThen((userId) => requirePeopleEdit([person_id], userId))
 			.map(() => {
 				deletePersonCore(person_id);
+				for (const { site_id } of linkedSiteRows) refreshSiteTreeDoc(site_id);
 				return {};
 			})
 	);
@@ -1875,6 +1906,9 @@ export const importGedcom = command(importGedcomInputSchema, async ({ site_id, p
 					(e) => fromUnknown('import_failed', e, 'Could not import GEDCOM.')
 				)()
 			)
-			.map((result) => ({ result }))
+			.map((result) => {
+				refreshSiteTreeDoc(site_id);
+				return { result };
+			})
 	);
 });

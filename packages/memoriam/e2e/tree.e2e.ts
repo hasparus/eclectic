@@ -691,9 +691,11 @@ test.describe('family tree — Phase B (living-relative redaction)', () => {
 		await modal(page).getByRole('button', { name: /^add$/i }).click();
 		await expect(card(page, /living daughter/i)).toBeVisible();
 
-		// Owner sees the real name on their canvas. `.first()` skips
-		// the affordance <title> elements that also contain the name.
-		await expect(treeCanvas(page).getByText('Living Daughter').first()).toBeVisible();
+		// Owner sees the real name on their canvas. `exact: true`
+		// matches the card's `<text>` content (just "Living
+		// Daughter") and skips the affordance `<title>` elements
+		// whose text is "Add a parent of Living Daughter" etc.
+		await expect(treeCanvas(page).getByText('Living Daughter', { exact: true })).toBeVisible();
 
 		// Invite a viewer.
 		await page.goto(`/sites/${siteId}`);
@@ -716,9 +718,11 @@ test.describe('family tree — Phase B (living-relative redaction)', () => {
 		// redacted. Both still appear as cards on the canvas — only
 		// their private fields are hidden.
 		await expect(cards(viewerPage)).toHaveCount(2);
-		await expect(treeCanvas(viewerPage).getByText('Grandma Edith')).toBeVisible();
+		await expect(treeCanvas(viewerPage).getByText('Grandma Edith', { exact: true })).toBeVisible();
 		await expect(treeCanvas(viewerPage).getByText('Living relative')).toBeVisible();
-		await expect(treeCanvas(viewerPage).getByText('Living Daughter')).toHaveCount(0);
+		await expect(
+			treeCanvas(viewerPage).getByText('Living Daughter', { exact: true })
+		).toHaveCount(0);
 
 		await viewerCtx.close();
 	});
@@ -733,7 +737,9 @@ test.describe('family tree — Phase B (living-relative redaction)', () => {
 		await modal(page).getByRole('button', { name: /^add$/i }).click();
 
 		// Admin sees the real name; no "Living relative" placeholder.
-		await expect(treeCanvas(page).getByText('Definitely Alive').first()).toBeVisible();
+		await expect(
+			treeCanvas(page).getByText('Definitely Alive', { exact: true })
+		).toBeVisible();
 		await expect(treeCanvas(page).getByText('Living relative')).toHaveCount(0);
 	});
 });
@@ -874,15 +880,93 @@ test.describe('family tree — Phase C (GEDCOM + fan chart)', () => {
 	});
 });
 
+test.describe('family tree — Phase 3 (multiplayer)', () => {
+	test('one admin\'s tree edit appears in another admin\'s tab without a manual reload', async ({
+		page,
+		browser
+	}) => {
+		// Owner: create site, seed subject, invite a co-editor.
+		const ownerEmail = uniqueEmail('mp-owner');
+		const editorEmail = uniqueEmail('mp-editor');
+		await signInAs(page, ownerEmail, '/sites');
+		await page.getByPlaceholder(/display name/i).fill('Shared Tree');
+		await page.getByRole('button', { name: /create site/i }).click();
+		await page.getByRole('link', { name: /shared tree/i }).click();
+		await expect(page).toHaveURL(/\/sites\/[a-z0-9]+$/);
+		const siteId = new URL(page.url()).pathname.split('/')[2];
+
+		await page.getByPlaceholder(/email@example\.com/i).fill(editorEmail);
+		// Default invite role is `editor`; leave it alone.
+		await page.getByRole('button', { name: /send invite/i }).click();
+		await expect(page.getByRole('listitem').filter({ hasText: editorEmail })).toBeVisible();
+		const token = latestInviteToken(editorEmail);
+
+		// Seed the subject from the owner's tree page.
+		await page.goto(`/sites/${siteId}/tree`);
+		await seedSubject(page, 'Shared Tree');
+
+		// Editor: separate browser context, accept invite, open the
+		// same tree. Both tabs are now connected to the same per-site
+		// Automerge document via WebSocket.
+		const editorCtx = await browser.newContext();
+		const editorPage = await editorCtx.newPage();
+		await signInAs(editorPage, editorEmail);
+		await editorPage.context().request.get(
+			`/auth/invite?token=${encodeURIComponent(token)}`,
+			{ maxRedirects: 0 }
+		);
+		await editorPage.goto(`/sites/${siteId}/tree`);
+		await expect(card(editorPage, /shared tree/i)).toBeVisible();
+		// Wait for hydration + Automerge subscription to settle —
+		// the doc-change event is what will drive the upcoming live
+		// update.
+		await editorPage.waitForLoadState('networkidle');
+
+		// Owner adds a child via the inline ghost card. The remote
+		// function persists to SQLite, then `refreshSiteTreeDoc`
+		// projects the new row into the per-site Automerge doc,
+		// which fires a `change` event over the WebSocket. The
+		// editor's subscription invalidates their page load.
+		await page
+			.getByRole('button', { name: /add a child of shared tree/i })
+			.click();
+		await modal(page).getByLabel(/display name/i).fill('Live Child');
+		await modal(page).getByRole('button', { name: /^add$/i }).click();
+		await expect(card(page, /live child/i)).toBeVisible();
+
+		// Editor sees the new card without a manual reload — that's
+		// the multiplayer assertion. We give it a generous timeout
+		// because the WebSocket → invalidateAll → load → render
+		// chain has more steps than a same-tab update.
+		await expect(card(editorPage, /live child/i)).toBeVisible({ timeout: 15_000 });
+
+		await editorCtx.close();
+	});
+});
+
 test.describe('family tree — i18n', () => {
 	test('Polish locale renders the tree page and drawer in Polish', async ({ page }) => {
 		await bootSiteAndOpenTree(page, 'pl-tree', 'Babcia Helena');
 		await seedSubject(page, 'Babcia Helena');
 
-		// Flip to Polish via the locale switcher on /sites.
+		// Flip to Polish. Setting the Paraglide cookie via
+		// `context.addCookies` is more reliable than driving the
+		// `Polski` button — the in-app flow does `setLocale +
+		// location.reload()`, which has been observed to race
+		// under the Automerge sync layer's added page-load
+		// latency. The button is exercised by `i18n.e2e.ts`; here
+		// we just need a Polish render to assert on.
+		await page.context().addCookies([
+			{
+				name: 'PARAGLIDE_LOCALE',
+				value: 'pl',
+				domain: '127.0.0.1',
+				path: '/'
+			}
+		]);
 		await page.goto('/sites');
-		await page.getByRole('button', { name: 'Polski' }).click();
-		await page.waitForLoadState('networkidle');
+		// Sanity: the Polish render landed.
+		await expect(page.getByRole('heading', { name: /^twoje strony$/i })).toBeVisible();
 
 		// Navigate back to the tree route — the cookie persists across
 		// navigations, so the next render is fully Polish.

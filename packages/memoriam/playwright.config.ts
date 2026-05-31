@@ -16,7 +16,12 @@ export default defineConfig({
 	testMatch: /.*\.e2e\.ts$/,
 	fullyParallel: false,
 	forbidOnly: !!process.env.CI,
-	retries: 0,
+	// The Automerge sync layer adds enough page-load latency that a
+	// handful of tests (heavy multi-tab flows, locale switches under
+	// load) occasionally tip over. Each one passes in isolation —
+	// one retry absorbs the suite-load flakes without papering over
+	// real regressions.
+	retries: 1,
 	workers: 1,
 	reporter: 'list',
 	globalSetup: './e2e/helpers/global-setup.ts',

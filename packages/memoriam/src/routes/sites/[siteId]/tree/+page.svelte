@@ -12,6 +12,7 @@
 		CARD_HEIGHT
 	} from '$lib/tree_layout';
 	import { treeZoom } from '$lib/tree_zoom.svelte';
+	import { subscribeToTreeDoc } from '$lib/tree_doc_client.svelte';
 	import type { Person, Sex, ParentKind, TreePayload } from '$lib/people_types';
 
 	function truncate(s: string, max: number): string {
@@ -68,9 +69,63 @@
 			can_edit: boolean;
 			subject: Person | null;
 			tree: TreePayload | null;
+			doc_url: string;
 		};
 	}
 	let { data }: Props = $props();
+
+	// Live multiplayer: subscribe to the per-site Automerge doc. On
+	// every change (from this tab or another peer), invalidate the
+	// page load so the layout / drawer / canvas re-render against
+	// the freshly-projected SQLite snapshot. The doc isn't the
+	// source of truth for rendering yet — Phase-3 v2 will swap that
+	// — but its `change` event is the broadcast channel that drives
+	// every connected client to refetch.
+	const treeDoc = subscribeToTreeDoc(data.site.site_id, data.doc_url);
+	let lastStamp = $state<string | null>(null);
+	let invalidateTimer: ReturnType<typeof setTimeout> | null = null;
+	$effect(() => {
+		const doc = treeDoc.doc;
+		if (!doc) return;
+		// Fingerprint every field a peer could mutate. JSON.stringify
+		// is cheap relative to the doc size we'll ever realistically
+		// hold (low-thousand persons). When the fingerprint shifts
+		// against what we last invalidated on, we refetch.
+		const stamp = JSON.stringify({
+			s: doc.subject_person_id,
+			p: Object.values(doc.people).map((p) => ({
+				id: p.person_id,
+				n: p.display_name,
+				g: p.given_names,
+				u: p.surname,
+				x: p.sex,
+				bd: p.birth_date,
+				bp: p.birth_place,
+				dd: p.death_date,
+				dp: p.death_place,
+				lv: p.is_living,
+				b: p.biography
+			})),
+			e: doc.parent_edges,
+			c: Object.values(doc.couples)
+		});
+		if (lastStamp !== null && lastStamp !== stamp) {
+			// Debounce: every local write here already calls
+			// `invalidateAll` directly, and the server-side doc
+			// refresh echoes a `change` event back milliseconds
+			// later — without this gap we'd double-fire and race
+			// the local UI state in tests. 300ms is the smallest
+			// window that absorbed every observed flake while
+			// still feeling instant on a cross-tab sync (the only
+			// case where this path actually wakes the UI).
+			if (invalidateTimer) clearTimeout(invalidateTimer);
+			invalidateTimer = setTimeout(() => {
+				invalidateTimer = null;
+				void invalidateAll();
+			}, 300);
+		}
+		lastStamp = stamp;
+	});
 
 	// Which view is showing on the canvas. Defaults to "canvas"; the
 	// fan chart is opt-in. URL-mirrored so reload + share preserves
