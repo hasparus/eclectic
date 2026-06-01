@@ -1,32 +1,37 @@
 /**
  * Shared document utilities used by both Session and Transaction.
  *
- * These functions operate on the core document state (schema, doc, selection, config)
- * without any history management or transaction tracking.
- *
- * @import { NodeId, DocumentPath, PrimitiveType, NodeProperty, NodeArrayProperty, NodeSchema, DocumentSchema, Selection, Annotation, Document } from './types'
+ * These functions operate on the core document state (schema, doc,
+ * selection, config) without any history management or transaction
+ * tracking.
  */
 
+import type {
+	NodeId,
+	DocumentPath,
+	PrimitiveType,
+	NodeProperty,
+	NodeArrayProperty,
+	NodeSchema,
+	DocumentSchema,
+	Selection,
+	Annotation,
+	Document,
+	DocumentNode
+} from './types.d.ts';
 import { get_selection_range, get_char_length } from './utils.js';
 
 /**
- * Identity function — keeps schema at runtime & makes IDE infer types.
- * Similar to your define_schema pattern but for document schemas.
- *
- * @template {Record<string, NodeSchema>} S
- * @param {S} schema - The document schema to validate
- * @returns {S} The same schema, but with type information preserved
+ * Identity function — keeps schema at runtime & makes IDE infer
+ * types. Similar to a `define_schema` pattern but for document
+ * schemas.
  */
-export function define_document_schema(schema) {
+export function define_document_schema<S extends Record<string, NodeSchema>>(schema: S): S {
 	return schema;
 }
 
-/**
- * Check if a string represents a valid primitive type.
- * @param {string} type - The type string to check
- * @returns {type is PrimitiveType} True if it's a valid primitive type
- */
-export function is_primitive_type(type) {
+/** Type guard for the set of primitive type names svedit recognises. */
+export function is_primitive_type(type: string): type is PrimitiveType {
 	return [
 		'string',
 		'number',
@@ -42,11 +47,13 @@ export function is_primitive_type(type) {
 }
 
 /**
- * Get the default node type for a property that references nodes.
- * @param {NodeProperty | NodeArrayProperty} property_definition - The property definition
- * @returns {string | null} The default node type, or null if none specified
+ * Pick the default node type for a node / node_array property.
+ * Returns null if the property has no `node_types` list, or it has
+ * more than one candidate and no `default_node_type` override.
  */
-export function get_default_node_type(property_definition) {
+export function get_default_node_type(
+	property_definition: NodeProperty | NodeArrayProperty | undefined
+): string | null {
 	if (!property_definition || !property_definition.node_types) {
 		return null;
 	}
@@ -58,16 +65,16 @@ export function get_default_node_type(property_definition) {
 }
 
 /**
- * Validate a document schema to ensure all referenced node types exist.
- * @param {DocumentSchema} document_schema - The document schema to validate
- * @throws {Error} Throws if the document schema is invalid
+ * Validate a document schema: every `node` / `node_array`
+ * property's `node_types` must reference a node type that's defined
+ * in the schema. Throws on the first violation.
  */
-export function validate_document_schema(document_schema) {
-	// Check that all referenced node types exist
-	for (const [node_type, node_schema] of Object.entries(document_schema)) {
+export function validate_document_schema(document_schema: DocumentSchema): void {
+	for (const [node_type, node_schema] of Object.entries(document_schema as Record<string, NodeSchema>)) {
 		for (const [prop_name, prop_def] of Object.entries(node_schema.properties)) {
-			if (prop_def.type === 'node' || prop_def.type === 'node_array') {
-				const missing_types = prop_def.node_types.filter(
+			const def = prop_def as { type: string; node_types?: string[] };
+			if (def.type === 'node' || def.type === 'node_array') {
+				const missing_types = (def.node_types ?? []).filter(
 					(ref_type) => !(ref_type in document_schema)
 				);
 				if (missing_types.length > 0) {
@@ -80,13 +87,8 @@ export function validate_document_schema(document_schema) {
 	}
 }
 
-/**
- * Validate a primitive value against its schema type.
- * @param {PrimitiveType} type - The expected type
- * @param {any} value - The value to validate
- * @returns {boolean} True if the value matches the type
- */
-function validate_primitive_value(type, value) {
+/** Validate a primitive value against its schema type. */
+function validate_primitive_value(type: PrimitiveType, value: unknown): boolean {
 	switch (type) {
 		case 'string':
 			return typeof value === 'string';
@@ -102,8 +104,8 @@ function validate_primitive_value(type, value) {
 			return (
 				typeof value === 'object' &&
 				value !== null &&
-				typeof value.text === 'string' &&
-				Array.isArray(value.annotations)
+				typeof (value as { text?: unknown }).text === 'string' &&
+				Array.isArray((value as { annotations?: unknown }).annotations)
 			);
 		case 'string_array':
 			return Array.isArray(value) && value.every((v) => typeof v === 'string');
@@ -118,36 +120,39 @@ function validate_primitive_value(type, value) {
 	}
 }
 
-/**
- * @param {string} id
- * @returns {boolean}
- */
-function is_id_valid(id) {
+function is_id_valid(id: unknown): boolean {
 	return typeof id === 'string' && id.length > 0;
 }
 
 /**
- * Validate a node against its schema.
- * @param {any} node - The node to validate
- * @param {DocumentSchema} schema - The document schema
- * @param {Record<string, any>} all_nodes - All nodes in the document to check references
- * @throws {Error} Throws if the node is invalid
+ * Validate a node against its schema. Walks every property in the
+ * node's schema definition and asserts the value matches. Node and
+ * node_array references additionally check that the referenced ids
+ * resolve to a node of an allowed type.
+ *
+ * Throws on the first violation; intended for use during
+ * transactions to catch schema drift early.
  */
-export function validate_node(node, schema, all_nodes = {}) {
+export function validate_node(
+	node: DocumentNode,
+	schema: DocumentSchema,
+	all_nodes: Record<NodeId, DocumentNode> = {}
+): void {
 	if (!is_id_valid(node.id)) {
 		throw new Error(`Node ${node.id} has an invalid id.`);
 	}
 
-	if (!node.type || !schema[node.type]) {
+	const sch = schema as Record<string, NodeSchema>;
+	if (!node.type || !sch[node.type]) {
 		throw new Error(`Node ${node.id} has an invalid type: ${node.type}`);
 	}
 
-	const node_schema = schema[node.type];
+	const node_schema = sch[node.type];
 
-	for (const [prop_name, prop_def] of Object.entries(node_schema.properties)) {
-		const value = node[prop_name];
+	for (const [prop_name, prop_def_raw] of Object.entries(node_schema.properties)) {
+		const prop_def = prop_def_raw as { type: string; node_types?: string[] };
+		const value = (node as Record<string, unknown>)[prop_name];
 
-		// Check primitive types
 		if (is_primitive_type(prop_def.type)) {
 			if (!validate_primitive_value(prop_def.type, value)) {
 				throw new Error(
@@ -155,23 +160,19 @@ export function validate_node(node, schema, all_nodes = {}) {
 				);
 			}
 		}
-		// Check node references
 		if (prop_def.type === 'node') {
 			if (!is_id_valid(value)) {
 				throw new Error(
 					`Node ${node.id} has an invalid property: ${prop_name} must be a valid node id.`
 				);
 			}
-			// Check if referenced node exists and is of allowed type
-			const referenced_node = all_nodes[value];
-			if (referenced_node && !prop_def.node_types.includes(referenced_node.type)) {
+			const referenced_node = all_nodes[value as NodeId];
+			if (referenced_node && !(prop_def.node_types ?? []).includes(referenced_node.type)) {
 				throw new Error(
-					`Node ${node.id} property ${prop_name} references node ${value} of type ${referenced_node.type}, but only types [${/** @type {NodeProperty} */ (prop_def).node_types.join(', ')}] are allowed.`
+					`Node ${node.id} property ${prop_name} references node ${value} of type ${referenced_node.type}, but only types [${(prop_def.node_types ?? []).join(', ')}] are allowed.`
 				);
 			}
-		}
-		// Check node arrays
-		else if (prop_def.type === 'node_array') {
+		} else if (prop_def.type === 'node_array') {
 			if (
 				!Array.isArray(value) ||
 				!value.every((id) => typeof id === 'string' && is_id_valid(id))
@@ -180,12 +181,11 @@ export function validate_node(node, schema, all_nodes = {}) {
 					`Node ${node.id} has an invalid property: ${prop_name} must be an array of node ids.`
 				);
 			}
-			// Check if all referenced nodes are of allowed types
-			for (const ref_id of value) {
+			for (const ref_id of value as NodeId[]) {
 				const referenced_node = all_nodes[ref_id];
-				if (referenced_node && !prop_def.node_types.includes(referenced_node.type)) {
+				if (referenced_node && !(prop_def.node_types ?? []).includes(referenced_node.type)) {
 					throw new Error(
-						`Node ${node.id} property ${prop_name} references node ${ref_id} of type ${referenced_node.type}, but only types [${prop_def.node_types.join(', ')}] are allowed.`
+						`Node ${node.id} property ${prop_name} references node ${ref_id} of type ${referenced_node.type}, but only types [${(prop_def.node_types ?? []).join(', ')}] are allowed.`
 					);
 				}
 			}
@@ -194,14 +194,15 @@ export function validate_node(node, schema, all_nodes = {}) {
 }
 
 /**
- * Gets a value from the document at the specified path.
+ * Get a value from the document at the specified path. `path` is
+ * a sequence of node ids, property names, and array indices —
+ * traversal is type-aware so `path = [page_id, 'children', 0]`
+ * follows a node_array into a child node.
  *
- * @param {DocumentSchema} schema - The document schema
- * @param {Document} doc - The document containing nodes
- * @param {DocumentPath|string} path - Array path to the value, or a string node ID
- * @returns {any} The value at the specified path
+ * Returns `any` because the result type depends on the path. Most
+ * callers know what they expect.
  */
-export function get(schema, doc, path) {
+export function get(schema: DocumentSchema, doc: Document, path: DocumentPath | string): any {
 	if (typeof path === 'string') {
 		path = [path];
 	}
@@ -209,8 +210,15 @@ export function get(schema, doc, path) {
 		throw new Error(`Invalid path provided ${JSON.stringify(path)}`);
 	}
 
-	let val = doc.nodes[path[0]];
-	let val_type = 'node';
+	let val: any = doc.nodes[path[0] as NodeId];
+	let val_type:
+		| 'node'
+		| 'node_array'
+		| 'annotated_text'
+		| 'value_array'
+		| 'value'
+		| 'annotation_array'
+		| 'annotation' = 'node';
 
 	for (let i = 1; i < path.length; i++) {
 		const path_segment = path[i];
@@ -223,7 +231,7 @@ export function get(schema, doc, path) {
 				val = val[path_segment];
 				val_type = 'annotated_text';
 			} else if (property_type(schema, val.type, path_segment_str) === 'node') {
-				val = doc.nodes[val[path_segment]];
+				val = doc.nodes[val[path_segment] as NodeId];
 				val_type = 'node';
 			} else if (
 				['string_array', 'integer_array'].includes(
@@ -237,7 +245,7 @@ export function get(schema, doc, path) {
 				val_type = 'value';
 			}
 		} else if (val_type === 'node_array') {
-			val = doc.nodes[val[path_segment]];
+			val = doc.nodes[val[path_segment] as NodeId];
 			val_type = 'node';
 		} else if (val_type === 'value_array') {
 			val = val[path_segment];
@@ -277,55 +285,51 @@ export function get(schema, doc, path) {
 	return val;
 }
 
-/**
- * Gets the type of a property from the schema.
- *
- * @param {object} schema - The document schema
- * @param {string} type - The node type
- * @param {string} property - The property name
- * @returns {string} The property type
- */
-export function property_type(schema, type, property) {
+/** Look up a property's type name in the schema. */
+export function property_type(schema: DocumentSchema, type: string, property: string): string {
 	if (typeof type !== 'string') throw new Error(`Invalid type ${type} provided`);
 	if (typeof property !== 'string') throw new Error(`Invalid property ${property} provided`);
 
 	if (property === 'type') return 'string';
 	if (property === 'id') return 'string';
 
-	if (!schema[type]) throw new Error(`Type ${type} not found in schema`);
-	if (!schema[type].properties[property])
+	const sch = schema as Record<string, NodeSchema>;
+	if (!sch[type]) throw new Error(`Type ${type} not found in schema`);
+	if (!sch[type].properties[property])
 		throw new Error(`Property ${property} not found in type ${type}`);
 
-	return schema[type].properties[property].type;
+	return (sch[type].properties[property] as { type: string }).type;
+}
+
+/** The schema-declared kind of a node. */
+export function kind(
+	schema: DocumentSchema,
+	node: DocumentNode
+): 'document' | 'block' | 'text' | 'annotation' {
+	return (schema as Record<string, NodeSchema>)[node.type].kind as
+		| 'document'
+		| 'block'
+		| 'text'
+		| 'annotation';
 }
 
 /**
- * Determines the kind of a node ('block', 'text', or 'annotation').
- *
- * @param {object} schema - The document schema
- * @param {any} node - The node to check
- * @returns {'block'|'text'|'annotation'} The node kind
+ * Inspect a path: returns either `{ kind: 'property', ... }`
+ * (the property's schema definition) or `{ kind: 'node', ... }`
+ * (the node's id / type / properties).
  */
-export function kind(schema, node) {
-	return schema[node.type].kind;
-}
-
-/**
- * Inspects a path to get metadata about the value at that location.
- *
- * @param {DocumentSchema} schema - The document schema
- * @param {Document} doc - The document containing nodes
- * @param {DocumentPath} path - The path to inspect
- * @returns {{kind: 'property'|'node', [key: string]: any}} Metadata about the path
- */
-export function inspect(schema, doc, path) {
+export function inspect(
+	schema: DocumentSchema,
+	doc: Document,
+	path: DocumentPath
+): { kind: 'property' | 'node'; [key: string]: any } {
 	const parent = path.length > 1 ? get(schema, doc, path.slice(0, -1)) : undefined;
 	if (parent?.type) {
-		const property_name = path.at(-1);
+		const property_name = path.at(-1) as string;
 		return {
 			kind: 'property',
 			name: property_name,
-			...schema[parent.type].properties[property_name]
+			...((schema as Record<string, NodeSchema>)[parent.type].properties[property_name] as object)
 		};
 	} else {
 		const node = get(schema, doc, path);
@@ -333,21 +337,18 @@ export function inspect(schema, doc, path) {
 			kind: 'node',
 			id: node.id,
 			type: node.type,
-			properties: schema[node.type]
+			properties: (schema as Record<string, NodeSchema>)[node.type]
 		};
 	}
 }
 
 /**
- * Applies an operation to a document and returns the new document.
- * Uses copy-on-write semantics.
- *
- * @param {Document} doc - The document to apply the operation to
- * @param {Array} op - The operation to apply [type, ...args]
- * @returns {Document} The new document with the operation applied
+ * Apply a single op to a document and return the new document.
+ * Uses copy-on-write semantics so callers can rely on the previous
+ * doc reference staying intact.
  */
-export function apply_op(doc, op) {
-	const [type, ...args] = op;
+export function apply_op(doc: Document, op: unknown[]): Document {
+	const [type, ...args] = op as [string, ...any[]];
 	if (type === 'set') {
 		const [node_id, property] = args[0];
 		const value = structuredClone(args[1]);
@@ -370,7 +371,7 @@ export function apply_op(doc, op) {
 			}
 		};
 	} else if (type === 'delete') {
-		// eslint-disable-next-line
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
 		const { [args[0]]: _removed, ...remaining_nodes } = doc.nodes;
 		return {
 			...doc,
@@ -380,18 +381,11 @@ export function apply_op(doc, op) {
 	return doc;
 }
 
-/**
- * Counts how many times a node is referenced in the document.
- *
- * @param {DocumentSchema} schema - The document schema
- * @param {Document} doc - The document containing nodes
- * @param {NodeId} node_id - The node ID to count references for
- * @returns {number} The number of references
- */
-export function count_references(schema, doc, node_id) {
+/** Count references to `node_id` from every other node in the doc. */
+export function count_references(schema: DocumentSchema, doc: Document, node_id: NodeId): number {
 	let count = 0;
 
-	for (const node of Object.values(doc.nodes)) {
+	for (const node of Object.values(doc.nodes) as DocumentNode[]) {
 		for (const [property, value] of Object.entries(node)) {
 			if (property === 'id' || property === 'type') continue;
 
@@ -409,30 +403,27 @@ export function count_references(schema, doc, node_id) {
 }
 
 /**
- * Gets the currently active annotation at the selection, optionally filtered by type.
- *
- * An annotation is considered "active" if it overlaps with the current selection in any way:
- * - Annotation contains the selection start
- * - Annotation contains the selection end
- * - Selection fully contains the annotation
- *
- * @param {DocumentSchema} schema - The document schema
- * @param {Document} doc - The document containing nodes
- * @param {Selection} [selection] - The current selection
- * @param {string} [annotation_type] - Optional annotation type to filter by
- * @returns {Annotation | null} The active annotation, or null if none found
+ * Get the annotation overlapping the current selection, optionally
+ * filtered by the annotation node's `type`. Overlap means: the
+ * annotation contains the selection start, contains the selection
+ * end, or is fully contained by the selection.
  */
-export function get_active_annotation(schema, doc, selection, annotation_type) {
+export function get_active_annotation(
+	schema: DocumentSchema,
+	doc: Document,
+	selection?: Selection | null,
+	annotation_type?: string
+): Annotation | null {
 	if (selection?.type !== 'text') return null;
 	const range = get_selection_range(selection);
 	if (!range) return null;
 
 	const annotated_text = get(schema, doc, selection.path);
-	const annotations = annotated_text.annotations;
+	const annotations = annotated_text.annotations as Annotation[];
 
 	const active_annotation =
 		annotations.find(
-			(/** @type {Annotation} */ { start_offset, end_offset }) =>
+			({ start_offset, end_offset }) =>
 				(start_offset <= range.start_offset && end_offset > range.start_offset) ||
 				(start_offset < range.end_offset && end_offset >= range.end_offset) ||
 				(start_offset >= range.start_offset && end_offset <= range.end_offset)
@@ -447,18 +438,20 @@ export function get_active_annotation(schema, doc, selection, annotation_type) {
 }
 
 /**
- * Counts references to a node, excluding nodes marked for deletion.
- *
- * @param {DocumentSchema} schema - The document schema
- * @param {Document} doc - The document containing nodes
- * @param {NodeId} target_node_id - The node ID to count references for
- * @param {Record<NodeId, boolean>} nodes_to_delete - Nodes marked for deletion
- * @returns {number} The number of references excluding deleted nodes
+ * Same as `count_references` but ignores nodes flagged in
+ * `nodes_to_delete`. Also counts annotation refs from
+ * `annotated_text` fields, which the plain `count_references`
+ * doesn't.
  */
-export function count_references_excluding_deleted(schema, doc, target_node_id, nodes_to_delete) {
+export function count_references_excluding_deleted(
+	schema: DocumentSchema,
+	doc: Document,
+	target_node_id: NodeId,
+	nodes_to_delete: Record<NodeId, boolean>
+): number {
 	let count = 0;
 
-	for (const node of Object.values(doc.nodes)) {
+	for (const node of Object.values(doc.nodes) as DocumentNode[]) {
 		if (nodes_to_delete[node.id]) continue;
 
 		for (const [property, value] of Object.entries(node)) {
@@ -470,8 +463,8 @@ export function count_references_excluding_deleted(schema, doc, target_node_id, 
 				count += value.filter((id) => id === target_node_id).length;
 			} else if (prop_type === 'node' && value === target_node_id) {
 				count += 1;
-			} else if (prop_type === 'annotated_text' && value && value.annotations) {
-				count += value.annotations.filter(
+			} else if (prop_type === 'annotated_text' && value && (value as any).annotations) {
+				count += ((value as { annotations: Annotation[] }).annotations).filter(
 					(annotation) => annotation.node_id === target_node_id
 				).length;
 			}
@@ -482,14 +475,17 @@ export function count_references_excluding_deleted(schema, doc, target_node_id, 
 }
 
 /**
- * Validates a selection against the current document state.
- * Works with any object that implements get() and inspect() (Session or Transaction).
- *
- * @param {Selection} selection - The selection to validate
- * @param {{ get: Function, inspect: Function }} session_or_transaction - A Session or Transaction instance
- * @throws {Error} Throws if the selection is invalid
+ * Validate a selection against the current document state. Works
+ * with anything that exposes `get(path)` and `inspect(path)` — both
+ * `Session` and `Transaction` qualify.
  */
-export function validate_selection(selection, session_or_transaction) {
+export function validate_selection(
+	selection: Selection | null | undefined,
+	session_or_transaction: {
+		get: (path: DocumentPath) => unknown;
+		inspect: (path: DocumentPath) => unknown;
+	}
+): void {
 	if (!selection) return;
 
 	const selection_type = selection.type;
@@ -516,7 +512,9 @@ export function validate_selection(selection, session_or_transaction) {
 			);
 		}
 	} else if (selection_type === 'text') {
-		const annotated_text = session_or_transaction.get(selection.path);
+		const annotated_text = session_or_transaction.get(selection.path) as {
+			text?: string;
+		} | null;
 
 		if (!annotated_text || typeof annotated_text.text !== 'string') {
 			throw new Error('Text selection path must point to annotated_text');

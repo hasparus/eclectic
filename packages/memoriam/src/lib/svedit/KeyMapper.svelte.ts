@@ -1,5 +1,9 @@
-const MODIFIER_KEYS = ['meta', 'ctrl', 'alt', 'shift'];
-const MODIFIER_EVENT_KEYS = {
+import type Command from './Command.svelte.js';
+
+const MODIFIER_KEYS = ['meta', 'ctrl', 'alt', 'shift'] as const;
+type ModifierKey = (typeof MODIFIER_KEYS)[number];
+
+const MODIFIER_EVENT_KEYS: Record<ModifierKey, keyof KeyboardEvent> = {
 	meta: 'metaKey',
 	ctrl: 'ctrlKey',
 	alt: 'altKey',
@@ -7,18 +11,30 @@ const MODIFIER_EVENT_KEYS = {
 };
 
 /**
- * Validates and defines a keymap.
- * Throws an error if any key combo is invalid.
- * Valid formats: 'meta+e,ctrl+e' or 'meta+shift+a'
- * Invalid: 'meta+e+a' (only one non-modifier key allowed)
+ * A keymap maps a comma-separated `<key_combo>` string to a list of
+ * commands that get tried in order at runtime. Examples of valid
+ * combos: `'meta+e,ctrl+e'`, `'meta+shift+a'`. Invalid:
+ * `'meta+e+a'` (must have exactly one non-modifier key).
  */
-export function define_keymap(keymap) {
+export type KeyMap = Record<string, Command[]>;
+
+/**
+ * Identity helper for keymaps: validates the combo grammar at
+ * setup time so a malformed entry blows up loudly, then returns
+ * the keymap so a caller can write
+ *
+ *   `const my_map = define_keymap({ 'meta+s': [save_cmd] })`
+ *
+ * The runtime check catches typos like `'meta+e+a'` that would
+ * otherwise silently never fire.
+ */
+export function define_keymap(keymap: KeyMap): KeyMap {
 	for (const [key_combo] of Object.entries(keymap)) {
 		const alternatives = key_combo.split(',');
 
 		for (const alternative of alternatives) {
 			const parts = alternative.trim().toLowerCase().split('+');
-			const non_modifiers = parts.filter((part) => !MODIFIER_KEYS.includes(part));
+			const non_modifiers = parts.filter((part) => !(MODIFIER_KEYS as readonly string[]).includes(part));
 
 			if (non_modifiers.length !== 1) {
 				throw new Error(
@@ -31,51 +47,47 @@ export function define_keymap(keymap) {
 }
 
 /**
- * Matches a keyboard event against a key combo string.
- * Example: 'meta+e,ctrl+e' matches either (metaKey && key==='e') OR (ctrlKey && key==='e')
+ * Match a `KeyboardEvent` against a combo string. `'meta+e,ctrl+e'`
+ * matches either Cmd+E *or* Ctrl+E (but not both modifiers together).
  */
-function matches_key_combo(key_combo, event) {
+function matches_key_combo(key_combo: string, event: KeyboardEvent): boolean {
 	const alternatives = key_combo.split(',');
 
 	return alternatives.some((alternative) => {
 		const parts = alternative.trim().toLowerCase().split('+');
-		const modifiers = parts.filter((part) => MODIFIER_KEYS.includes(part));
-		const non_modifier = parts.find((part) => !MODIFIER_KEYS.includes(part));
+		const modifiers = parts.filter((part) =>
+			(MODIFIER_KEYS as readonly string[]).includes(part)
+		) as ModifierKey[];
+		const non_modifier = parts.find(
+			(part) => !(MODIFIER_KEYS as readonly string[]).includes(part)
+		);
 
-		// Check if all specified modifiers are pressed
 		const modifiers_match = modifiers.every((mod) => event[MODIFIER_EVENT_KEYS[mod]]);
 
-		// Check if no unspecified modifiers are pressed
 		const no_extra_modifiers = MODIFIER_KEYS.every((mod) => {
-			if (modifiers.includes(mod)) return true; // This modifier is expected
-			return !event[MODIFIER_EVENT_KEYS[mod]]; // This modifier should NOT be pressed
+			if (modifiers.includes(mod)) return true;
+			return !event[MODIFIER_EVENT_KEYS[mod]];
 		});
 
-		// Check if the key matches
 		const key_matches = event.key.toLowerCase() === non_modifier;
 		return modifiers_match && no_extra_modifiers && key_matches;
 	});
 }
 
 /**
- * Handles a key map by matching keyboard event against registered key combos
- * and executing the first enabled command.
- *
- * Supports both sync and async commands. For async commands, errors are logged
- * but don't crash the application.
+ * Walk the registered keymap, find the first enabled command whose
+ * combo matches the event, execute it. Supports both sync and async
+ * `execute()`s — async errors are logged but never crash the app.
  */
-function handle_key_map(key_map, event) {
+function handle_key_map(key_map: KeyMap, event: KeyboardEvent): boolean {
 	for (const [key_combo, commands] of Object.entries(key_map)) {
 		if (matches_key_combo(key_combo, event)) {
-			// Find the first enabled command and execute it
 			const enabled_command = commands.find((cmd) => cmd.is_enabled());
 			if (enabled_command) {
 				event.preventDefault();
 
-				// Execute command (may be sync or async)
 				const result = enabled_command.execute();
 
-				// If it's a promise, handle errors (fire-and-forget)
 				if (result instanceof Promise) {
 					result.catch((err) => {
 						console.error('Command execution failed:', err);
@@ -90,48 +102,32 @@ function handle_key_map(key_map, event) {
 }
 
 /**
- * KeyMapper manages keyboard shortcuts using a stack-based scope system.
+ * Manages keyboard shortcuts via a stack of scopes. Higher scopes
+ * (pushed last) get first crack at each event. App-level shortcuts
+ * sit at the bottom, contextual ones (toolbar open, modal focused,
+ * editor focused) push on top as those contexts gain focus.
  *
- * Scopes are tried from top to bottom (most specific to most general).
- * This makes it completely general-purpose - no knowledge of specific contexts.
- *
- * Usage:
  *   const mapper = new KeyMapper();
- *   mapper.push_scope(app_keymap);        // Base layer
- *   mapper.push_scope(editor_keymap);     // When editor gains focus
- *   mapper.pop_scope();                   // When editor loses focus
+ *   mapper.push_scope(app_keymap);       // always active
+ *   mapper.push_scope(editor_keymap);    // when editor focused
+ *   mapper.pop_scope();                  // when editor blurs
  */
 export class KeyMapper {
-	constructor() {
-		this.scope_stack = [];
-		this.skip_onkeydown = false;
-	}
+	scope_stack: KeyMap[] = [];
+	skip_onkeydown = false;
 
-	/**
-	 * Push a new scope onto the stack (becomes highest priority)
-	 */
-	push_scope(keymap) {
-		// console.log('pushed keymap', keymap);
+	push_scope(keymap: KeyMap): void {
 		this.scope_stack.push(keymap);
 	}
 
-	/**
-	 * Pop the most recent scope from the stack
-	 */
-	pop_scope() {
-		const keymap = this.scope_stack.pop();
-		// console.log('popped keymap', keymap);
-		return keymap;
+	pop_scope(): KeyMap | undefined {
+		return this.scope_stack.pop();
 	}
 
-	/**
-	 * Handle keyboard event by trying scopes from top to bottom
-	 */
-	handle_keydown(event) {
-		// Key handling temporarily disabled (e.g. while character composition takes place)
+	handle_keydown(event: KeyboardEvent): void {
+		// Temporarily disabled, e.g. while IME character composition.
 		if (this.skip_onkeydown) return;
-		// console.log('KeyMapper.handle_keydown', event);
-		// Try from most specific (top of stack) to most general (bottom)
+		// Try from most specific (top of stack) to most general.
 		for (let i = this.scope_stack.length - 1; i >= 0; i--) {
 			if (handle_key_map(this.scope_stack[i], event)) {
 				return;

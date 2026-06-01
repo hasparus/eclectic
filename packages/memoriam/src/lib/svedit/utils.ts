@@ -1,14 +1,9 @@
-/**
- * @import { Annotation, AnnotatedText, SelectionRange, Selection } from './types.d.ts';
- */
+import type { Annotation, AnnotatedText, SelectionRange, Selection, NodeId, DocumentSchema, Document, DocumentNode } from './types.d.ts';
 
 const SEGMENTER = new Intl.Segmenter('en', { granularity: 'grapheme' });
 
-/**
- * Detect if the current browser is on a mobile device
- * @returns {boolean} true if mobile browser, false otherwise
- */
-export function is_mobile_browser() {
+/** Detect if the current browser is on a mobile device. */
+export function is_mobile_browser(): boolean {
 	if (typeof window === 'undefined' || typeof navigator === 'undefined') {
 		return false;
 	}
@@ -21,12 +16,9 @@ export function is_mobile_browser() {
 	);
 }
 
-// ‼️‼️‼️‼️‼️‼️ UNUSED UTILITY BELOW ‼️‼️‼️‼️‼️‼️ 
-/**
- * Detect if the current browser is Chrome on desktop
- * @returns {boolean} true if Chrome desktop browser, false otherwise
- */
-export function is_chrome_desktop_browser() {
+// ‼️ UNUSED UTILITY BELOW ‼️
+/** Detect if the current browser is Chrome on desktop. */
+export function is_chrome_desktop_browser(): boolean {
 	if (typeof window === 'undefined' || typeof navigator === 'undefined') {
 		return false;
 	}
@@ -37,61 +29,30 @@ export function is_chrome_desktop_browser() {
 }
 
 /**
- * Get the actual character length (accounting for multi-byte characters)
- *
- * Uses Intl.Segmenter to count grapheme clusters rather than UTF-16 code units,
- * ensuring emojis and other complex Unicode sequences are counted as single characters.
- *
- * @param {string} str - The string to measure
- * @returns {number} The number of visual characters (grapheme clusters)
+ * Grapheme-cluster character count via `Intl.Segmenter` — emojis
+ * and other complex Unicode sequences count as single characters.
  *
  * @example
- * get_char_length('Hello') // Returns: 5
- * get_char_length('a😀b') // Returns: 3 (not 4)
- * get_char_length('👋🏽') // Returns: 1 (not 4 - skin tone modifier treated as single char)
+ *   get_char_length('Hello') // 5
+ *   get_char_length('a😀b') // 3 (not 4)
+ *   get_char_length('👋🏽') // 1 (skin tone modifier merged)
  */
-export function get_char_length(str) {
+export function get_char_length(str: string): number {
 	return [...SEGMENTER.segment(str)].length;
 }
 
-
-// ‼️‼️‼️‼️‼️‼️ UNUSED UTILITY BELOW ‼️‼️‼️‼️‼️‼️ 
-/**
- * Get a single character at the specified position (accounting for multi-byte characters)
- *
- * Uses Intl.Segmenter to access grapheme clusters rather than UTF-16 code units,
- * ensuring emojis and other complex Unicode sequences are treated as single characters.
- *
- * @param {string} str - The string to access
- * @param {number} index - Character position (0-based)
- * @returns {string} The character at the specified position, or empty string if index is out of bounds
- *
- * @example
- * get_char_at('Hello', 1) // Returns: 'e'
- * get_char_at('a😀b', 1) // Returns: '😀' (full emoji)
- * get_char_at('👋🏽', 0) // Returns: '👋🏽' (skin tone modifier included)
- */
-export function get_char_at(str, index) {
+// ‼️ UNUSED UTILITY BELOW ‼️
+/** Character at the given index, grapheme-aware. */
+export function get_char_at(str: string, index: number): string {
 	const segments = [...SEGMENTER.segment(str)];
 	return segments[index].segment;
 }
 
 /**
- * Slice string by character positions (accounting for multi-byte characters)
- *
- * Uses Intl.Segmenter to slice by grapheme clusters rather than UTF-16 code units,
- * ensuring emojis and other complex Unicode sequences remain intact.
- *
- * @param {string} str - The string to slice
- * @param {number} start - Starting character position (inclusive)
- * @param {number} [end] - Ending character position (exclusive). If undefined, slices to end
- * @returns {string} The sliced string with complete characters
- *
- * @example
- * char_slice('Hello 😀 World', 6, 8) // Returns: '😀 ' (emoji stays intact)
- * char_slice('a👋🏽b', 1, 2) // Returns: '👋🏽' (skin tone modifier included)
+ * Grapheme-aware slice: `[start, end)` positions count grapheme
+ * clusters rather than UTF-16 code units, so emoji stay intact.
  */
-export function char_slice(str, start, end = undefined) {
+export function char_slice(str: string, start: number, end?: number): string {
 	const segments = [...SEGMENTER.segment(str)];
 	return segments
 		.slice(start, end)
@@ -100,20 +61,10 @@ export function char_slice(str, start, end = undefined) {
 }
 
 /**
- * Convert UTF-16 code unit offset to grapheme cluster offset within a string
- *
- * Converts DOM selection offsets (which use UTF-16 code units) to character-based
- * offsets (grapheme clusters) for consistent text manipulation.
- *
- * @param {string} str - The string to convert offsets within
- * @param {number} utf16_offset - The UTF-16 code unit offset from DOM
- * @returns {number} The corresponding grapheme cluster offset
- *
- * @example
- * // For string "a😀b" where 😀 uses 2 UTF-16 code units
- * utf16_to_char_offset("a😀b", 3) // Returns: 2 (position after emoji)
+ * Convert a UTF-16 code-unit offset (what DOM selections use)
+ * into a grapheme-cluster offset (what svedit operates on).
  */
-export function utf16_to_char_offset(str, utf16_offset) {
+export function utf16_to_char_offset(str: string, utf16_offset: number): number {
 	const segments = [...SEGMENTER.segment(str)];
 	let char_offset = 0;
 	let utf16_count = 0;
@@ -128,21 +79,8 @@ export function utf16_to_char_offset(str, utf16_offset) {
 	return char_offset;
 }
 
-/**
- * Convert grapheme cluster offset to UTF-16 code unit offset within a string
- *
- * Converts character-based offsets (grapheme clusters) to DOM selection offsets
- * (UTF-16 code units) for proper DOM selection positioning.
- *
- * @param {string} str - The string to convert offsets within
- * @param {number} char_offset - The grapheme cluster offset
- * @returns {number} The corresponding UTF-16 code unit offset for DOM operations
- *
- * @example
- * // For string "a😀b" where 😀 uses 2 UTF-16 code units
- * char_to_utf16_offset("a😀b", 2) // Returns: 3 (UTF-16 position after emoji)
- */
-export function char_to_utf16_offset(str, char_offset) {
+/** Inverse of `utf16_to_char_offset`. */
+export function char_to_utf16_offset(str: string, char_offset: number): number {
 	const segments = [...SEGMENTER.segment(str)];
 	let utf16_offset = 0;
 
@@ -154,49 +92,32 @@ export function char_to_utf16_offset(str, char_offset) {
 }
 
 /**
- * Splits an annotated text at the specified character position.
- *
- * Annotations that span the split point will be divided appropriately,
- * with offsets adjusted for each resulting part.
- *
- * @param {AnnotatedText} text_with_annotations - Annotated text object
- * @param {number} at_position - Character position where to split (0-based)
- * @returns {[AnnotatedText, AnnotatedText]} Tuple of [left_part, right_part]
- *
- * @example
- * split_annotated_text({text: "Hello world", annotations: [{start_offset: 6, end_offset: 11, node_id: "strong"}]}, 8)
- * // Returns:
- * // [
- * //   {text: "Hello wo", annotations: [{start_offset: 6, end_offset: 8, node_id: "strong"}]},
- * //   {text: "rld", annotations: [{start_offset: 0, end_offset: 3, node_id: "strong"}]}
- * // ]
+ * Split an annotated text at a grapheme position. Annotations
+ * spanning the split point are divided and their offsets rebased
+ * on each side.
  */
-export function split_annotated_text(text_with_annotations, at_position) {
+export function split_annotated_text(
+	text_with_annotations: AnnotatedText,
+	at_position: number
+): [AnnotatedText, AnnotatedText] {
 	const { text, annotations } = text_with_annotations;
 
-	// Split the text using character-aware slicing
 	const left_text = char_slice(text, 0, at_position);
 	const right_text = char_slice(text, at_position);
 
-	/** @type {Array<Annotation>} */
-	const left_annotations = [];
-	/** @type {Array<Annotation>} */
-	const right_annotations = [];
+	const left_annotations: Annotation[] = [];
+	const right_annotations: Annotation[] = [];
 
-	// Process each annotation
 	for (const { start_offset, end_offset, node_id } of annotations) {
 		if (end_offset <= at_position) {
-			// Annotation is entirely in the left part
 			left_annotations.push({ start_offset, end_offset, node_id });
 		} else if (start_offset >= at_position) {
-			// Annotation is entirely in the right part - shift offsets
 			right_annotations.push({
 				start_offset: start_offset - at_position,
 				end_offset: end_offset - at_position,
 				node_id
 			});
 		} else {
-			// Annotation spans the split point - split it
 			left_annotations.push({ start_offset, end_offset: at_position, node_id });
 			right_annotations.push({ start_offset: 0, end_offset: end_offset - at_position, node_id });
 		}
@@ -209,52 +130,37 @@ export function split_annotated_text(text_with_annotations, at_position) {
 }
 
 /**
- * Joins two annotated texts into a single annotated text.
- *
- * Annotations from the second text will have their offsets shifted by the length
- * of the first text. Adjacent annotations of the same type and data will be merged.
- *
- * @param {AnnotatedText} first_text - First annotated text object
- * @param {AnnotatedText} second_text - Second annotated text object
- * @returns {AnnotatedText} Combined annotated text object
- *
- * @example
- * join_annotated_text({text: "Hello wo", annotations: [{start_offset: 6, end_offset: 8, node_id: "strong"}]}, {text: "rld", annotations: [{start_offset: 0, end_offset: 3, node_id: "strong"}]})
- * // Returns: {text: "Hello world", annotations: [{start_offset: 6, end_offset: 11, node_id: "strong"}]}
+ * Join two annotated texts. Second-text annotation offsets shift
+ * by the first text's grapheme length. Adjacent annotations of
+ * the same `node_id` are merged.
  */
-export function join_annotated_text(first_text, second_text) {
+export function join_annotated_text(
+	first_text: AnnotatedText,
+	second_text: AnnotatedText
+): AnnotatedText {
 	const { text: first_text_content, annotations: first_annotations } = first_text;
 	const { text: second_text_content, annotations: second_annotations } = second_text;
 
-	// Join the text content
 	const joined_text = first_text_content + second_text_content;
 
-	// Start with all annotations from the first text (unchanged)
-	/** @type {Array<Annotation>} */
-	const joined_annotations = [...first_annotations];
+	const joined_annotations: Annotation[] = [...first_annotations];
 
-	// Add annotations from the second text, shifting their offsets
 	const offset = get_char_length(first_text_content);
 	for (const { start_offset, end_offset, node_id } of second_annotations) {
-		/** @type {Annotation} */
-		const shifted_annotation = {
+		const shifted_annotation: Annotation = {
 			start_offset: start_offset + offset,
 			end_offset: end_offset + offset,
 			node_id
 		};
 
-		// Check if this annotation can be merged with the last annotation from first text
 		const last_annotation = joined_annotations[joined_annotations.length - 1];
 		if (
 			last_annotation &&
-			last_annotation.end_offset === shifted_annotation.start_offset && // annotations are adjacent
+			last_annotation.end_offset === shifted_annotation.start_offset &&
 			last_annotation.node_id === shifted_annotation.node_id
 		) {
-			// same node_id
-			// Merge by extending the end position of the last annotation
 			last_annotation.end_offset = shifted_annotation.end_offset;
 		} else {
-			// Add as separate annotation
 			joined_annotations.push(shifted_annotation);
 		}
 	}
@@ -263,62 +169,63 @@ export function join_annotated_text(first_text, second_text) {
 }
 
 /**
- * Convert snake_case string to PascalCase
+ * snake_case → PascalCase.
  *
- * @param {string} str - The snake_case string to convert
- * @returns {string} The converted PascalCase string
- *
- * @example
- * snake_to_pascal('list_item') // Returns: 'ListItem'
+ * @example  snake_to_pascal('list_item') // 'ListItem'
  */
-export function snake_to_pascal(str) {
+export function snake_to_pascal(str: string): string {
 	return str
 		.split('_')
 		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
 		.join('');
 }
 
-export function traverse(node_id, schema, nodes) {
-	const json = [];
-	const visited = {};
-	const visit = (node) => {
+/**
+ * Depth-first traversal of the node graph starting at `node_id`.
+ * Returns a structurally-cloned list of every reachable node in
+ * post-order. Cycles are guarded by a `visited` set.
+ */
+export function traverse(
+	node_id: NodeId,
+	schema: DocumentSchema,
+	nodes: Document['nodes']
+): DocumentNode[] {
+	const json: DocumentNode[] = [];
+	const visited: Record<string, boolean> = {};
+	const visit = (node: any): void => {
 		if (!node || visited[node.id]) {
 			return;
 		}
 		visited[node.id] = true;
 		for (const [property_name, value] of Object.entries(node)) {
-			const property_definition = schema[node.type].properties[property_name];
+			const property_definition = (schema as any)[node.type].properties[property_name];
 
 			if (property_definition?.type === 'node_array') {
-				for (const v of value) {
+				for (const v of value as unknown[]) {
 					if (typeof v === 'string') {
 						visit(nodes[v]);
 					}
 				}
 			} else if (property_definition?.type === 'node') {
-				visit(nodes[value]);
+				visit(nodes[value as NodeId]);
 			} else if (property_definition?.type === 'annotated_text') {
-				for (const annotation of value.annotations) {
+				for (const annotation of (value as AnnotatedText).annotations) {
 					visit(nodes[annotation.node_id]);
 				}
 			}
 		}
-		// Finally add the node to the result.
-		// Deep clone, to make sure nothing of the original document is referenced.
 		json.push(structuredClone(node));
 	};
-	// Start with the root node (document_id)
 	visit(nodes[node_id]);
 	return json;
 }
 
 /**
- * Extracts the normalized range from a text or node selection.
- * Returns start and end offsets in document order (start <= end), regardless of selection direction.
- * @param {Selection} [selection] - The selection to extract the range from
- * @returns {SelectionRange | null} The normalized selection range, or null if selection is null, undefined, or a property selection
+ * Normalised range for a text or node selection — start ≤ end
+ * regardless of selection direction. Returns null for property
+ * selections (which don't carry offsets).
  */
-export function get_selection_range(selection) {
+export function get_selection_range(selection?: Selection | null): SelectionRange | null {
 	if (selection && selection.type !== 'property') {
 		return {
 			start_offset: Math.min(selection.anchor_offset, selection.focus_offset),
@@ -329,7 +236,8 @@ export function get_selection_range(selection) {
 	}
 }
 
-export function is_selection_collapsed(selection) {
+/** True if the selection is a text/node selection whose endpoints coincide. */
+export function is_selection_collapsed(selection?: Selection | null): boolean {
 	if (selection && selection.type !== 'property') {
 		return selection.anchor_offset === selection.focus_offset;
 	} else {
