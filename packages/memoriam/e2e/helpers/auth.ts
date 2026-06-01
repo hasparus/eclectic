@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { awaitPlatformDb, waitForMagicLinkToken } from './db.js';
+import { awaitPlatformDb, issueMagicLinkToken } from './db.js';
 
 let counter = 0;
 
@@ -13,40 +13,33 @@ export function uniqueEmail(label = 'user'): string {
 }
 
 /**
- * Sign the page in as `email`, end-to-end through the real UI:
- *   1. Visit /signin (carrying `next` if given).
- *   2. Wait for hydration before driving the form.
- *   3. Fill the labelled email input, click "Send link".
- *   4. Poll the platform DB for the issued magic-link token (the dev
- *      stack logs the link but never emails it).
- *   5. Drive `/auth/magic` via the shared APIRequestContext so the
- *      Set-Cookie applies to the page without tripping chromium's
- *      ERR_ABORTED on the 303 chain.
- *   6. Navigate to the target page.
+ * Sign the page in as `email` by issuing a magic-link token directly
+ * via the platform DB and consuming it through `/auth/magic`.
  *
- * The form's post-click UI state ("Check your email") is asserted by
- * the dedicated auth spec — here we wait for the DB token as an
- * equivalent signal, free of Svelte re-mount timing.
+ * Why not drive the `/signin` form? Two reasons:
+ *   - The form path goes through `requestMagicLink`, which is rate-
+ *     limited per-email and per-IP at 5 requests / hour. A test
+ *     suite that re-signs the same email a handful of times trips
+ *     the limit and starts returning 429s — which is real product
+ *     behavior worth covering, but in *one* dedicated test, not
+ *     incidentally in every flow that just needs an authed page.
+ *   - The form's purpose (and failure modes) are covered by
+ *     `auth.e2e.ts`. Reusing it as plumbing in every other suite
+ *     made tests serialize on a slow UI render that wasn't the
+ *     thing under test.
+ *
+ * The behavior under test in *this* helper's callers is what
+ * happens *after* a successful sign-in, not the sign-in flow
+ * itself — so we skip straight to the consume step.
  */
 export async function signInAs(page: Page, email: string, next?: string): Promise<void> {
-	// Visit /signin first — that wakes the dev server, which triggers
-	// SvelteKit's `init()` hook and materializes the platform DB file.
-	// Only then does awaitPlatformDb (which is otherwise a no-op once
-	// the file exists) have something to find.
-	const signinUrl = next ? `/signin?next=${encodeURIComponent(next)}` : '/signin';
-	await page.goto(signinUrl);
-	await page.waitForLoadState('networkidle');
+	// SvelteKit's `init` hook (which creates the platform SQLite file)
+	// runs lazily on the first request. Touch any cheap endpoint so
+	// the DB file exists before the helper tries to write a token row.
+	await page.context().request.get('/signin', { maxRedirects: 0 });
 	await awaitPlatformDb();
 
-	await page.getByLabel('Email').fill(email);
-	await page.getByRole('button', { name: /send link/i }).click();
-
-	// Wait for the success-state UI before reading the DB — this both
-	// confirms the click reached the handler (i.e. hydration was done)
-	// and gives the server a moment to commit the token row.
-	await page.getByText(/check your email/i).waitFor({ state: 'visible' });
-
-	const token = await waitForMagicLinkToken(email);
+	const token = issueMagicLinkToken(email);
 	const consumeResponse = await page.context().request.get(
 		`/auth/magic?token=${encodeURIComponent(token)}`,
 		{ maxRedirects: 0 }

@@ -221,6 +221,12 @@ export function get(schema: DocumentSchema, doc: Document, path: DocumentPath | 
 		| 'annotation' = 'node';
 
 	for (let i = 1; i < path.length; i++) {
+		// Path walking can dereference a node ID that's no longer in
+		// `doc.nodes` — e.g., a stale selection still pointing at a
+		// node that was just deleted by a remote Automerge patch, or
+		// transient state during a doc swap. Bail out gracefully
+		// instead of crashing on `undefined.type` further down.
+		if (val == null) return undefined;
 		const path_segment = path[i];
 		const path_segment_str = String(path_segment);
 		if (val_type === 'node') {

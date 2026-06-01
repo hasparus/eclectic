@@ -112,6 +112,13 @@ export default class Session {
 	#applying_remote = false;
 	#automerge_change_listener: (() => void) | null = null;
 	#splice_fn: SpliceFn | null = null;
+	// Set while a local mirror is in flight so the synchronous
+	// `change` event emitted by `handle.change()` doesn't echo back
+	// through `#on_automerge_change` and wholesale-overwrite
+	// `this.doc.nodes`. Without this guard, each local keystroke
+	// triggers a re-render of the entire contenteditable, and
+	// rapid typing loses keystrokes mid-rerender.
+	#mirroring_locally = false;
 
 	// Reactive helpers for UI state
 	can_undo = $derived(this.history_index >= 0);
@@ -214,9 +221,9 @@ export default class Session {
 		} else {
 			// we are assuming we are either in a text or property (=custom) selection
 			const owner_node_path = this.selection?.path?.slice(0, -1);
-			if (!owner_node_path) return null;
-			const owner_node = this.get(owner_node_path) as DocumentNode;
-			return owner_node;
+			if (!owner_node_path || owner_node_path.length === 0) return null;
+			const owner_node = this.get(owner_node_path) as DocumentNode | undefined;
+			return owner_node ?? null;
 		}
 	}
 
@@ -630,6 +637,16 @@ export default class Session {
 		const handle = this.#automerge_handle;
 		if (!handle || !ops || ops.length === 0) return;
 		const splice_fn = this.#splice_fn;
+		this.#mirroring_locally = true;
+		const release = () => {
+			this.#mirroring_locally = false;
+		};
+		// Cover both sync (EventEmitter) and microtask-deferred `change`
+		// emits. The flag flips back at the end of this stack and at
+		// the next microtask — whichever the handle uses, the echo is
+		// already swallowed by then.
+		queueMicrotask(release);
+		try {
 		handle.change((d: AutomergeDoc) => {
 			if (!d.nodes) d.nodes = {};
 			const nodes = d.nodes;
@@ -673,14 +690,21 @@ export default class Session {
 				}
 			}
 		});
+		} finally {
+			release();
+		}
 	}
 
 	/**
 	 * Re-materialise local `doc` from the bound Automerge handle.
 	 * Called whenever the handle fires `change` — both for our own
-	 * local mirror (debounced no-op) and remote peer updates.
+	 * local mirror (skipped via `#mirroring_locally`) and remote
+	 * peer updates.
 	 */
 	#on_automerge_change(): void {
+		// Our own write echo — skip the wholesale node-map replace
+		// so we don't re-render the contenteditable mid-keystroke.
+		if (this.#mirroring_locally) return;
 		const handle = this.#automerge_handle;
 		if (!handle) return;
 		const next = handle.doc();

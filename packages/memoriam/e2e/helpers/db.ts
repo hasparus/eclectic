@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
+import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 
 let cachedPath: string | null = null;
@@ -93,6 +94,34 @@ export function latestInviteToken(email: string): string {
 		throw new Error(`No outstanding invite token found for ${email}`);
 	}
 	return row.invite_token;
+}
+
+/**
+ * Issue a magic-link token directly against the platform DB,
+ * skipping the rate-limited remote-function path. Mirrors what
+ * `issueMagicLink` does server-side, but without going through
+ * the HTTP layer — so tests can sign users in repeatedly without
+ * tripping the per-email / per-IP magic-link bucket.
+ *
+ * Also up-serts the user row if it doesn't yet exist (the server
+ * does this on `consumeMagicLink`, but inserting the user up-front
+ * lets unrelated tests skip the form-driven flow entirely).
+ */
+export function issueMagicLinkToken(email: string): string {
+	const normalized = email.trim().toLowerCase();
+	if (!normalized.includes('@')) {
+		throw new Error(`Invalid email: ${email}`);
+	}
+	const token = randomBytes(32).toString('base64url');
+	const expires = Math.floor(Date.now() / 1000) + 15 * 60;
+	const now_iso = new Date().toISOString();
+	db()
+		.prepare(
+			`INSERT INTO magic_link_tokens (token, email, expires, created_at)
+			 VALUES (?, ?, ?, ?)`
+		)
+		.run(token, normalized, expires, now_iso);
+	return token;
 }
 
 /** Direct read of the sites row for a given site_id. */
