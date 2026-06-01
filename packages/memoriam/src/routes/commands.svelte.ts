@@ -21,7 +21,10 @@ interface CommandContext {
 export class CycleLayoutCommand extends Command {
 	direction: Direction;
 	closest_switchable_layout = $derived<SwitchableTarget | null>(
-		getClosestSwitchableLayout(this.context.session, this.context.session.config)
+		getClosestSwitchableLayout(
+			this.context.session,
+			this.context.session.config as { node_layouts?: Record<string, number> }
+		)
 	);
 
 	constructor(direction: Direction, context: CommandContext) {
@@ -81,7 +84,7 @@ export class CycleNodeTypeCommand extends Command {
 		const session = this.context.session;
 		const { node, node_array_path, node_index } = this.closest_switchable_type;
 		const node_array_schema = session.inspect(node_array_path);
-		const node_types: string[] = node_array_schema.node_types;
+		const node_types: string[] = node_array_schema.node_types as string[];
 
 		const current_type_index = node_types.indexOf(node.type);
 		let new_type_index: number;
@@ -100,7 +103,7 @@ export class CycleNodeTypeCommand extends Command {
 			anchor_offset: node_index,
 			focus_offset: node_index + 1
 		});
-		session.config.inserters[new_type](tr);
+		session.config.inserters![new_type](tr);
 		session.apply(tr);
 	}
 }
@@ -200,13 +203,17 @@ export class ToggleLinkCommand extends Command {
 		return this.context.session.active_annotation('link');
 	}
 
-	is_enabled() {
+	is_enabled(): boolean {
 		const { session, editable } = this.context;
 
 		const can_remove_link = session.active_annotation('link');
 		const can_create_link =
 			!session.active_annotation() && !is_selection_collapsed(session.selection);
-		return editable && session.selection?.type === 'text' && (can_remove_link || can_create_link);
+		return Boolean(
+			editable &&
+				session.selection?.type === 'text' &&
+				(can_remove_link || can_create_link)
+		);
 	}
 
 	execute() {

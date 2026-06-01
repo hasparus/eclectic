@@ -218,7 +218,9 @@ function collectNodeIds(
 		const typeSchema = (documentSchema as Record<string, any>)[node.type];
 		if (!typeSchema) continue;
 
-		for (const [propName, propDef] of Object.entries(typeSchema.properties)) {
+		for (const [propName, propDef] of Object.entries(
+			typeSchema.properties as Record<string, { type: string }>
+		)) {
 			const value = node[propName];
 			if (value == null) continue;
 
@@ -228,8 +230,12 @@ function collectNodeIds(
 				for (const childId of value) {
 					stack.push(childId);
 				}
-			} else if (propDef.type === 'annotated_text' && value.annotations) {
-				for (const annotation of value.annotations) {
+			} else if (
+				propDef.type === 'annotated_text' &&
+				(value as { annotations?: Array<{ node_id?: string }> }).annotations
+			) {
+				for (const annotation of (value as { annotations: Array<{ node_id?: string }> })
+					.annotations) {
 					if (annotation.node_id) {
 						stack.push(annotation.node_id);
 					}
@@ -250,7 +256,7 @@ function collectNodeIds(
  * @returns {DocumentData}
  */
 function extractDocument( document_id: string, nodeIds: Iterable<string>, allNodes: Record<string, any>) {
-	const nodes = {};
+	const nodes: Record<string, any> = {};
 	for (const id of nodeIds) {
 		if (allNodes[id]) {
 			nodes[id] = allNodes[id];
@@ -264,9 +270,9 @@ function extractDocument( document_id: string, nodeIds: Iterable<string>, allNod
  * @returns {DocumentData}
  */
 function getDocFromDb( document_id: string) {
-	const docRow = /** @type {DocumentRow | undefined} */ (
-		db().prepare('SELECT * FROM documents WHERE document_id = ?').get(document_id)
-	);
+	const docRow = db()
+		.prepare('SELECT * FROM documents WHERE document_id = ?')
+		.get(document_id) as { data: string } | undefined;
 
 	if (!docRow) {
 		throw new Error(`Document not found: ${document_id}`);
@@ -280,9 +286,9 @@ function getDocFromDb( document_id: string) {
  * @returns {DocumentData | null}
  */
 function getOptionalDocFromDb( document_id: string) {
-	const docRow = /** @type {DocumentRow | undefined} */ (
-		db().prepare('SELECT * FROM documents WHERE document_id = ?').get(document_id)
-	);
+	const docRow = db()
+		.prepare('SELECT * FROM documents WHERE document_id = ?')
+		.get(document_id) as { data: string } | undefined;
 
 	if (!docRow) return null;
 	return JSON.parse(docRow.data);
@@ -291,10 +297,10 @@ function getOptionalDocFromDb( document_id: string) {
 /**
  * @returns {string | null}
  */
-function getHomePageIdFromDb() {
-	const row = /** @type {{ value: string } | undefined } */ (
-		db().prepare('SELECT value FROM site_settings WHERE key = ?').get('home_page_id')
-	);
+function getHomePageIdFromDb(): string | null {
+	const row = db()
+		.prepare('SELECT value FROM site_settings WHERE key = ?')
+		.get('home_page_id') as { value: string } | undefined;
 
 	return row?.value ?? null;
 }
@@ -313,12 +319,10 @@ function isHomePageDocumentId( document_id: string) {
  * @param {string} document_id
  * @returns {string | null}
  */
-function getActiveSlugForDocumentId( document_id: string) {
-	const row = /** @type {{ slug: string } | undefined } */ (
-		db().prepare('SELECT slug FROM document_slugs WHERE document_id = ? AND is_active = 1').get(
-			document_id
-		)
-	);
+function getActiveSlugForDocumentId(document_id: string): string | null {
+	const row = db()
+		.prepare('SELECT slug FROM document_slugs WHERE document_id = ? AND is_active = 1')
+		.get(document_id) as { slug: string } | undefined;
 
 	return row?.slug ?? null;
 }
@@ -328,9 +332,9 @@ function getActiveSlugForDocumentId( document_id: string) {
  * @returns {{ document_id: string, is_active: boolean, active_slug: string } | null}
  */
 function resolveSlug( slug: string) {
-	const row = /** @type {{ document_id: string, is_active: number } | undefined } */ (
-		db().prepare('SELECT document_id, is_active FROM document_slugs WHERE slug = ?').get(slug)
-	);
+	const row = db()
+		.prepare('SELECT document_id, is_active FROM document_slugs WHERE slug = ?')
+		.get(slug) as { document_id: string; is_active: number } | undefined;
 
 	if (!row) return null;
 
@@ -350,12 +354,12 @@ function resolveSlug( slug: string) {
  * @returns {PageDocumentRecord[]}
  */
 function listPageDocuments() {
-	const rows = /** @type {DocumentRow[]} */ (
-		db().prepare('SELECT * FROM documents WHERE type = ? ORDER BY document_id').all('page')
-	);
+	const rows = db()
+		.prepare('SELECT * FROM documents WHERE type = ? ORDER BY document_id')
+		.all('page') as Array<{ document_id: string; data: string; updated_at?: string; created_at?: string }>;
 
 	return rows.map((row) => {
-		const doc = /** @type {DocumentData} */ (JSON.parse(row.data));
+		const doc = JSON.parse(row.data) as { document_id: string; nodes: Record<string, any> };
 		return {
 			document_id: doc.document_id,
 			nodes: doc.nodes,
@@ -461,10 +465,14 @@ function collectDocumentRefs( nodes: Record<string, any>, nodeIds: Iterable<stri
 		const typeSchema = (documentSchema as Record<string, any>)[node.type];
 		if (!typeSchema) continue;
 
-		for (const [propName, propDef] of Object.entries(typeSchema.properties)) {
+		for (const [propName, propDef] of Object.entries(
+			typeSchema.properties as Record<string, { type: string }>
+		)) {
 			if (propDef.type !== 'annotated_text') continue;
 
-			const value = node[propName];
+			const value = node[propName] as
+				| { annotations?: Array<{ node_id?: string }> }
+				| undefined;
 			if (!value?.annotations) continue;
 
 			for (const annotation of value.annotations) {
@@ -496,7 +504,7 @@ function collectDocumentRefs( nodes: Record<string, any>, nodeIds: Iterable<stri
  * @param {import('node:sqlite').StatementSync} insert_stmt
  */
 function updateAssetRefs( document_id: string, nodeIds: Iterable<string>, allNodes: Record<string, any>, delete_stmt: import("node:sqlite").StatementSync, insert_stmt: import("node:sqlite").StatementSync) {
-	const assetIds = new Set();
+	const assetIds = new Set<string>();
 
 	for (const node_id of nodeIds) {
 		const node = allNodes[node_id];
@@ -523,7 +531,12 @@ function updateAssetRefs( document_id: string, nodeIds: Iterable<string>, allNod
  * @param {import('node:sqlite').StatementSync} delete_stmt
  * @param {import('node:sqlite').StatementSync} insert_stmt
  */
-function updateDocumentRefs( sourceDocumentId: string | undefined, target_document_ids: string[], delete_stmt: import("node:sqlite").StatementSync, insert_stmt: import("node:sqlite").StatementSync) {
+function updateDocumentRefs(
+	sourceDocumentId: string,
+	target_document_ids: string[],
+	delete_stmt: import('node:sqlite').StatementSync,
+	insert_stmt: import('node:sqlite').StatementSync
+) {
 	delete_stmt.run(sourceDocumentId);
 	for (const [ref_order, targetDocumentId] of target_document_ids.entries()) {
 		insert_stmt.run(targetDocumentId, sourceDocumentId, ref_order);
@@ -572,12 +585,16 @@ function getCombinedDocument( document_id: string) {
  * @param {PageDocumentRecord} page_doc
  * @returns {PageSummary}
  */
-function summarizePageDocument( pageDoc: PageDocumentRecord | DocumentData) {
+function summarizePageDocument(pageDoc: PageDocumentRecord | DocumentData) {
 	const metadata = extractPageMetadata({
 		document_id: pageDoc.document_id,
 		nodes: pageDoc.nodes
 	});
 	const activeSlug = getActiveSlugForDocumentId(pageDoc.document_id);
+	// `created_at` / `updated_at` live on the DB row, not on the JSON
+	// payload — DocumentData (parsed JSON) doesn't carry them. Read
+	// through the optional union shape.
+	const withTimestamps = pageDoc as Partial<PageDocumentRecord>;
 
 	// By invariant, only the home page has no active slug row. All other pages
 	// must have an active slug, so a missing slug here implies `/`.
@@ -588,8 +605,8 @@ function summarizePageDocument( pageDoc: PageDocumentRecord | DocumentData) {
 		preview_media_node: metadata.preview_media_node,
 		page_href: activeSlug ? `/${activeSlug}` : '/',
 		slug: activeSlug ?? '',
-		created_at: pageDoc.created_at ?? null,
-		updated_at: pageDoc.updated_at ?? null
+		created_at: withTimestamps.created_at ?? null,
+		updated_at: withTimestamps.updated_at ?? null
 	};
 }
 
@@ -597,14 +614,14 @@ function summarizePageDocument( pageDoc: PageDocumentRecord | DocumentData) {
  * @param {string} source_document_id
  * @returns {string[]}
  */
-function getOutgoingRefs( sourceDocumentId: string | undefined) {
-	const rows = /** @type {Array<{ target_document_id: string }>} */ (
-		db().prepare(
+function getOutgoingRefs(sourceDocumentId: string) {
+	const rows = db()
+		.prepare(
 			'SELECT target_document_id FROM document_refs WHERE source_document_id = ? ORDER BY ref_order, rowid'
-		).all(sourceDocumentId)
-	);
+		)
+		.all(sourceDocumentId) as Array<{ target_document_id: string }>;
 
-	return rows.map((row) => row.targetDocumentId);
+	return rows.map((row) => row.target_document_id);
 }
 
 /**
@@ -614,8 +631,13 @@ function getOutgoingRefs( sourceDocumentId: string | undefined) {
  * @param {Map<string, string[]>} body_refs_by_page_id
  * @returns {PageTreeNode[]}
  */
-function buildTreeChildren( refs: string[], assignedPageIds: Set<string>, summariesById: Map<string, PageSummary>, bodyRefsByPageId: Map<string, string[]>) {
-	const children = [];
+function buildTreeChildren(
+	refs: string[],
+	assignedPageIds: Set<string>,
+	summariesById: Map<string, PageSummary>,
+	bodyRefsByPageId: Map<string, string[]>
+): PageTreeNode[] {
+	const children: PageTreeNode[] = [];
 
 	for (const targetDocumentId of refs) {
 		if (assignedPageIds.has(targetDocumentId)) continue;
@@ -653,9 +675,13 @@ function buildTreeChildren( refs: string[], assignedPageIds: Set<string>, summar
  * @param {string[] | null} root_refs
  * @returns {PageTreeNode | null}
  */
-function buildPageTreeNode( root_document_id: string, assignedPageIds: Set<string>, summariesById: Map<string, PageSummary>, bodyRefsByPageId: Map<string, string[]>,
-	rootRefs = null
-) {
+function buildPageTreeNode(
+	root_document_id: string,
+	assignedPageIds: Set<string>,
+	summariesById: Map<string, PageSummary>,
+	bodyRefsByPageId: Map<string, string[]>,
+	rootRefs: string[] | null = null
+): PageTreeNode | null {
 	const summary = summariesById.get(root_document_id);
 	if (!summary) return null;
 	if (assignedPageIds.has(root_document_id)) return null;
@@ -704,7 +730,7 @@ function buildPageBrowserData() {
 		? getSharedRootIds(homePageDoc)
 		: { navRootId: null, footerRootId: null };
 
-	const bodyRefsByPageId = new Map();
+	const bodyRefsByPageId = new Map<string, string[]>();
 	for (const pageDoc of pageDocs) {
 		const bodyNodeIds = collectPageBodyNodeIds(pageDoc);
 		bodyRefsByPageId.set(
@@ -713,9 +739,9 @@ function buildPageBrowserData() {
 		);
 	}
 
-	const pageForest = [];
-	const assignedPageIds = new Set();
-	const incomingPageRefCounts = new Map();
+	const pageForest: PageTreeNode[] = [];
+	const assignedPageIds = new Set<string>();
+	const incomingPageRefCounts = new Map<string, number>();
 
 	for (const pageDoc of pageDocs) {
 		incomingPageRefCounts.set(pageDoc.document_id, 0);
@@ -731,7 +757,7 @@ function buildPageBrowserData() {
 		}
 	}
 
-	let homeLinkedPageIds = new Set();
+	let homeLinkedPageIds = new Set<string>();
 
 	if (homePageId && summariesById.has(homePageId)) {
 		const navRefs = navRootId ? getOutgoingRefs(navRootId) : [];
@@ -1060,14 +1086,14 @@ export const getInternalLinkPreview = query(type('string'), async (href) => {
 		return null;
 	}
 
-	const docRow = /** @type {DocumentRow | undefined} */ (
-		db().prepare('SELECT type, data FROM documents WHERE document_id = ?').get(resolved.document_id)
-	);
+	const docRow = db()
+		.prepare('SELECT type, data FROM documents WHERE document_id = ?')
+		.get(resolved.document_id) as { type: string; data: string } | undefined;
 	if (!docRow || docRow.type !== 'page') {
 		return null;
 	}
 
-	const pageDoc = /** @type {DocumentData} */ (JSON.parse(docRow.data));
+	const pageDoc = JSON.parse(docRow.data) as DocumentData;
 	const metadata = extractPageMetadata(pageDoc);
 
 	return /** @type {InternalLinkPreview} */ ({
@@ -1081,7 +1107,7 @@ export const getInternalLinkPreview = query(type('string'), async (href) => {
 /**
  * Save a document to the database, splitting shared documents (nav, footer) back out.
  */
-function rewriteInternalPageHref( href: string, targetDocumentId, new_slug: string) {
+function rewriteInternalPageHref(href: string, targetDocumentId: string, new_slug: string) {
 	const parsed = parseInternalPageHref(href);
 	if (!parsed) return href;
 
@@ -1091,7 +1117,11 @@ function rewriteInternalPageHref( href: string, targetDocumentId, new_slug: stri
 	return `/${new_slug}${parsed.fragment}`;
 }
 
-function rewriteInternalPageHrefs( nodes: Record<string, any>, targetDocumentId, new_slug: string) {
+function rewriteInternalPageHrefs(
+	nodes: Record<string, any>,
+	targetDocumentId: string,
+	new_slug: string
+) {
 	for (const node of Object.values(nodes)) {
 		if (!node || typeof node !== 'object') continue;
 
@@ -1102,10 +1132,14 @@ function rewriteInternalPageHrefs( nodes: Record<string, any>, targetDocumentId,
 		const typeSchema = (documentSchema as Record<string, any>)[node.type];
 		if (!typeSchema) continue;
 
-		for (const [propName, propDef] of Object.entries(typeSchema.properties)) {
+		for (const [propName, propDef] of Object.entries(
+			typeSchema.properties as Record<string, { type: string }>
+		)) {
 			if (propDef.type !== 'annotated_text') continue;
 
-			const value = node[propName];
+			const value = node[propName] as
+				| { annotations?: Array<{ node_id?: string }> }
+				| undefined;
 			if (!value?.annotations) continue;
 
 			for (const annotation of value.annotations) {
@@ -1163,12 +1197,14 @@ export const saveDocument = command(saveDocumentInputSchema, async (combinedDoc)
 	const navRootId = pageNode.nav;
 	const footerRootId = pageNode.footer;
 
-	const navNodeIds = navRootId ? new Set(collectNodeIdsInOrder(navRootId, allNodes)) : new Set();
-	const footerNodeIds = footerRootId
+	const navNodeIds: Set<string> = navRootId
+		? new Set(collectNodeIdsInOrder(navRootId, allNodes))
+		: new Set<string>();
+	const footerNodeIds: Set<string> = footerRootId
 		? new Set(collectNodeIdsInOrder(footerRootId, allNodes))
-		: new Set();
+		: new Set<string>();
 
-	const excludeRoots = new Set();
+	const excludeRoots = new Set<string>();
 	if (navRootId) excludeRoots.add(navRootId);
 	if (footerRootId) excludeRoots.add(footerRootId);
 
@@ -1391,13 +1427,15 @@ export const updatePageSlug = command(updatePageSlugInputSchema, async (input) =
 			throw new Error('Failed to assign new active slug');
 		}
 
-		const pageRows = /** @type {DocumentRow[]} */ (
-			db().prepare('SELECT * FROM documents WHERE type IN (?, ?, ?) ORDER BY document_id').all(
-				'page',
-				'nav',
-				'footer'
-			)
-		);
+		const pageRows = db()
+			.prepare('SELECT * FROM documents WHERE type IN (?, ?, ?) ORDER BY document_id')
+			.all('page', 'nav', 'footer') as Array<{
+			document_id: string;
+			type: string;
+			data: string;
+			created_at?: string | null;
+			updated_at?: string | null;
+		}>;
 
 		const upsert = db().prepare(
 			'INSERT INTO documents (document_id, type, data, created_at, updated_at) VALUES(?, ?, ?, ?, ?) ON CONFLICT(document_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at'

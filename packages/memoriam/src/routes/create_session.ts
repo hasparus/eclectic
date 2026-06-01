@@ -10,6 +10,9 @@ import {
 	RedoCommand,
 	SelectParentCommand
 } from '$lib/svedit';
+import type Transaction from '$lib/svedit/Transaction.svelte.js';
+import type { SessionConfig } from '$lib/svedit/Session.svelte.js';
+import type { Document, DocumentNode, DocumentPath } from '$lib/svedit/types.d.ts';
 import nanoid from './nanoid.js';
 import {
 	CycleLayoutCommand,
@@ -152,7 +155,7 @@ const session_config = {
 		Link
 	},
 	replace_media,
-	handle_property_deletion: (session, path) => {
+	handle_property_deletion: (session: Session, path: DocumentPath) => {
 		const property_definition = session.inspect(path);
 		if (property_definition?.type !== 'node') return;
 
@@ -163,15 +166,22 @@ const session_config = {
 		set_properties(tr, [target_node.id], MEDIA_DEFAULTS);
 		session.apply(tr);
 	},
-	handle_media_paste: async (session, pasted_media) => {
-		if (session.selection.type === 'property') {
-			const node = session.get(session.selection.path);
+	handle_media_paste: async (
+		session: Session,
+		pasted_media: Array<{ blob: File; data_url: string; type: string; size: number }>
+	) => {
+		if (session.selection?.type === 'property') {
+			const sel = session.selection;
+			const node = session.get(sel.path);
 			if (node.type === 'image' || node.type === 'video') {
-				await replace_media(session, session.selection.path, pasted_media[0].blob, pasted_media[0].data_url);
+				await replace_media(session, sel.path, pasted_media[0].blob, pasted_media[0].data_url);
 			}
 			return null;
 		} else {
-			const pasted_json = { main_nodes: [], nodes: {} };
+			const pasted_json: { main_nodes: string[]; nodes: Record<string, DocumentNode> } = {
+				main_nodes: [],
+				nodes: {}
+			};
 
 			// When cursor inside an image grid we want to insert a gallery_item,
 			// otherwise insert a figure.
@@ -216,9 +226,13 @@ const session_config = {
 
 	// HTML exporters for different node types
 	html_exporters: {
-		prose: (node, session, html_exporters) => {
+		prose: (
+			node: DocumentNode,
+			session: Session,
+			html_exporters: Record<string, (n: DocumentNode, s: Session, h: any) => string>
+		) => {
 			let html = '<div class="prose">\n';
-			for (const child_id of node.content) {
+			for (const child_id of node.content as string[]) {
 				const child = session.get(child_id);
 				const exporter = html_exporters[child.type];
 				if (exporter) {
@@ -228,15 +242,11 @@ const session_config = {
 			html += '</div>\n';
 			return html;
 		},
-		text: (node) => {
+		text: (node: DocumentNode) => {
 			const tag_name =
-				{
-					1: 'p',
-					2: 'h1',
-					3: 'h2',
-					4: 'h3',
-					5: 'p'
-				}[node.layout] ?? 'p';
+				({ 1: 'p', 2: 'h1', 3: 'h2', 4: 'h3', 5: 'p' } as Record<number, string>)[
+					node.layout as number
+				] ?? 'p';
 			return `<${tag_name}>${node.content.text}</${tag_name}>\n`;
 		}
 	},
@@ -259,7 +269,7 @@ const session_config = {
 	 * @param {object} context - The svedit context with session, editable, canvas.
 	 * @returns {{ commands: object, keymap: object }}
 	 */
-	create_commands_and_keymap: (context) => {
+	create_commands_and_keymap: (context: { session: Session; editable: boolean }) => {
 		// Create command instances with the provided context
 		const commands = {
 			select_all: new SelectAllCommand(context),
@@ -312,7 +322,7 @@ const session_config = {
 	// Custom functions to insert new "blank" nodes and setting the selection depening on the
 	// intended behavior.
 	inserters: {
-		prose: function (tr) {
+		prose: function (tr: Transaction) {
 			const new_heading = {
 				id: nanoid(),
 				type: 'text',
@@ -344,7 +354,7 @@ const session_config = {
 			// 	focus_offset: 0
 			// });
 		},
-		text: function (tr, content = { text: '', annotations: [] }, layout = 1) {
+		text: function (tr: Transaction, content: any = { text: '', annotations: [] }, layout = 1) {
 			const new_text = {
 				id: nanoid(),
 				type: 'text',
@@ -354,14 +364,15 @@ const session_config = {
 			tr.create(new_text);
 			tr.insert_nodes([new_text.id]);
 			// NOTE: Relies on insert_nodes selecting the newly inserted node(s)
+			const sel_after_text = tr.selection as { path: DocumentPath; focus_offset: number };
 			tr.set_selection({
 				type: 'text',
-				path: [...tr.selection.path, tr.selection.focus_offset - 1, 'content'],
+				path: [...sel_after_text.path, sel_after_text.focus_offset - 1, 'content'],
 				anchor_offset: 0,
 				focus_offset: 0
 			});
 		},
-		feature: function (tr) {
+		feature: function (tr: Transaction) {
 			const new_feature_id = tr.build('new_feature', {
 				feature_image: {
 					id: 'feature_image',
@@ -386,7 +397,7 @@ const session_config = {
 
 			tr.insert_nodes([new_feature_id]);
 		},
-		figure: function (tr, content = { text: '', annotations: [] }, layout = 1) {
+		figure: function (tr: Transaction, content: any = { text: '', annotations: [] }, layout = 1) {
 			const new_figure_id = tr.build('new_figure', {
 				image_one: {
 					id: 'image_one',
@@ -409,7 +420,7 @@ const session_config = {
 			//   focus_offset: 0
 			// });
 		},
-		decoration: function (tr, content = { text: '', annotations: [] }, layout = 1) {
+		decoration: function (tr: Transaction, content: any = { text: '', annotations: [] }, layout = 1) {
 			const new_decoration_id = tr.build('new_decoration', {
 				image_one: {
 					id: 'image_one',
@@ -425,7 +436,7 @@ const session_config = {
 
 			tr.insert_nodes([new_decoration_id]);
 		},
-		nav_item: function (tr, content = { text: '', annotations: [] }, layout = 1) {
+		nav_item: function (tr: Transaction, content: any = { text: '', annotations: [] }, layout = 1) {
 			const new_nav_item_id = tr.build('new_nav_item', {
 				new_nav_item: {
 					id: 'new_nav_item',
@@ -442,7 +453,7 @@ const session_config = {
 			//   focus_offset: 0
 			// });
 		},
-		hero: function (tr, content = { text: '', annotations: [] }, layout = 1) {
+		hero: function (tr: Transaction, content: any = { text: '', annotations: [] }, layout = 1) {
 			const new_hero_id = tr.build('new_hero', {
 				new_hero: {
 					id: 'new_hero',
@@ -456,7 +467,7 @@ const session_config = {
 
 			tr.insert_nodes([new_hero_id]);
 		},
-		button: function (tr, content = { text: '', annotations: [] }, layout = 1) {
+		button: function (tr: Transaction, content: any = { text: '', annotations: [] }, layout = 1) {
 			const new_button_id = tr.build('new_button', {
 				new_button: {
 					id: 'new_button',
@@ -466,7 +477,7 @@ const session_config = {
 
 			tr.insert_nodes([new_button_id]);
 		},
-		footer_link: function (tr, content = { text: '', annotations: [] }, layout = 1) {
+		footer_link: function (tr: Transaction, content: any = { text: '', annotations: [] }, layout = 1) {
 			const new_footer_link_id = tr.build('new_footer_link', {
 				new_footer_link: {
 					id: 'new_footer_link',
@@ -483,7 +494,7 @@ const session_config = {
 			//   focus_offset: 0
 			// });
 		},
-		footer_link_column: function (tr, content = { text: '', annotations: [] }, layout = 1) {
+		footer_link_column: function (tr: Transaction, content: any = { text: '', annotations: [] }, layout = 1) {
 			const new_footer_link_column_id = tr.build('new_footer_link_column', {
 				new_footer_link: {
 					id: 'new_footer_link',
@@ -506,7 +517,7 @@ const session_config = {
 			// });
 		},
 
-		gallery: function (tr) {
+		gallery: function (tr: Transaction) {
 			// Create intro text
 			const intro_text = {
 				id: nanoid(),
@@ -555,15 +566,15 @@ const session_config = {
 			tr.create(new_gallery);
 			tr.insert_nodes([new_gallery.id]);
 		},
-		gallery_item: function (tr) {
+		gallery_item: function (tr: Transaction) {
 			const gallery_item_image = {
+				...MEDIA_DEFAULTS,
 				id: nanoid(),
 				type: 'image',
 				src: '',
 				width: 800,
 				height: 600,
-				alt: 'Sample image',
-				...MEDIA_DEFAULTS
+				alt: 'Sample image'
 			};
 			tr.create(gallery_item_image);
 			const new_gallery_item = {
@@ -573,15 +584,16 @@ const session_config = {
 			};
 			tr.create(new_gallery_item);
 			tr.insert_nodes([new_gallery_item.id]);
+			const sel_after_gallery = tr.selection as { path: DocumentPath; focus_offset: number };
 			tr.set_selection({
 				type: 'node',
-				path: [...tr.selection.path],
-				anchor_offset: tr.selection.focus_offset,
-				focus_offset: tr.selection.focus_offset
+				path: [...sel_after_gallery.path],
+				anchor_offset: sel_after_gallery.focus_offset,
+				focus_offset: sel_after_gallery.focus_offset
 			});
 		},
 
-		link_collection: function (tr) {
+		link_collection: function (tr: Transaction) {
 			// Create intro text
 			const intro_text = {
 				id: nanoid(),
@@ -637,7 +649,7 @@ const session_config = {
 			tr.insert_nodes([new_link_collection.id]);
 		},
 
-		link_collection_item: function (tr) {
+		link_collection_item: function (tr: Transaction) {
 			const image_id = nanoid();
 			const image = {
 				id: image_id,
@@ -657,17 +669,18 @@ const session_config = {
 			};
 			tr.create(new_link_collection_item);
 			tr.insert_nodes([new_link_collection_item.id]);
+			const sel_after_lci = tr.selection as { path: DocumentPath; focus_offset: number };
 			tr.set_selection({
 				type: 'node',
-				path: [...tr.selection.path],
-				anchor_offset: tr.selection.focus_offset,
-				focus_offset: tr.selection.focus_offset
+				path: [...sel_after_lci.path],
+				anchor_offset: sel_after_lci.focus_offset,
+				focus_offset: sel_after_lci.focus_offset
 			});
 		}
 	}
 };
 
-export function createSession(doc) {
-	const session = new Session(documentSchema, doc, session_config);
+export function createSession(doc: Document): Session {
+	const session = new Session(documentSchema, doc, session_config as unknown as SessionConfig);
 	return session;
 }

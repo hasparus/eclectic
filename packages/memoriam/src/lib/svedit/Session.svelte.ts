@@ -73,7 +73,10 @@ export interface SessionConfig {
 		keymap: Record<string, unknown>;
 	};
 	inserters?: Record<string, (tr: Transaction, content?: AnnotatedText) => void>;
-	[key: string]: unknown;
+	// Open the type so app-level configs can hang arbitrary helpers
+	// (node_layouts, system_components, html_exporters, etc.) without
+	// each one needing to extend SessionConfig.
+	[key: string]: any;
 }
 
 export default class Session {
@@ -344,7 +347,7 @@ export default class Session {
 	 * // Get an annotated text property
 	 * session.get(['page_1', 'cover', 'title']) // => {text: 'Hello world', annotations: []}
 	 */
-	get(path: DocumentPath | string): unknown {
+	get(path: DocumentPath | string): any {
 		return doc_get(this.schema, this.doc, path);
 	}
 

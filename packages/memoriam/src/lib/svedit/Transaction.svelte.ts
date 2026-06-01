@@ -80,7 +80,7 @@ export default class Transaction {
 	/**
 	 * Gets a value from the document at the specified path.
 	 */
-	get(path: DocumentPath | string): unknown {
+	get(path: DocumentPath | string): any {
 		return doc_get(this.schema, this.doc, path);
 	}
 
