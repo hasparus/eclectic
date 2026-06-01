@@ -401,18 +401,22 @@ tenant routing.
       internals. The character-by-character CRDT merge that
       lets two users co-type the same paragraph is a separate
       undertaking (Phase 3.2 below).
-- [ ] **Convert vendored svedit JSDoc → TypeScript bodies.** All
-      svedit files now live as `.ts` / `<script lang="ts">`
-      (consistent with the rest of the codebase), but their
-      function signatures + locals still use JSDoc-style `@param`
-      / `@type` comments — which TS treats as documentation, not
-      types. The result: ~600 implicit-`any` errors in
-      `svelte-check`. Runtime is unaffected; the noise is real.
-      Mechanical fix: convert each `/** @param {Foo} x */`
-      directive into `(x: Foo)` on the signature, import the
-      referenced types from `./types.d.ts` properly, and drop the
-      JSDoc body. ~9 files; do it per-file as we touch them, or
-      in a focused conversion pass.
+- [x] **Convert vendored svedit JSDoc → TypeScript bodies.** All
+      svedit `.ts` / `.svelte` files now use real TS syntax:
+      class field types on `Session`, parameter / return types
+      on every `Transaction` method, generic `$state.raw<T>()`,
+      a discriminated `Op` union, typed `getContext('svedit')`
+      lookups with explicit context shapes in every component.
+      `utils.ts::traverse` return type tightened to
+      `DocumentNode[]`. The two largest files (`Session.svelte.ts`
+      and `Transaction.svelte.ts`) were rewritten in one pass and
+      diffed against the pre-rename `.js` to catch regressions —
+      the only one was a stub `{ id, type: '' }` synthesis in
+      `#mirror_ops_to_automerge` (now `{ id }` again). The
+      Svelte components were edited in place rather than
+      rewritten. Net error drop: 633 → 0 inside `src/lib/svedit/`;
+      213 errors remain in unrelated files (api.remote.ts, route
+      loads).
 - [x] **svedit ↔ Automerge binding (Phase 3.2 / Option A).**
       Vendored svedit's `src/lib/` into `packages/memoriam/src/lib
       /svedit/`; updated 25 import sites; dropped the `svedit`
