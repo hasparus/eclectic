@@ -599,6 +599,7 @@
 									role="button"
 									tabindex="0"
 									aria-label={name}
+									aria-roledescription="person card"
 								/>
 								<text
 									x={label.x}
@@ -716,6 +717,7 @@
 									role="button"
 									tabindex="0"
 									aria-label={lifespan ? `${name}, ${lifespan}` : name}
+									aria-roledescription="person card"
 								/>
 								<text
 									x={CARD_WIDTH / 2}

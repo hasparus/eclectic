@@ -7,27 +7,23 @@ import { latestInviteToken } from './helpers/db';
 function treeCanvas(page: Page) {
 	return page.getByRole('figure', { name: /family tree|drzewo/i });
 }
+/**
+ * Person-card rects carry `aria-roledescription="person card"`,
+ * separately from the inline "+ Parent / + Spouse / + Child"
+ * affordance buttons. We scope card queries to that descriptor —
+ * accessible to screen readers (they hear "Grandma Edith, person
+ * card, button") and unambiguous to tests, no name-regex
+ * gymnastics needed.
+ */
+function cards(page: Page) {
+	return treeCanvas(page).locator('[aria-roledescription="person card"]');
+}
 function card(page: Page, name: string | RegExp) {
-	// Anchor the name match. The inline "+ Parent of X / + Spouse of X
-	// / + Child of X" affordance buttons embed the person's display
-	// name in their aria-label, so an unanchored `/X/i` regex would
-	// match both the card and its affordances. The card itself uses
-	// `${name}` or `${name}, ${lifespan}` for its aria-label, so we
-	// allow an optional `, <suffix>` after the anchored name.
 	const pattern =
 		name instanceof RegExp
 			? new RegExp(`^${name.source}(,.*)?$`, name.flags)
 			: new RegExp(`^${name}(,.*)?$`, 'i');
-	return treeCanvas(page).getByRole('button', { name: pattern });
-}
-/**
- * Count-able locator for "person cards on the canvas", excluding the
- * inline "+ Parent / + Spouse / + Child" affordance buttons. The
- * negative-lookahead regex against the aria-label drops anything
- * starting with "Add " (en) or "Dodaj " (pl).
- */
-function cards(page: Page) {
-	return treeCanvas(page).getByRole('button', { name: /^(?!Add |Dodaj )/ });
+	return cards(page).and(treeCanvas(page).getByRole('button', { name: pattern }));
 }
 function drawer(page: Page) {
 	return page.getByRole('complementary', { name: /person|osoba/i });

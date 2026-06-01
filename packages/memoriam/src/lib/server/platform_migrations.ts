@@ -320,6 +320,42 @@ const migrations: Migration[] = [
 				FOREIGN KEY (site_id) REFERENCES sites(site_id)
 			);
 		`);
+	},
+
+	function consolidate_automerge_doc_tables({ db }) {
+		// Roll the three per-kind tables — `site_automerge_docs`
+		// (tree), `site_page_automerge_docs` (broadcast),
+		// `document_automerge_docs` (per-document) — into a single
+		// `automerge_docs(site_id, kind, target_id, doc_url)` table.
+		// `target_id` is empty for site-wide kinds (`tree`,
+		// `page_broadcast`) and carries the document id for the
+		// `document` kind.
+		db.exec(sql`
+			CREATE TABLE automerge_docs (
+				site_id TEXT NOT NULL,
+				kind TEXT NOT NULL CHECK (kind IN ('tree', 'page_broadcast', 'document')),
+				target_id TEXT NOT NULL DEFAULT '',
+				doc_url TEXT NOT NULL UNIQUE,
+				created_at TEXT NOT NULL,
+				PRIMARY KEY (site_id, kind, target_id),
+				FOREIGN KEY (site_id) REFERENCES sites(site_id)
+			);
+		`);
+		db.exec(sql`
+			INSERT INTO automerge_docs (site_id, kind, target_id, doc_url, created_at)
+			SELECT site_id, 'tree', '', doc_url, created_at FROM site_automerge_docs;
+		`);
+		db.exec(sql`
+			INSERT INTO automerge_docs (site_id, kind, target_id, doc_url, created_at)
+			SELECT site_id, 'page_broadcast', '', doc_url, created_at FROM site_page_automerge_docs;
+		`);
+		db.exec(sql`
+			INSERT INTO automerge_docs (site_id, kind, target_id, doc_url, created_at)
+			SELECT site_id, 'document', document_id, doc_url, created_at FROM document_automerge_docs;
+		`);
+		db.exec(sql`DROP TABLE site_automerge_docs;`);
+		db.exec(sql`DROP TABLE site_page_automerge_docs;`);
+		db.exec(sql`DROP TABLE document_automerge_docs;`);
 	}
 ];
 

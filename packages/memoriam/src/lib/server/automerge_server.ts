@@ -11,7 +11,7 @@
  * The first time a client requests a site's tree doc, we
  * bootstrap from SQLite — read every linked `person` /
  * `relationship` / `couple` row, write them into a fresh Automerge
- * doc, and store the doc URL in `site_automerge_docs`. On
+ * doc, and store the doc URL in `automerge_docs`. On
  * subsequent connections the doc is found by URL and resumed.
  *
  * On every doc change we re-project the doc back into SQLite via
@@ -69,7 +69,9 @@ export async function ensureSiteTreeDoc(siteId: string): Promise<AutomergeUrl> {
 
 	const db = getPlatformDb();
 	const existing = db
-		.prepare(`SELECT doc_url FROM site_automerge_docs WHERE site_id = ?`)
+		.prepare(
+			`SELECT doc_url FROM automerge_docs WHERE site_id = ? AND kind = 'tree' AND target_id = ''`
+		)
 		.get(siteId) as { doc_url: string } | undefined;
 
 	const repo = getAutomergeRepo();
@@ -95,8 +97,8 @@ export async function ensureSiteTreeDoc(siteId: string): Promise<AutomergeUrl> {
 	handleCache.set(siteId, handle);
 
 	db.prepare(
-		`INSERT INTO site_automerge_docs (site_id, doc_url, created_at)
-		 VALUES (?, ?, ?)`
+		`INSERT INTO automerge_docs (site_id, kind, target_id, doc_url, created_at)
+		 VALUES (?, 'tree', '', ?, ?)`
 	).run(siteId, handle.url, new Date().toISOString());
 
 	return handle.url;
@@ -261,7 +263,9 @@ export async function ensureSitePageBroadcastDoc(siteId: string): Promise<Autome
 
 	const db = getPlatformDb();
 	const existing = db
-		.prepare(`SELECT doc_url FROM site_page_automerge_docs WHERE site_id = ?`)
+		.prepare(
+			`SELECT doc_url FROM automerge_docs WHERE site_id = ? AND kind = 'page_broadcast' AND target_id = ''`
+		)
 		.get(siteId) as { doc_url: string } | undefined;
 
 	const repo = getAutomergeRepo();
@@ -283,8 +287,8 @@ export async function ensureSitePageBroadcastDoc(siteId: string): Promise<Autome
 	pageHandleCache.set(siteId, handle);
 
 	db.prepare(
-		`INSERT INTO site_page_automerge_docs (site_id, doc_url, created_at)
-		 VALUES (?, ?, ?)`
+		`INSERT INTO automerge_docs (site_id, kind, target_id, doc_url, created_at)
+		 VALUES (?, 'page_broadcast', '', ?, ?)`
 	).run(siteId, handle.url, new Date().toISOString());
 
 	return handle.url;
@@ -330,7 +334,7 @@ function documentKey(siteId: string, documentId: string): string {
 /**
  * Resolve (and lazily create + bootstrap) the Automerge URL for a
  * specific `documents` row. Same pattern as the tree doc: stored
- * URL in the `document_automerge_docs` table; first connection
+ * URL in the `automerge_docs` table (kind = 'document'); first connection
  * populates the doc from SQLite.
  */
 export async function ensureDocumentDoc(siteId: string, documentId: string): Promise<AutomergeUrl> {
@@ -341,7 +345,7 @@ export async function ensureDocumentDoc(siteId: string, documentId: string): Pro
 	const db = getPlatformDb();
 	const existing = db
 		.prepare(
-			`SELECT doc_url FROM document_automerge_docs WHERE site_id = ? AND document_id = ?`
+			`SELECT doc_url FROM automerge_docs WHERE site_id = ? AND kind = 'document' AND target_id = ?`
 		)
 		.get(siteId, documentId) as { doc_url: string } | undefined;
 
@@ -367,8 +371,8 @@ export async function ensureDocumentDoc(siteId: string, documentId: string): Pro
 	documentHandleCache.set(key, handle);
 
 	db.prepare(
-		`INSERT INTO document_automerge_docs (site_id, document_id, doc_url, created_at)
-		 VALUES (?, ?, ?, ?)`
+		`INSERT INTO automerge_docs (site_id, kind, target_id, doc_url, created_at)
+		 VALUES (?, 'document', ?, ?, ?)`
 	).run(siteId, documentId, handle.url, new Date().toISOString());
 
 	return handle.url;
