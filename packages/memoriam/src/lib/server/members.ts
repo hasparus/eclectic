@@ -1,23 +1,46 @@
 import { randomBytes } from 'node:crypto';
+import { type } from 'arktype';
 import { getPlatformDb } from '$lib/server/platform_db.js';
 import { getUserByEmail } from '$lib/server/users.js';
+import { parseRow, parseRowOptional, parseRows } from '$lib/server/db_row.js';
 import type { SiteMember } from '$lib/server/sites.js';
 
 export type Role = 'owner' | 'editor' | 'viewer';
 
-export interface SiteMemberWithEmail extends SiteMember {
-	email: string | null;
-}
+const RoleSchema = type('"owner" | "editor" | "viewer"');
 
-export interface Invite {
-	invite_token: string;
-	site_id: string;
-	email: string;
-	role: Role;
-	created_at: string;
-	expires_at: string;
-	accepted_at: string | null;
-}
+const SiteMemberWithEmailSchema = type({
+	site_id: 'string',
+	user_id: 'string',
+	role: RoleSchema,
+	created_at: 'string',
+	email: 'string | null'
+});
+export type SiteMemberWithEmail = typeof SiteMemberWithEmailSchema.infer;
+
+const InviteSchema = type({
+	invite_token: 'string',
+	site_id: 'string',
+	email: 'string',
+	role: RoleSchema,
+	created_at: 'string',
+	expires_at: 'string',
+	accepted_at: 'string | null'
+});
+export type Invite = typeof InviteSchema.infer;
+
+const AcceptInviteRowSchema = type({
+	invite_token: 'string',
+	site_id: 'string',
+	email: 'string',
+	role: RoleSchema,
+	expires_at: 'string',
+	accepted_at: 'string | null'
+});
+
+const ExistenceMarkerRowSchema = type({ '1': 'number' });
+const RoleRowSchema = type({ role: RoleSchema });
+const CountRowSchema = type({ n: 'number' });
 
 const INVITE_TTL_DAYS = 14;
 
@@ -34,7 +57,7 @@ function generateInviteToken(): string {
 }
 
 export function listMembers(siteId: string): SiteMemberWithEmail[] {
-	return getPlatformDb()
+	const raw = getPlatformDb()
 		.prepare(
 			`SELECT m.site_id, m.user_id, m.role, m.created_at, u.email
 			 FROM site_members m
@@ -42,18 +65,20 @@ export function listMembers(siteId: string): SiteMemberWithEmail[] {
 			 WHERE m.site_id = ?
 			 ORDER BY m.created_at ASC`
 		)
-		.all(siteId) as unknown as SiteMemberWithEmail[];
+		.all(siteId);
+	return parseRows(SiteMemberWithEmailSchema, raw);
 }
 
 export function listOutstandingInvites(siteId: string): Invite[] {
-	return getPlatformDb()
+	const raw = getPlatformDb()
 		.prepare(
 			`SELECT invite_token, site_id, email, role, created_at, expires_at, accepted_at
 			 FROM invites
 			 WHERE site_id = ? AND accepted_at IS NULL
 			 ORDER BY created_at DESC`
 		)
-		.all(siteId) as unknown as Invite[];
+		.all(siteId);
+	return parseRows(InviteSchema, raw);
 }
 
 export interface CreateInviteResult {
@@ -71,9 +96,12 @@ export function createInvite(siteId: string, email: string, role: Role): Invite 
 
 	const existingUser = getUserByEmail(normalized);
 	if (existingUser) {
-		const member = db
-			.prepare(`SELECT 1 FROM site_members WHERE site_id = ? AND user_id = ?`)
-			.get(siteId, existingUser.user_id) as { 1: number } | undefined;
+		const member = parseRowOptional(
+			ExistenceMarkerRowSchema,
+			db
+				.prepare(`SELECT 1 FROM site_members WHERE site_id = ? AND user_id = ?`)
+				.get(siteId, existingUser.user_id)
+		);
 		if (member) {
 			throw new Error(`${normalized} is already a member of this site`);
 		}
@@ -116,21 +144,13 @@ export function acceptInvite(
 	user: { user_id: string; email: string }
 ): ConsumeInviteResult {
 	const db = getPlatformDb();
-	const invite = db
+	const raw = db
 		.prepare(
 			`SELECT invite_token, site_id, email, role, expires_at, accepted_at
 			 FROM invites WHERE invite_token = ?`
 		)
-		.get(token) as
-		| {
-				invite_token: string;
-				site_id: string;
-				email: string;
-				role: Role;
-				expires_at: string;
-				accepted_at: string | null;
-		  }
-		| undefined;
+		.get(token);
+	const invite = parseRowOptional(AcceptInviteRowSchema, raw);
 
 	if (!invite) return { ok: false, reason: 'unknown' };
 	if (invite.accepted_at) return { ok: false, reason: 'already_consumed' };
@@ -176,15 +196,21 @@ export function changeMemberRole(siteId: string, userId: string, role: Role): vo
  */
 export function removeMember(siteId: string, userId: string): void {
 	const db = getPlatformDb();
-	const member = db
-		.prepare(`SELECT role FROM site_members WHERE site_id = ? AND user_id = ?`)
-		.get(siteId, userId) as { role: Role } | undefined;
+	const member = parseRowOptional(
+		RoleRowSchema,
+		db
+			.prepare(`SELECT role FROM site_members WHERE site_id = ? AND user_id = ?`)
+			.get(siteId, userId)
+	);
 	if (!member) return;
 
 	if (member.role === 'owner') {
-		const ownerCount = db
-			.prepare(`SELECT COUNT(*) AS n FROM site_members WHERE site_id = ? AND role = 'owner'`)
-			.get(siteId) as { n: number };
+		const ownerCount = parseRow(
+			CountRowSchema,
+			db
+				.prepare(`SELECT COUNT(*) AS n FROM site_members WHERE site_id = ? AND role = 'owner'`)
+				.get(siteId)
+		);
 		if (ownerCount.n <= 1) {
 			throw new Error('Cannot remove the last owner of a site');
 		}
@@ -200,16 +226,22 @@ export function removeMember(siteId: string, userId: string): void {
  */
 export function transferOwnership(siteId: string, fromUserId: string, toUserId: string): void {
 	const db = getPlatformDb();
-	const from = db
-		.prepare(`SELECT role FROM site_members WHERE site_id = ? AND user_id = ?`)
-		.get(siteId, fromUserId) as { role: Role } | undefined;
+	const from = parseRowOptional(
+		RoleRowSchema,
+		db
+			.prepare(`SELECT role FROM site_members WHERE site_id = ? AND user_id = ?`)
+			.get(siteId, fromUserId)
+	);
 	if (from?.role !== 'owner') {
 		throw new Error('Only an owner can transfer ownership');
 	}
 
-	const to = db
-		.prepare(`SELECT role FROM site_members WHERE site_id = ? AND user_id = ?`)
-		.get(siteId, toUserId) as { role: Role } | undefined;
+	const to = parseRowOptional(
+		RoleRowSchema,
+		db
+			.prepare(`SELECT role FROM site_members WHERE site_id = ? AND user_id = ?`)
+			.get(siteId, toUserId)
+	);
 	if (!to) {
 		throw new Error('Recipient must be a current member');
 	}

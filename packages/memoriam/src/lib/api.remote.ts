@@ -111,15 +111,32 @@ function createAuthErrorResult(code: string, message: string): ErrorResult {
 	return { ok: false, code, message };
 }
 
-interface DocumentRow {
-	document_id: string;
-	type: string;
-	data: string;
-	created_at?: string | null;
-	updated_at?: string | null;
-}
+import { parseRow, parseRowOptional, parseRows } from '$lib/server/db_row.js';
 
-interface DocumentData {
+// Arktype schemas for SQLite rows — used wherever we read via
+// `db().prepare(sql).get(...)` or `.all(...)`. The schema runs at the
+// trust boundary; if a migration drops a column or a join misses,
+// `parseRow` blows up at the source instead of three frames deeper
+// where the wrong shape causes `undefined.foo`.
+const DocumentRowSchema = type({
+	document_id: 'string',
+	type: 'string',
+	data: 'string',
+	'created_at?': 'string | null | undefined',
+	'updated_at?': 'string | null | undefined'
+});
+type DocumentRow = typeof DocumentRowSchema.infer;
+
+const DocumentDataRowSchema = type({ data: 'string' });
+const DocumentTypeDataRowSchema = type({ type: 'string', data: 'string' });
+const SlugRowSchema = type({ slug: 'string' });
+const SettingValueRowSchema = type({ value: 'string' });
+const SlugResolveRowSchema = type({ document_id: 'string', is_active: 'number' });
+const RefRowSchema = type({ target_document_id: 'string' });
+const TimestampRowSchema = type({ 'created_at?': 'string | null | undefined' });
+const SiteIdRowSchema = type({ site_id: 'string' });
+
+export interface DocumentData {
 	document_id: string;
 	nodes: Record<string, any>;
 }
@@ -269,39 +286,32 @@ function extractDocument( document_id: string, nodeIds: Iterable<string>, allNod
  * @param {string} document_id
  * @returns {DocumentData}
  */
-function getDocFromDb( document_id: string) {
-	const docRow = db()
-		.prepare('SELECT * FROM documents WHERE document_id = ?')
-		.get(document_id) as { data: string } | undefined;
-
+function getDocFromDb(document_id: string): DocumentData {
+	const raw = db().prepare('SELECT * FROM documents WHERE document_id = ?').get(document_id);
+	const docRow = parseRowOptional(DocumentRowSchema, raw);
 	if (!docRow) {
 		throw new Error(`Document not found: ${document_id}`);
 	}
-
-	return JSON.parse(docRow.data);
+	return JSON.parse(docRow.data) as DocumentData;
 }
 
 /**
  * @param {string} document_id
  * @returns {DocumentData | null}
  */
-function getOptionalDocFromDb( document_id: string) {
-	const docRow = db()
-		.prepare('SELECT * FROM documents WHERE document_id = ?')
-		.get(document_id) as { data: string } | undefined;
-
+function getOptionalDocFromDb(document_id: string): DocumentData | null {
+	const raw = db().prepare('SELECT * FROM documents WHERE document_id = ?').get(document_id);
+	const docRow = parseRowOptional(DocumentRowSchema, raw);
 	if (!docRow) return null;
-	return JSON.parse(docRow.data);
+	return JSON.parse(docRow.data) as DocumentData;
 }
 
 /**
  * @returns {string | null}
  */
 function getHomePageIdFromDb(): string | null {
-	const row = db()
-		.prepare('SELECT value FROM site_settings WHERE key = ?')
-		.get('home_page_id') as { value: string } | undefined;
-
+	const raw = db().prepare('SELECT value FROM site_settings WHERE key = ?').get('home_page_id');
+	const row = parseRowOptional(SettingValueRowSchema, raw);
 	return row?.value ?? null;
 }
 
@@ -320,10 +330,10 @@ function isHomePageDocumentId( document_id: string) {
  * @returns {string | null}
  */
 function getActiveSlugForDocumentId(document_id: string): string | null {
-	const row = db()
+	const raw = db()
 		.prepare('SELECT slug FROM document_slugs WHERE document_id = ? AND is_active = 1')
-		.get(document_id) as { slug: string } | undefined;
-
+		.get(document_id);
+	const row = parseRowOptional(SlugRowSchema, raw);
 	return row?.slug ?? null;
 }
 
@@ -331,10 +341,11 @@ function getActiveSlugForDocumentId(document_id: string): string | null {
  * @param {string} slug
  * @returns {{ document_id: string, is_active: boolean, active_slug: string } | null}
  */
-function resolveSlug( slug: string) {
-	const row = db()
+function resolveSlug(slug: string) {
+	const raw = db()
 		.prepare('SELECT document_id, is_active FROM document_slugs WHERE slug = ?')
-		.get(slug) as { document_id: string; is_active: number } | undefined;
+		.get(slug);
+	const row = parseRowOptional(SlugResolveRowSchema, raw);
 
 	if (!row) return null;
 
@@ -353,13 +364,14 @@ function resolveSlug( slug: string) {
 /**
  * @returns {PageDocumentRecord[]}
  */
-function listPageDocuments() {
-	const rows = db()
+function listPageDocuments(): PageDocumentRecord[] {
+	const raw = db()
 		.prepare('SELECT * FROM documents WHERE type = ? ORDER BY document_id')
-		.all('page') as Array<{ document_id: string; data: string; updated_at?: string; created_at?: string }>;
+		.all('page');
+	const rows = parseRows(DocumentRowSchema, raw);
 
 	return rows.map((row) => {
-		const doc = JSON.parse(row.data) as { document_id: string; nodes: Record<string, any> };
+		const doc = JSON.parse(row.data) as DocumentData;
 		return {
 			document_id: doc.document_id,
 			nodes: doc.nodes,
@@ -614,13 +626,13 @@ function summarizePageDocument(pageDoc: PageDocumentRecord | DocumentData) {
  * @param {string} source_document_id
  * @returns {string[]}
  */
-function getOutgoingRefs(sourceDocumentId: string) {
-	const rows = db()
+function getOutgoingRefs(sourceDocumentId: string): string[] {
+	const raw = db()
 		.prepare(
 			'SELECT target_document_id FROM document_refs WHERE source_document_id = ? ORDER BY ref_order, rowid'
 		)
-		.all(sourceDocumentId) as Array<{ target_document_id: string }>;
-
+		.all(sourceDocumentId);
+	const rows = parseRows(RefRowSchema, raw);
 	return rows.map((row) => row.target_document_id);
 }
 
@@ -1086,9 +1098,10 @@ export const getInternalLinkPreview = query(type('string'), async (href) => {
 		return null;
 	}
 
-	const docRow = db()
+	const raw = db()
 		.prepare('SELECT type, data FROM documents WHERE document_id = ?')
-		.get(resolved.document_id) as { type: string; data: string } | undefined;
+		.get(resolved.document_id);
+	const docRow = parseRowOptional(DocumentTypeDataRowSchema, raw);
 	if (!docRow || docRow.type !== 'page') {
 		return null;
 	}
@@ -1238,7 +1251,8 @@ export const saveDocument = command(saveDocumentInputSchema, async (combinedDoc)
 	`);
 
 	try {
-		const existingPageRow = /** @type {DocumentRow | undefined} */ (
+		const existingPageRow = parseRowOptional(
+			TimestampRowSchema,
 			db().prepare('SELECT created_at FROM documents WHERE document_id = ?').get(combinedDoc.document_id)
 		);
 		const nowIso = new Date().toISOString();
@@ -1261,7 +1275,8 @@ export const saveDocument = command(saveDocumentInputSchema, async (combinedDoc)
 
 		if (navRootId && navNodeIds.size > 0) {
 			const nav_doc = extractDocument(navRootId, navNodeIds, allNodes);
-			const existingNavRow = /** @type {DocumentRow | undefined} */ (
+			const existingNavRow = parseRowOptional(
+				TimestampRowSchema,
 				db().prepare('SELECT created_at FROM documents WHERE document_id = ?').get(navRootId)
 			);
 			const nav_created_at = existingNavRow?.created_at ?? nowIso;
@@ -1277,7 +1292,8 @@ export const saveDocument = command(saveDocumentInputSchema, async (combinedDoc)
 
 		if (footerRootId && footerNodeIds.size > 0) {
 			const footer_doc = extractDocument(footerRootId, footerNodeIds, allNodes);
-			const existingFooterRow = /** @type {DocumentRow | undefined} */ (
+			const existingFooterRow = parseRowOptional(
+				TimestampRowSchema,
 				db().prepare('SELECT created_at FROM documents WHERE document_id = ?').get(footerRootId)
 			);
 			const footer_created_at = existingFooterRow?.created_at ?? nowIso;
@@ -1427,15 +1443,10 @@ export const updatePageSlug = command(updatePageSlugInputSchema, async (input) =
 			throw new Error('Failed to assign new active slug');
 		}
 
-		const pageRows = db()
+		const pageRowsRaw = db()
 			.prepare('SELECT * FROM documents WHERE type IN (?, ?, ?) ORDER BY document_id')
-			.all('page', 'nav', 'footer') as Array<{
-			document_id: string;
-			type: string;
-			data: string;
-			created_at?: string | null;
-			updated_at?: string | null;
-		}>;
+			.all('page', 'nav', 'footer');
+		const pageRows = parseRows(DocumentRowSchema, pageRowsRaw);
 
 		const upsert = db().prepare(
 			'INSERT INTO documents (document_id, type, data, created_at, updated_at) VALUES(?, ?, ?, ?, ?) ON CONFLICT(document_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at'
@@ -1884,9 +1895,10 @@ export const deletePerson = command(deletePersonInputSchema, async ({ person_id 
 	const { locals } = getRequestEvent();
 	// Capture site ids *before* deletion — `deletePerson` drops the
 	// `person_memorials` rows along with everything else.
-	const linkedSiteRows = getPlatformDb()
+	const linkedSiteRowsRaw = getPlatformDb()
 		.prepare(`SELECT site_id FROM person_memorials WHERE person_id = ?`)
-		.all(person_id) as { site_id: string }[];
+		.all(person_id);
+	const linkedSiteRows = parseRows(SiteIdRowSchema, linkedSiteRowsRaw);
 	return rpcFromResult(
 		requireUser(locals.userId)
 			.andThen((userId) => requirePeopleEdit([person_id], userId))

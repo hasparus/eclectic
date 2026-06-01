@@ -1,7 +1,9 @@
 import { customAlphabet } from 'nanoid';
+import { type } from 'arktype';
 import { Result, ok, err } from 'neverthrow';
 import { getPlatformDb } from '$lib/server/platform_db.js';
 import { errOf, type AppError } from '$lib/server/app_error.js';
+import { parseRowOptional, parseRows } from '$lib/server/db_row.js';
 import type {
 	Person,
 	ParentEdge,
@@ -15,6 +17,60 @@ import type {
 } from '$lib/people_types.js';
 
 export type { Person, ParentEdge, Couple, TreePayload, Sex, PrivacyLevel, ParentKind, CoupleKind, CoupleEndReason };
+
+// Arktype schemas matching the typescript types in people_types.ts.
+// Used at the SQLite read boundary so a column rename or migration
+// drift blows up at the boundary, not three frames deeper.
+const SexSchema = type('"M" | "F" | "X" | "U" | null');
+const PrivacyLevelSchema = type('"public" | "members" | "private"');
+const ParentKindSchema = type('"biological" | "adoptive" | "foster" | "step" | "unknown"');
+const CoupleKindSchema = type('"marriage" | "partnership" | "engagement" | "other"');
+const CoupleEndReasonSchema = type(
+	'"divorce" | "death" | "annulment" | "separation" | null'
+);
+
+const PersonRowSchema = type({
+	person_id: 'string',
+	display_name: 'string',
+	given_names: 'string | null',
+	surname: 'string | null',
+	sex: SexSchema,
+	birth_date: 'string | null',
+	birth_place: 'string | null',
+	death_date: 'string | null',
+	death_place: 'string | null',
+	birth_year: 'number | null',
+	death_year: 'number | null',
+	is_living: '0 | 1',
+	biography: 'string | null',
+	privacy_level: PrivacyLevelSchema,
+	owner_user_id: 'string',
+	created_at: 'string',
+	updated_at: 'string'
+});
+
+const ParentEdgeRowSchema = type({
+	parent_id: 'string',
+	child_id: 'string',
+	kind: ParentKindSchema,
+	certainty: '"certain" | "probable" | "unverified"'
+});
+
+const CoupleRowSchema = type({
+	couple_id: 'string',
+	person_a_id: 'string',
+	person_b_id: 'string',
+	kind: CoupleKindSchema,
+	start_date: 'string | null',
+	end_date: 'string | null',
+	end_reason: CoupleEndReasonSchema
+});
+
+const ExistenceMarkerRowSchema = type({ '1': 'number' });
+const IdRowSchema = type({ id: 'string' });
+const SubjectRowSchema = type({ subject_person_id: 'string | null' });
+const EdgePairRowSchema = type({ a: 'string', b: 'string' });
+const PersonIdRowSchema = type({ person_id: 'string' });
 
 const personIdAlphabet = customAlphabet('abcdefghijklmnopqrstuvwxyz0123456789', 16);
 const coupleIdAlphabet = customAlphabet('abcdefghijklmnopqrstuvwxyz0123456789', 16);
@@ -104,7 +160,7 @@ export function createPerson(input: CreatePersonInput): Person {
 }
 
 export function getPerson(personId: string): Person | null {
-	const row = getPlatformDb()
+	const raw = getPlatformDb()
 		.prepare(
 			`SELECT person_id, display_name, given_names, surname,
 			        sex, birth_date, birth_place, death_date, death_place,
@@ -112,8 +168,8 @@ export function getPerson(personId: string): Person | null {
 			        privacy_level, owner_user_id, created_at, updated_at
 			 FROM people WHERE person_id = ?`
 		)
-		.get(personId) as Person | undefined;
-	return row ?? null;
+		.get(personId);
+	return parseRowOptional(PersonRowSchema, raw) ?? null;
 }
 
 export interface UpdatePersonInput {
@@ -210,18 +266,21 @@ export function addParentEdge(input: {
 
 	// Cycle guard. If child_id is already an ancestor of parent_id, the
 	// new edge would close a loop — reject.
-	const cycle = platform
-		.prepare(
-			`WITH RECURSIVE anc(id, depth) AS (
-				SELECT ?, 0
-				UNION
-				SELECT r.from_person_id, anc.depth + 1
-				FROM anc JOIN relationships r ON r.to_person_id = anc.id
-				WHERE r.relation_type = 'parent_of' AND anc.depth < 32
+	const cycle = parseRowOptional(
+		ExistenceMarkerRowSchema,
+		platform
+			.prepare(
+				`WITH RECURSIVE anc(id, depth) AS (
+					SELECT ?, 0
+					UNION
+					SELECT r.from_person_id, anc.depth + 1
+					FROM anc JOIN relationships r ON r.to_person_id = anc.id
+					WHERE r.relation_type = 'parent_of' AND anc.depth < 32
+				)
+				SELECT 1 FROM anc WHERE id = ? LIMIT 1`
 			)
-			SELECT 1 FROM anc WHERE id = ? LIMIT 1`
-		)
-		.get(input.parent_id, input.child_id) as { 1: number } | undefined;
+			.get(input.parent_id, input.child_id)
+	);
 	if (cycle) {
 		throw new Error('cycle: candidate child is already an ancestor of candidate parent');
 	}
@@ -282,12 +341,15 @@ export function createCouple(input: {
 			: [input.person_b_id, input.person_a_id];
 
 	const platform = getPlatformDb();
-	const existing = platform
-		.prepare(
-			`SELECT couple_id, person_a_id, person_b_id, kind, start_date, end_date, end_reason
-			 FROM couples WHERE person_a_id = ? AND person_b_id = ?`
-		)
-		.get(a, b) as Couple | undefined;
+	const existing = parseRowOptional(
+		CoupleRowSchema,
+		platform
+			.prepare(
+				`SELECT couple_id, person_a_id, person_b_id, kind, start_date, end_date, end_reason
+				 FROM couples WHERE person_a_id = ? AND person_b_id = ?`
+			)
+			.get(a, b)
+	);
 	if (existing) return existing;
 
 	const id = coupleIdAlphabet();
@@ -323,13 +385,13 @@ export function createCouple(input: {
 }
 
 export function getCoupleById(coupleId: string): Couple | null {
-	const row = getPlatformDb()
+	const raw = getPlatformDb()
 		.prepare(
 			`SELECT couple_id, person_a_id, person_b_id, kind, start_date, end_date, end_reason
 			 FROM couples WHERE couple_id = ?`
 		)
-		.get(coupleId) as Couple | undefined;
-	return row ?? null;
+		.get(coupleId);
+	return parseRowOptional(CoupleRowSchema, raw) ?? null;
 }
 
 export function removeCouple(coupleId: string): void {
@@ -398,9 +460,10 @@ export function setSiteSubject(siteId: string, personId: string | null): void {
 }
 
 export function getSiteSubjectId(siteId: string): string | null {
-	const row = getPlatformDb()
+	const raw = getPlatformDb()
 		.prepare(`SELECT subject_person_id FROM sites WHERE site_id = ?`)
-		.get(siteId) as { subject_person_id: string | null } | undefined;
+		.get(siteId);
+	const row = parseRowOptional(SubjectRowSchema, raw);
 	return row?.subject_person_id ?? null;
 }
 
@@ -417,24 +480,30 @@ export function userCanEditPerson(personId: string, userId: string | null): bool
 	const platform = getPlatformDb();
 
 	// Direct ownership / curator grant.
-	const direct = platform
-		.prepare(
-			`SELECT 1 FROM person_access
-			 WHERE person_id = ? AND user_id = ? AND role IN ('owner','editor')`
-		)
-		.get(personId, userId) as { 1: number } | undefined;
+	const direct = parseRowOptional(
+		ExistenceMarkerRowSchema,
+		platform
+			.prepare(
+				`SELECT 1 FROM person_access
+				 WHERE person_id = ? AND user_id = ? AND role IN ('owner','editor')`
+			)
+			.get(personId, userId)
+	);
 	if (direct) return true;
 
 	// Transitive via any site that this person is linked to.
-	const transitive = platform
-		.prepare(
-			`SELECT 1
-			 FROM person_memorials pm
-			 JOIN site_members sm ON sm.site_id = pm.site_id
-			 WHERE pm.person_id = ? AND sm.user_id = ? AND sm.role IN ('owner','editor')
-			 LIMIT 1`
-		)
-		.get(personId, userId) as { 1: number } | undefined;
+	const transitive = parseRowOptional(
+		ExistenceMarkerRowSchema,
+		platform
+			.prepare(
+				`SELECT 1
+				 FROM person_memorials pm
+				 JOIN site_members sm ON sm.site_id = pm.site_id
+				 WHERE pm.person_id = ? AND sm.user_id = ? AND sm.role IN ('owner','editor')
+				 LIMIT 1`
+			)
+			.get(personId, userId)
+	);
 	return !!transitive;
 }
 
@@ -452,33 +521,39 @@ export function getTreeRootedAt(rootPersonId: string, levels = 4): TreePayload {
 	const ids = new Set<string>([rootPersonId]);
 
 	// Ancestors.
-	const ancestorRows = platform
-		.prepare(
-			`WITH RECURSIVE anc(id, depth) AS (
-				SELECT ?, 0
-				UNION
-				SELECT r.from_person_id, anc.depth + 1
-				FROM anc JOIN relationships r ON r.to_person_id = anc.id
-				WHERE r.relation_type = 'parent_of' AND anc.depth < ?
+	const ancestorRows = parseRows(
+		IdRowSchema,
+		platform
+			.prepare(
+				`WITH RECURSIVE anc(id, depth) AS (
+					SELECT ?, 0
+					UNION
+					SELECT r.from_person_id, anc.depth + 1
+					FROM anc JOIN relationships r ON r.to_person_id = anc.id
+					WHERE r.relation_type = 'parent_of' AND anc.depth < ?
+				)
+				SELECT id FROM anc`
 			)
-			SELECT id FROM anc`
-		)
-		.all(rootPersonId, levels) as { id: string }[];
+			.all(rootPersonId, levels)
+	);
 	for (const r of ancestorRows) ids.add(r.id);
 
 	// Descendants.
-	const descendantRows = platform
-		.prepare(
-			`WITH RECURSIVE des(id, depth) AS (
-				SELECT ?, 0
-				UNION
-				SELECT r.to_person_id, des.depth + 1
-				FROM des JOIN relationships r ON r.from_person_id = des.id
-				WHERE r.relation_type = 'parent_of' AND des.depth < ?
+	const descendantRows = parseRows(
+		IdRowSchema,
+		platform
+			.prepare(
+				`WITH RECURSIVE des(id, depth) AS (
+					SELECT ?, 0
+					UNION
+					SELECT r.to_person_id, des.depth + 1
+					FROM des JOIN relationships r ON r.from_person_id = des.id
+					WHERE r.relation_type = 'parent_of' AND des.depth < ?
+				)
+				SELECT id FROM des`
 			)
-			SELECT id FROM des`
-		)
-		.all(rootPersonId, levels) as { id: string }[];
+			.all(rootPersonId, levels)
+	);
 	for (const r of descendantRows) ids.add(r.id);
 
 	// Pull spouses of everyone collected so far (so they appear on the
@@ -486,13 +561,16 @@ export function getTreeRootedAt(rootPersonId: string, levels = 4): TreePayload {
 	// in-law subtree and not what the visitor came to see.
 	if (ids.size > 0) {
 		const placeholders = Array.from(ids, () => '?').join(',');
-		const spouseRows = platform
-			.prepare(
-				`SELECT DISTINCT person_a_id AS a, person_b_id AS b
-				 FROM couples
-				 WHERE person_a_id IN (${placeholders}) OR person_b_id IN (${placeholders})`
-			)
-			.all(...ids, ...ids) as { a: string; b: string }[];
+		const spouseRows = parseRows(
+			EdgePairRowSchema,
+			platform
+				.prepare(
+					`SELECT DISTINCT person_a_id AS a, person_b_id AS b
+					 FROM couples
+					 WHERE person_a_id IN (${placeholders}) OR person_b_id IN (${placeholders})`
+				)
+				.all(...ids, ...ids)
+		);
 		for (const r of spouseRows) {
 			ids.add(r.a);
 			ids.add(r.b);
@@ -505,34 +583,43 @@ export function getTreeRootedAt(rootPersonId: string, levels = 4): TreePayload {
 
 	const placeholders = Array.from(ids, () => '?').join(',');
 
-	const people = platform
-		.prepare(
-			`SELECT person_id, display_name, given_names, surname,
-			        sex, birth_date, birth_place, death_date, death_place,
-			        birth_year, death_year, is_living, biography,
-			        privacy_level, owner_user_id, created_at, updated_at
-			 FROM people WHERE person_id IN (${placeholders})`
-		)
-		.all(...ids) as unknown as Person[];
+	const people = parseRows(
+		PersonRowSchema,
+		platform
+			.prepare(
+				`SELECT person_id, display_name, given_names, surname,
+				        sex, birth_date, birth_place, death_date, death_place,
+				        birth_year, death_year, is_living, biography,
+				        privacy_level, owner_user_id, created_at, updated_at
+				 FROM people WHERE person_id IN (${placeholders})`
+			)
+			.all(...ids)
+	);
 
-	const parent_edges = platform
-		.prepare(
-			`SELECT from_person_id AS parent_id, to_person_id AS child_id,
-			        COALESCE(kind, 'biological') AS kind, certainty
-			 FROM relationships
-			 WHERE relation_type = 'parent_of'
-			   AND from_person_id IN (${placeholders})
-			   AND to_person_id IN (${placeholders})`
-		)
-		.all(...ids, ...ids) as unknown as ParentEdge[];
+	const parent_edges = parseRows(
+		ParentEdgeRowSchema,
+		platform
+			.prepare(
+				`SELECT from_person_id AS parent_id, to_person_id AS child_id,
+				        COALESCE(kind, 'biological') AS kind, certainty
+				 FROM relationships
+				 WHERE relation_type = 'parent_of'
+				   AND from_person_id IN (${placeholders})
+				   AND to_person_id IN (${placeholders})`
+			)
+			.all(...ids, ...ids)
+	);
 
-	const couples = platform
-		.prepare(
-			`SELECT couple_id, person_a_id, person_b_id, kind, start_date, end_date, end_reason
-			 FROM couples
-			 WHERE person_a_id IN (${placeholders}) AND person_b_id IN (${placeholders})`
-		)
-		.all(...ids, ...ids) as unknown as Couple[];
+	const couples = parseRows(
+		CoupleRowSchema,
+		platform
+			.prepare(
+				`SELECT couple_id, person_a_id, person_b_id, kind, start_date, end_date, end_reason
+				 FROM couples
+				 WHERE person_a_id IN (${placeholders}) AND person_b_id IN (${placeholders})`
+			)
+			.all(...ids, ...ids)
+	);
 
 	return { root_person_id: rootPersonId, people, parent_edges, couples };
 }
@@ -735,40 +822,52 @@ export function importParsedGedcom(
  */
 export function getAllSitePeople(siteId: string): TreePayload {
 	const platform = getPlatformDb();
-	const idRows = platform
-		.prepare(`SELECT person_id FROM person_memorials WHERE site_id = ?`)
-		.all(siteId) as { person_id: string }[];
+	const idRows = parseRows(
+		PersonIdRowSchema,
+		platform
+			.prepare(`SELECT person_id FROM person_memorials WHERE site_id = ?`)
+			.all(siteId)
+	);
 	const ids = idRows.map((r) => r.person_id);
 	if (ids.length === 0) {
 		return { root_person_id: '', people: [], parent_edges: [], couples: [] };
 	}
 	const placeholders = ids.map(() => '?').join(',');
-	const people = platform
-		.prepare(
-			`SELECT person_id, display_name, given_names, surname,
-			        sex, birth_date, birth_place, death_date, death_place,
-			        birth_year, death_year, is_living, biography,
-			        privacy_level, owner_user_id, created_at, updated_at
-			 FROM people WHERE person_id IN (${placeholders})`
-		)
-		.all(...ids) as unknown as Person[];
-	const parent_edges = platform
-		.prepare(
-			`SELECT from_person_id AS parent_id, to_person_id AS child_id,
-			        COALESCE(kind, 'biological') AS kind, certainty
-			 FROM relationships
-			 WHERE relation_type = 'parent_of'
-			   AND from_person_id IN (${placeholders})
-			   AND to_person_id IN (${placeholders})`
-		)
-		.all(...ids, ...ids) as unknown as ParentEdge[];
-	const couples = platform
-		.prepare(
-			`SELECT couple_id, person_a_id, person_b_id, kind, start_date, end_date, end_reason
-			 FROM couples
-			 WHERE person_a_id IN (${placeholders}) AND person_b_id IN (${placeholders})`
-		)
-		.all(...ids, ...ids) as unknown as Couple[];
+	const people = parseRows(
+		PersonRowSchema,
+		platform
+			.prepare(
+				`SELECT person_id, display_name, given_names, surname,
+				        sex, birth_date, birth_place, death_date, death_place,
+				        birth_year, death_year, is_living, biography,
+				        privacy_level, owner_user_id, created_at, updated_at
+				 FROM people WHERE person_id IN (${placeholders})`
+			)
+			.all(...ids)
+	);
+	const parent_edges = parseRows(
+		ParentEdgeRowSchema,
+		platform
+			.prepare(
+				`SELECT from_person_id AS parent_id, to_person_id AS child_id,
+				        COALESCE(kind, 'biological') AS kind, certainty
+				 FROM relationships
+				 WHERE relation_type = 'parent_of'
+				   AND from_person_id IN (${placeholders})
+				   AND to_person_id IN (${placeholders})`
+			)
+			.all(...ids, ...ids)
+	);
+	const couples = parseRows(
+		CoupleRowSchema,
+		platform
+			.prepare(
+				`SELECT couple_id, person_a_id, person_b_id, kind, start_date, end_date, end_reason
+				 FROM couples
+				 WHERE person_a_id IN (${placeholders}) AND person_b_id IN (${placeholders})`
+			)
+			.all(...ids, ...ids)
+	);
 	return {
 		root_person_id: getSiteSubjectId(siteId) ?? ids[0],
 		people,

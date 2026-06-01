@@ -80,18 +80,28 @@
 	}
 
 	let invite_email = $state('');
-	let invite_role = $state<'editor' | 'viewer'>('editor');
+	let invite_email_el: HTMLInputElement | undefined = $state();
+	let invite_role_el: HTMLSelectElement | undefined = $state();
 	let invite_pending = $state(false);
 	let invite_error = $state('');
 	let invite_sent_to = $state<string | null>(null);
 
 	async function send_invite() {
 		if (invite_pending) return;
-		const trimmed = invite_email.trim();
+		// Read directly from the DOM rather than the bound `$state`.
+		// A user (or automation) can interact with the form before
+		// Svelte's `bind:value` listeners attach at hydration — those
+		// events fire into the void and the bound state stays at its
+		// initial value. The DOM tracks the actual current value
+		// regardless of hydration timing, so this is race-free.
+		const email_raw = invite_email_el?.value ?? invite_email;
+		const trimmed = email_raw.trim();
 		if (!trimmed || !trimmed.includes('@')) {
 			invite_error = m.invite_error_invalid_email();
 			return;
 		}
+		const role: 'editor' | 'viewer' =
+			invite_role_el?.value === 'viewer' ? 'viewer' : 'editor';
 		invite_pending = true;
 		invite_error = '';
 		try {
@@ -99,7 +109,7 @@
 			const result = (await api.inviteMember({
 				site_id: data.site.site_id,
 				email: trimmed,
-				role: invite_role
+				role
 			})) as
 				| { ok: true; invite_token: string; email: string }
 				| { ok: false; code: string; message: string };
@@ -224,13 +234,18 @@
 					type="email"
 					placeholder={m.invite_email_placeholder()}
 					bind:value={invite_email}
+					bind:this={invite_email_el}
 					class="flex-1 border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-3 py-2 text-base"
 				/>
+				<!-- Uncontrolled select: SSR picks the default via `selected`,
+				     pre-hydration interactions stick (Svelte's `bind:value`
+				     would otherwise clobber them on its first reactive write).
+				     `send_invite` reads the live DOM via `invite_role_el`. -->
 				<select
-					bind:value={invite_role}
+					bind:this={invite_role_el}
 					class="border border-[color-mix(in_oklch,var(--foreground)_18%,transparent)] bg-(--background) px-3 py-2 text-base"
 				>
-					<option value="editor">{m.common_role_editor()}</option>
+					<option value="editor" selected>{m.common_role_editor()}</option>
 					<option value="viewer">{m.common_role_viewer()}</option>
 				</select>
 				<button

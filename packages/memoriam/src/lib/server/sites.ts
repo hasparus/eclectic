@@ -1,25 +1,35 @@
 import { customAlphabet } from 'nanoid';
+import { type } from 'arktype';
 import { getPlatformDb } from '$lib/server/platform_db.js';
 import { getDb } from '$lib/server/db.js';
 import { isValidSiteId } from '$lib/server_config.js';
+import { parseRow, parseRowOptional, parseRows } from '$lib/server/db_row.js';
 
 const siteIdAlphabet = customAlphabet('abcdefghijklmnopqrstuvwxyz0123456789', 12);
 
-export interface Site {
-	site_id: string;
-	owner_user_id: string;
-	display_name: string | null;
-	visibility: 'public' | 'unlisted' | 'private';
-	created_at: string;
-	updated_at: string;
-}
+const VisibilitySchema = type('"public" | "unlisted" | "private"');
+const RoleSchema = type('"owner" | "editor" | "viewer"');
 
-export interface SiteMember {
-	site_id: string;
-	user_id: string;
-	role: 'owner' | 'editor' | 'viewer';
-	created_at: string;
-}
+const SiteRowSchema = type({
+	site_id: 'string',
+	owner_user_id: 'string',
+	display_name: 'string | null',
+	visibility: VisibilitySchema,
+	created_at: 'string',
+	updated_at: 'string'
+});
+export type Site = typeof SiteRowSchema.infer;
+
+const SiteMemberRowSchema = type({
+	site_id: 'string',
+	user_id: 'string',
+	role: RoleSchema,
+	created_at: 'string'
+});
+export type SiteMember = typeof SiteMemberRowSchema.infer;
+
+const UserIdRowSchema = type({ user_id: 'string' });
+const ExistenceMarkerRowSchema = type({ '1': 'number' });
 
 export interface CreateSiteInput {
 	ownerUserId: string;
@@ -43,9 +53,10 @@ export function createSite(input: CreateSiteInput): Site {
 	const now = new Date().toISOString();
 
 	// Verify the owner exists.
-	const owner = platform
-		.prepare('SELECT user_id FROM users WHERE user_id = ?')
-		.get(input.ownerUserId) as { user_id: string } | undefined;
+	const owner = parseRowOptional(
+		UserIdRowSchema,
+		platform.prepare('SELECT user_id FROM users WHERE user_id = ?').get(input.ownerUserId)
+	);
 	if (!owner) {
 		throw new Error(`User ${input.ownerUserId} not found`);
 	}
@@ -57,9 +68,10 @@ export function createSite(input: CreateSiteInput): Site {
 		throw new Error(`Invalid site id: ${siteId}`);
 	}
 	for (let attempt = 0; attempt < 5; attempt++) {
-		const exists = platform
-			.prepare('SELECT 1 FROM sites WHERE site_id = ?')
-			.get(siteId) as { 1: number } | undefined;
+		const exists = parseRowOptional(
+			ExistenceMarkerRowSchema,
+			platform.prepare('SELECT 1 FROM sites WHERE site_id = ?').get(siteId)
+		);
 		if (!exists) break;
 		if (input.preferredSiteId) {
 			throw new Error(`Site id ${input.preferredSiteId} already taken`);
@@ -106,23 +118,23 @@ export function createSite(input: CreateSiteInput): Site {
 }
 
 export function getSite(siteId: string): Site | null {
-	const row = getPlatformDb()
+	const raw = getPlatformDb()
 		.prepare(
 			`SELECT site_id, owner_user_id, display_name, visibility, created_at, updated_at
 			 FROM sites WHERE site_id = ?`
 		)
-		.get(siteId) as Site | undefined;
-	return row ?? null;
+		.get(siteId);
+	return parseRowOptional(SiteRowSchema, raw) ?? null;
 }
 
 export function getSiteMember(siteId: string, userId: string): SiteMember | null {
-	const row = getPlatformDb()
+	const raw = getPlatformDb()
 		.prepare(
 			`SELECT site_id, user_id, role, created_at FROM site_members
 			 WHERE site_id = ? AND user_id = ?`
 		)
-		.get(siteId, userId) as SiteMember | undefined;
-	return row ?? null;
+		.get(siteId, userId);
+	return parseRowOptional(SiteMemberRowSchema, raw) ?? null;
 }
 
 /**
@@ -144,15 +156,22 @@ export function siteIsViewableByPublic(visibility: Site['visibility']): boolean 
 	return visibility === 'public' || visibility === 'unlisted';
 }
 
-export interface UserSiteEntry extends Site {
-	role: 'owner' | 'editor' | 'viewer';
-}
+const UserSiteEntrySchema = type({
+	site_id: 'string',
+	owner_user_id: 'string',
+	display_name: 'string | null',
+	visibility: VisibilitySchema,
+	created_at: 'string',
+	updated_at: 'string',
+	role: RoleSchema
+});
+export type UserSiteEntry = typeof UserSiteEntrySchema.infer;
 
 /**
  * List every site the user has a membership on, newest first.
  */
 export function listUserSites(userId: string): UserSiteEntry[] {
-	return getPlatformDb()
+	const raw = getPlatformDb()
 		.prepare(
 			`SELECT s.site_id, s.owner_user_id, s.display_name, s.visibility,
 			        s.created_at, s.updated_at, m.role
@@ -161,5 +180,6 @@ export function listUserSites(userId: string): UserSiteEntry[] {
 			 WHERE m.user_id = ?
 			 ORDER BY s.created_at DESC`
 		)
-		.all(userId) as unknown as UserSiteEntry[];
+		.all(userId);
+	return parseRows(UserSiteEntrySchema, raw);
 }

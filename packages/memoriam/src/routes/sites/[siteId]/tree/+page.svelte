@@ -129,15 +129,18 @@
 
 	// Which view is showing on the canvas. Defaults to "canvas"; the
 	// fan chart is opt-in. URL-mirrored so reload + share preserves
-	// — the `?view=fan` parameter is a sibling to `?focus`.
+	// — the `?view=fan` parameter is a sibling to `?focus`. We derive
+	// from page.url instead of holding local state so the view toggle
+	// can be plain `<a>` links — they work pre-hydration (browser
+	// handles navigation natively) and post-hydration (SvelteKit
+	// router intercepts for SPA navigation).
 	type ViewMode = 'canvas' | 'fan';
-	let view = $state<ViewMode>(page.url.searchParams.get('view') === 'fan' ? 'fan' : 'canvas');
-	function setView(next: ViewMode) {
-		view = next;
+	let view = $derived<ViewMode>(page.url.searchParams.get('view') === 'fan' ? 'fan' : 'canvas');
+	function viewHref(next: ViewMode): string {
 		const url = new URL(page.url);
 		if (next === 'fan') url.searchParams.set('view', 'fan');
 		else url.searchParams.delete('view');
-		replaceState(url, page.state);
+		return url.pathname + url.search;
 	}
 
 	let layout = $derived(view === 'canvas' && data.tree ? layoutTree(data.tree) : null);
@@ -484,27 +487,33 @@
 					aria-label={m.tree_view_toggle_label()}
 				>
 					<legend class="sr-only">{m.tree_view_toggle_label()}</legend>
-					<button
-						type="button"
+					<a
+						href={viewHref('canvas')}
 						class="underline"
 						class:font-medium={view === 'canvas'}
 						class:no-underline={view === 'canvas'}
 						aria-pressed={view === 'canvas'}
-						onclick={() => setView('canvas')}
+						role="button"
+						data-sveltekit-replacestate
+						data-sveltekit-keepfocus
+						data-sveltekit-noscroll
 					>
 						{m.tree_view_toggle_canvas()}
-					</button>
+					</a>
 					<span aria-hidden="true">·</span>
-					<button
-						type="button"
+					<a
+						href={viewHref('fan')}
 						class="underline"
 						class:font-medium={view === 'fan'}
 						class:no-underline={view === 'fan'}
 						aria-pressed={view === 'fan'}
-						onclick={() => setView('fan')}
+						role="button"
+						data-sveltekit-replacestate
+						data-sveltekit-keepfocus
+						data-sveltekit-noscroll
 					>
 						{m.tree_view_toggle_fan()}
-					</button>
+					</a>
 				</fieldset>
 			{/if}
 			{#if data.can_edit}
