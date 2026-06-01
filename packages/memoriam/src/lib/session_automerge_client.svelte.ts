@@ -14,9 +14,17 @@ import { browser } from '$app/environment';
 import type { AutomergeUrl } from '@automerge/automerge-repo';
 
 interface SessionLike {
-	attach_automerge_handle: (handle: unknown) => void;
+	attach_automerge_handle: (handle: unknown, splice?: SpliceFn) => void;
 	detach_automerge_handle: () => void;
 }
+
+type SpliceFn = (
+	doc: unknown,
+	path: ReadonlyArray<string | number>,
+	index: number,
+	deleteCount: number,
+	value?: string
+) => void;
 
 interface RepoLike {
 	find: <T>(url: AutomergeUrl) => Promise<{
@@ -69,12 +77,23 @@ export function attachSessionToDocumentDoc(
 
 	(async () => {
 		try {
-			const { isValidAutomergeUrl } = await import('@automerge/automerge-repo');
+			const [{ isValidAutomergeUrl }, automerge] = await Promise.all([
+				import('@automerge/automerge-repo'),
+				import('@automerge/automerge')
+			]);
 			if (!isValidAutomergeUrl(docUrl)) return;
 			const repo = await getRepo(siteId);
 			const handle = await repo.find(docUrl as AutomergeUrl);
 			if (cancelled) return;
-			session.attach_automerge_handle(handle);
+			// `Automerge.splice` is the per-character CRDT op; passing
+			// it through lets Session route text edits in
+			// `annotated_text` properties through splice instead of
+			// whole-value replace. Concurrent typing in the same
+			// paragraph merges character-by-character.
+			session.attach_automerge_handle(
+				handle,
+				automerge.splice as unknown as SpliceFn
+			);
 			attached_handle = handle as unknown as { off?: () => void };
 		} catch (err) {
 			console.error('[automerge] session attach failed', err);

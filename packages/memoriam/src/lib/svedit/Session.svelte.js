@@ -58,12 +58,18 @@ export default class Session {
 	/**
 	 * Automerge binding. When attached, every local `apply` mirrors
 	 * its `ops` into the bound document via `handle.change(...)`;
-	 * remote patches arriving on the same handle replace the local
-	 * `doc` with the materialised Automerge state.
+	 * remote patches arriving on the same handle update `this.doc`
+	 * with the materialised Automerge state.
 	 *
 	 * `#applying_remote` is the re-entry guard — the remote patch
 	 * handler updates `this.doc` directly, which would otherwise
 	 * trigger another local `apply` and echo back to Automerge.
+	 *
+	 * `#splice_fn` is `Automerge.splice` passed through from the
+	 * caller. We don't import it directly here so the editor stays
+	 * usable without an Automerge dependency loaded; the binding
+	 * caller (which already imports Automerge for the handle)
+	 * threads it in via `attach_automerge_handle`.
 	 *
 	 * @type {null | {
 	 *   change: (fn: (d: any) => void) => void,
@@ -76,6 +82,8 @@ export default class Session {
 	#applying_remote = false;
 	/** @type {(() => void) | null} */
 	#automerge_change_listener = null;
+	/** @type {null | ((doc: any, path: any[], index: number, deleteCount: number, value?: string) => void)} */
+	#splice_fn = null;
 
 	// Reactive helpers for UI state
 	can_undo = $derived(this.history_index >= 0);
@@ -574,22 +582,30 @@ export default class Session {
 	 * Attach an Automerge `DocHandle` to this session. Sync becomes
 	 * bidirectional:
 	 *   • local `apply()` mirrors the transaction's `ops` into the
-	 *     handle via `change(d => ...)`.
-	 *   • remote `change` events on the handle replace `this.doc`
+	 *     handle via `change(d => ...)`. Text changes inside
+	 *     `annotated_text` properties route through `splice_fn`
+	 *     (Automerge's character-level CRDT op) so concurrent
+	 *     typing in the same paragraph merges per-character
+	 *     rather than last-write-wins.
+	 *   • remote `change` events on the handle update `this.doc`
 	 *     with the materialised Automerge state (guarded against
 	 *     echoing back via `#applying_remote`).
 	 *
-	 * The handle's doc shape is expected to be `{ nodes: { id: node } }`
-	 * — the same shape the local doc carries, minus svedit metadata
+	 * The handle's doc shape is `{ nodes: { id: node } }` — the
+	 * same shape the local doc carries, minus svedit metadata
 	 * like `document_id`. Bootstrapping the handle (writing the
-	 * initial `nodes` map) is the caller's job; this method just
-	 * subscribes.
+	 * initial `nodes` map) is the caller's job.
 	 *
 	 * @param {object} handle - Automerge DocHandle
+	 * @param {(doc: any, path: any[], index: number, deleteCount: number, value?: string) => void} [splice_fn]
+	 *   `Automerge.splice` (or equivalent). Optional; if omitted,
+	 *   text changes fall back to whole-value replace and lose
+	 *   per-character merge.
 	 */
-	attach_automerge_handle(handle) {
+	attach_automerge_handle(handle, splice_fn) {
 		this.detach_automerge_handle();
 		this.#automerge_handle = handle;
+		this.#splice_fn = splice_fn ?? null;
 		const listener = () => this.#on_automerge_change();
 		this.#automerge_change_listener = listener;
 		handle.on('change', listener);
@@ -607,31 +623,60 @@ export default class Session {
 	}
 
 	/**
-	 * Apply a list of svedit ops to the bound Automerge doc. The op
-	 * formats — `['set', [node_id, property], value]`, `['create',
-	 * node]`, `['delete', node_id]` — translate 1:1 to Automerge map
-	 * mutations. Unknown op types are ignored (svedit may add more
-	 * op kinds upstream; we don't want to crash on them).
+	 * Apply a list of svedit ops to the bound Automerge doc.
+	 *
+	 *   ['set', [node_id, property], value] →
+	 *     plain map assignment, except when `value` looks like an
+	 *     annotated_text (`{ text, annotations }`) AND the previous
+	 *     value was one too — in which case we splice the text
+	 *     character-by-character so concurrent typing in the same
+	 *     paragraph merges per-character instead of last-write-wins.
+	 *   ['create', node]                    → d.nodes[node.id] = node
+	 *   ['delete', node_id]                 → delete d.nodes[node_id]
+	 *
+	 * Unknown op types are ignored — svedit may grow new ones
+	 * upstream and we don't want to crash on them.
 	 *
 	 * @param {Array<unknown>} ops
 	 */
 	#mirror_ops_to_automerge(ops) {
 		const handle = this.#automerge_handle;
 		if (!handle || !ops || ops.length === 0) return;
+		const splice_fn = this.#splice_fn;
 		handle.change((/** @type {any} */ d) => {
 			if (!d.nodes) d.nodes = {};
 			for (const op of ops) {
 				const [type, ...args] = /** @type {[string, ...any[]]} */ (op);
 				if (type === 'set') {
 					const [node_id, property] = args[0];
-					const value = structuredClone(args[1]);
+					const new_value = args[1];
+					const old_value = d.nodes[node_id]?.[property];
 					if (!d.nodes[node_id]) {
-						// `set` against a node we haven't created yet —
-						// initialise the entry so concurrent peers see
-						// a partial node rather than throw.
 						d.nodes[node_id] = { id: node_id };
 					}
-					d.nodes[node_id][property] = value;
+					if (
+						splice_fn &&
+						is_annotated_text(new_value) &&
+						is_annotated_text(old_value)
+					) {
+						// Per-character merge on `.text` — concurrent
+						// typing in the same paragraph keeps both
+						// users' keystrokes. The `annotations` array is
+						// replaced wholesale; per-mark CRDT is the
+						// next layer.
+						apply_text_splice(
+							splice_fn,
+							d,
+							['nodes', node_id, property, 'text'],
+							old_value.text,
+							new_value.text
+						);
+						d.nodes[node_id][property].annotations = structuredClone(
+							new_value.annotations
+						);
+					} else {
+						d.nodes[node_id][property] = structuredClone(new_value);
+					}
 				} else if (type === 'create') {
 					const node = structuredClone(args[0]);
 					d.nodes[node.id] = node;
@@ -684,6 +729,61 @@ export default class Session {
  * @param {Record<string, unknown>} a
  * @param {Record<string, unknown>} b
  */
+/**
+ * Quick structural check for svedit's `annotated_text` shape —
+ * `{ text: string, annotations: Annotation[] }`. We don't validate
+ * Annotation fields; the mere shape is the discriminator.
+ *
+ * @param {any} v
+ */
+function is_annotated_text(v) {
+	return (
+		v !== null &&
+		typeof v === 'object' &&
+		typeof v.text === 'string' &&
+		Array.isArray(v.annotations)
+	);
+}
+
+/**
+ * Translate a from-to text change into the smallest single
+ * Automerge splice that produces it. Finds the common prefix and
+ * suffix between `old_text` and `new_text`; the middle is what
+ * actually changed, and we splice that range with the new content.
+ *
+ * Most editor operations (single-char insert / backspace / delete /
+ * paste) collapse into one splice exactly; complex middle-substitutions
+ * become one larger splice that still merges correctly with
+ * concurrent edits elsewhere in the same string.
+ *
+ * @param {(doc: any, path: any[], index: number, deleteCount: number, value?: string) => void} splice_fn
+ * @param {any} doc
+ * @param {any[]} path
+ * @param {string} old_text
+ * @param {string} new_text
+ */
+function apply_text_splice(splice_fn, doc, path, old_text, new_text) {
+	if (old_text === new_text) return;
+	let prefix = 0;
+	const maxLen = Math.min(old_text.length, new_text.length);
+	while (prefix < maxLen && old_text.charCodeAt(prefix) === new_text.charCodeAt(prefix)) {
+		prefix++;
+	}
+	let suffix = 0;
+	const maxSuffix = Math.min(old_text.length - prefix, new_text.length - prefix);
+	while (
+		suffix < maxSuffix &&
+		old_text.charCodeAt(old_text.length - 1 - suffix) ===
+			new_text.charCodeAt(new_text.length - 1 - suffix)
+	) {
+		suffix++;
+	}
+	const deleteCount = old_text.length - prefix - suffix;
+	const insertText = new_text.slice(prefix, new_text.length - suffix);
+	if (deleteCount === 0 && insertText.length === 0) return;
+	splice_fn(doc, path, prefix, deleteCount, insertText);
+}
+
 function shallowEqualNodes(a, b) {
 	const ak = Object.keys(a);
 	const bk = Object.keys(b);
