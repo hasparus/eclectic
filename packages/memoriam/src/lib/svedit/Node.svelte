@@ -1,19 +1,25 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
+	import type { NodeProps } from './types.d.ts';
+	import type Session from './Session.svelte.js';
 
-	/** @import { NodeProps } from './types.d.ts'; */
+	const svedit = getContext<{ session: Session }>('svedit');
 
-	const svedit = getContext('svedit');
+	let {
+		path,
+		children,
+		tag = 'div',
+		class: css_class,
+		style = '',
+		...rest
+	}: NodeProps = $props();
 
-	/** @type {NodeProps} */
-	let { path, children, tag = 'div', class: css_class, style = '', ...rest } = $props();
+	const node = $derived(svedit.session.get(path) as { id: string });
 
-	let node = $derived(svedit.session.get(path));
-
-	const node_array_meta = getContext('node_array_meta');
-	let child_index = $derived(node_array_meta ? parseInt(String(path.at(-1)), 10) : -1);
-	let is_first = $derived(node_array_meta && child_index === 0);
-	let is_last = $derived(node_array_meta && child_index === node_array_meta.length - 1);
+	const node_array_meta = getContext<{ length: number } | undefined>('node_array_meta');
+	const child_index = $derived(node_array_meta ? parseInt(String(path.at(-1)), 10) : -1);
+	const is_first = $derived(node_array_meta && child_index === 0);
+	const is_last = $derived(node_array_meta && child_index === node_array_meta.length - 1);
 </script>
 
 <svelte:element

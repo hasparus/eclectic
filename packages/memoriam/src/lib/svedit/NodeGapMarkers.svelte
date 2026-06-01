@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 	import NodeCaret from './NodeCaret.svelte';
+	import type { DocumentPath } from './types.d.ts';
 
 	/**
 	 * Renders insertion gap markers for a single node_array.
@@ -13,14 +14,30 @@
 	 * svedit context. This component reads and renders it.
 	 */
 
-	let { path } = $props();
+	interface Gap {
+		key: string;
+		type: 'gap-empty' | 'gap-edge' | 'gap-mid';
+		vars: string;
+		is_first?: boolean;
+		is_last?: boolean;
+		has_pair?: boolean;
+	}
 
-	const svedit = getContext('svedit');
-	let path_str = $derived(path.join('.'));
+	interface SveditCtx {
+		insertion_gap_data?: {
+			get_gaps: (path_str: string) => { gaps: Gap[] } | undefined;
+			caret_gap_key?: string;
+		};
+	}
+
+	const { path }: { path: DocumentPath } = $props();
+
+	const svedit = getContext<SveditCtx>('svedit');
+	const path_str = $derived(path.join('.'));
 	// Per-path signal: only re-evaluates when THIS path's gaps change.
-	let gap_signal = $derived(svedit.insertion_gap_data?.get_gaps(path_str));
-	let my_gaps = $derived(gap_signal?.gaps ?? []);
-	let caret_gap_key = $derived(svedit.insertion_gap_data?.caret_gap_key);
+	const gap_signal = $derived(svedit.insertion_gap_data?.get_gaps(path_str));
+	const my_gaps = $derived(gap_signal?.gaps ?? []);
+	const caret_gap_key = $derived(svedit.insertion_gap_data?.caret_gap_key);
 </script>
 
 {#each my_gaps as gap (gap.key)}

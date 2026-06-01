@@ -1,27 +1,50 @@
 <script lang="ts">
-	import { getContext, setContext } from 'svelte';
+	import { getContext, setContext, type Component } from 'svelte';
 	import UnknownNode from './UnknownNode.svelte';
 	import { snake_to_pascal } from './utils.js';
 	import DefaultNodeGap from './NodeGap.svelte';
 	import DefaultNodeGapMarkers from './NodeGapMarkers.svelte';
+	import type { NodeArrayPropertyProps, DocumentPath, DocumentNode } from './types.d.ts';
+	import type Session from './Session.svelte.js';
 
-	/** @import { NodeArrayPropertyProps } from './types.d.ts'; */
+	interface SveditCtx {
+		session: Session & {
+			config: {
+				system_components?: {
+					NodeGap?: Component<Record<string, unknown>>;
+					NodeGapMarkers?: Component<Record<string, unknown>>;
+				};
+				node_components: Record<string, Component<Record<string, unknown>>>;
+			};
+		};
+		editable: boolean;
+		is_near_viewport?: (path: DocumentPath) => boolean;
+	}
 
-	const svedit = getContext('svedit');
-	let NodeGap = $derived(svedit.session.config.system_components?.NodeGap ?? DefaultNodeGap);
-	let NodeGapMarkers = $derived(svedit.session.config.system_components?.NodeGapMarkers ?? DefaultNodeGapMarkers);
+	const svedit = getContext<SveditCtx>('svedit');
+	const NodeGap = $derived(svedit.session.config.system_components?.NodeGap ?? DefaultNodeGap);
+	const NodeGapMarkers = $derived(
+		svedit.session.config.system_components?.NodeGapMarkers ?? DefaultNodeGapMarkers
+	);
 
-	/** @type {NodeArrayPropertyProps} */
-	let { path, tag = 'div', class: css_class, style = '', ...rest } = $props();
+	let {
+		path,
+		tag = 'div',
+		class: css_class,
+		style = '',
+		...rest
+	}: NodeArrayPropertyProps = $props();
 
-	let nodes = $derived(
-		svedit.session
-			.get(path)
-			.map(/** @param {string} node_id */ (node_id) => svedit.session.get(node_id))
+	const nodes = $derived(
+		(svedit.session.get(path) as string[]).map(
+			(node_id: string) => svedit.session.get(node_id) as DocumentNode
+		)
 	);
 
 	setContext('node_array_meta', {
-		get length() { return nodes.length; }
+		get length() {
+			return nodes.length;
+		}
 	});
 </script>
 <!-- we use the anchor of node_array in Overlays.svelte to position the last insertion point in a horizontal layout based on the right edge of the container -->

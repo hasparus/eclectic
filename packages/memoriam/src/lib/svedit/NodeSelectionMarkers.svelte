@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
+	import type Session from './Session.svelte.js';
+	import type { DocumentPath } from './types.d.ts';
 
-	const svedit = getContext('svedit');
-	let selected_node_paths = $derived(get_selected_node_paths());
+	const svedit = getContext<{ session: Session }>('svedit');
+	const selected_node_paths = $derived(get_selected_node_paths());
 
-	function get_selected_node_paths() {
-		const paths = [];
+	function get_selected_node_paths(): DocumentPath[] | undefined {
+		const paths: DocumentPath[] = [];
 		const selection = svedit.session.selection;
 		if (!selection) return;
 		if (selection.type !== 'node' || selection.anchor_offset === selection.focus_offset) return;

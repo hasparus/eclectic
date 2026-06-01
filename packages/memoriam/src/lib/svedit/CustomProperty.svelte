@@ -1,11 +1,17 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
+	import type { CustomPropertyProps } from './types.d.ts';
 
-	/** @import { CustomPropertyProps } from './types.d.ts'; */
-	const svedit = getContext('svedit');
+	const svedit = getContext<{ editable: boolean }>('svedit');
 
-	/** @type {CustomPropertyProps} */
-	let { path, tag = 'div', class: css_class, children, style, ...rest } = $props();
+	let {
+		path,
+		tag = 'div',
+		class: css_class,
+		children,
+		style,
+		...rest
+	}: CustomPropertyProps = $props();
 </script>
 
 <svelte:element

@@ -1,28 +1,52 @@
 <script lang="ts">
-	import { getContext } from 'svelte';
+	import { getContext, type Component } from 'svelte';
 	import { char_slice, get_char_length, snake_to_pascal, get_selection_range } from './utils.js';
+	import type {
+		AnnotatedTextPropertyProps,
+		Annotation,
+		Fragment,
+		SelectionRange,
+		AnnotatedText,
+		DocumentNode
+	} from './types.d.ts';
+	import type Session from './Session.svelte.js';
 
-	/** @import { AnnotatedTextPropertyProps, Annotation, Fragment, SelectionRange } from './types.d.ts'; */
+	interface SveditCtx {
+		session: Session & {
+			config: { node_components: Record<string, Component<Record<string, unknown>>> };
+		};
+		editable: boolean;
+		is_composing: boolean;
+		canvas_focused: boolean;
+	}
 
-	const svedit = getContext('svedit');
+	const svedit = getContext<SveditCtx>('svedit');
 
-	/** @type {AnnotatedTextPropertyProps} */
-	let { path, class: css_class, placeholder = '', tag = 'div', style = '', ...rest } = $props();
+	let {
+		path,
+		class: css_class,
+		placeholder = '',
+		tag = 'div',
+		style = '',
+		...rest
+	}: AnnotatedTextPropertyProps = $props();
 
-	let is_focused = $derived.by(() => {
+	const is_focused = $derived.by(() => {
 		return (
 			svedit.session.selection?.type === 'text' &&
 			path.join('.') === svedit.session.selection?.path.join('.')
 		);
 	});
 
-	let plain_text = $derived(svedit.session.get(path).text);
-	let is_empty = $derived(
+	const plain_text = $derived((svedit.session.get(path) as AnnotatedText).text);
+	const is_empty = $derived(
 		get_char_length(plain_text) === 0 && !(svedit.is_composing && is_focused)
 	);
 
-	let is_collapsed = $derived(
-		is_focused && svedit.session.selection?.anchor_offset == svedit.session.selection?.focus_offset
+	const is_collapsed = $derived(
+		is_focused &&
+			svedit.session.selection?.type !== 'property' &&
+			svedit.session.selection?.anchor_offset === svedit.session.selection?.focus_offset
 	);
 
 	// Get selection highlight range if not inside an annotation
@@ -30,7 +54,7 @@
 	// This avoids DOM mutations (splitting text nodes for highlight spans)
 	// while the user is actively selecting, which would cause selection
 	// feedback loops and scroll-to-focus issues.
-	let selection_highlight_range = $derived.by(() => {
+	const selection_highlight_range = $derived.by<SelectionRange | null>(() => {
 		if (svedit.canvas_focused) return null;
 		if (is_collapsed) return null;
 		if (!is_focused) return null;
@@ -40,28 +64,27 @@
 		return get_selection_range(sel);
 	});
 
-	let fragments = $derived(
+	const fragments = $derived(
 		get_fragments(
-			svedit.session.get(path).text,
-			svedit.session.get(path).annotations,
+			(svedit.session.get(path) as AnnotatedText).text,
+			(svedit.session.get(path) as AnnotatedText).annotations,
 			selection_highlight_range
 		)
 	);
 
 	/**
 	 * Converts text with annotations into renderable fragments for display.
-	 * @param {string} text - The plain text content
-	 * @param {Array<Annotation>} annotations - Array of annotations
-	 * @param {SelectionRange} [selection_highlight_range] - Optional selection highlight range
-	 * @returns {Array<Fragment>} Array of fragments
 	 */
-	function get_fragments(text, annotations, selection_highlight_range) {
-		/** @type {Array<Fragment>} */
-		let fragments = [];
+	function get_fragments(
+		text: string,
+		annotations: Annotation[],
+		selection_highlight_range: SelectionRange | null
+	): Fragment[] {
+		const fragments: Fragment[] = [];
 		let last_index = 0;
 
 		// Merge annotations with selection highlight and sort by start offset
-		const ranges = [
+		const ranges: Array<Annotation | SelectionRange> = [
 			...annotations,
 			...(selection_highlight_range ? [selection_highlight_range] : [])
 		].sort((a, b) => a.start_offset - b.start_offset);
@@ -75,14 +98,14 @@
 			const content = char_slice(text, range.start_offset, range.end_offset);
 
 			if ('node_id' in range) {
-				const node = svedit.session.get(range.node_id);
+				const node = svedit.session.get(range.node_id) as DocumentNode | undefined;
 				if (!node) throw new Error(`Node not found for annotation ${range.node_id}`);
 
 				fragments.push({
 					type: 'annotation',
 					node,
 					content,
-					annotation_index: annotations.indexOf(/** @type {Annotation} */ (range))
+					annotation_index: annotations.indexOf(range)
 				});
 			} else {
 				fragments.push({
