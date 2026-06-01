@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	/**
 	 * Invisible keyboard caret selectable and gap hit area.
 	 *

@@ -401,6 +401,18 @@ tenant routing.
       internals. The character-by-character CRDT merge that
       lets two users co-type the same paragraph is a separate
       undertaking (Phase 3.2 below).
+- [ ] **Convert vendored svedit JSDoc → TypeScript bodies.** All
+      svedit files now live as `.ts` / `<script lang="ts">`
+      (consistent with the rest of the codebase), but their
+      function signatures + locals still use JSDoc-style `@param`
+      / `@type` comments — which TS treats as documentation, not
+      types. The result: ~600 implicit-`any` errors in
+      `svelte-check`. Runtime is unaffected; the noise is real.
+      Mechanical fix: convert each `/** @param {Foo} x */`
+      directive into `(x: Foo)` on the signature, import the
+      referenced types from `./types.d.ts` properly, and drop the
+      JSDoc body. ~9 files; do it per-file as we touch them, or
+      in a focused conversion pass.
 - [x] **svedit ↔ Automerge binding (Phase 3.2 / Option A).**
       Vendored svedit's `src/lib/` into `packages/memoriam/src/lib
       /svedit/`; updated 25 import sites; dropped the `svedit`

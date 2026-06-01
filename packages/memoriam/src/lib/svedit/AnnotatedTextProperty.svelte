@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import { getContext } from 'svelte';
 	import { char_slice, get_char_length, snake_to_pascal, get_selection_range } from './utils.js';
 

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import { flushSync, getContext, setContext } from 'svelte';
 	import {
 		snake_to_pascal,

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import { getContext } from 'svelte';
 
 	/** @import { NodeProps } from './types.d.ts'; */

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import { getContext, setContext } from 'svelte';
 	import UnknownNode from './UnknownNode.svelte';
 	import { snake_to_pascal } from './utils.js';

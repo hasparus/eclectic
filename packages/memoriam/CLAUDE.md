@@ -12,8 +12,9 @@ decisions live in [PLAN.md](./PLAN.md).
   `node_types`, `default_node_type`, `allow_newlines`) stay as
   svedit dictates. The vendored code is mid-flip; finish during
   the TS migration (PLAN.md Phase 1), not as drive-by renames.
-- Files using Svelte runes (`$state`, `$derived`, `$effect`)
-  must use `.svelte.js` / `.svelte.ts`.
+- TypeScript everywhere. Files using Svelte runes (`$state`,
+  `$derived`, `$effect`) must use the `.svelte.ts` extension;
+  Svelte components use `<script lang="ts">`.
 - Tailwind first; custom CSS only for things Tailwind can't
   express.
 - Sentence case for comments and commit messages.
@@ -125,7 +126,7 @@ stay in the canvas view.
 
 **Svedit ↔ Automerge binding.** Svedit is vendored at
 `src/lib/svedit/` (was an npm package; copied so we can edit the
-Session class directly). `Session.svelte.js` exposes
+Session class directly). `Session.svelte.ts` exposes
 `attach_automerge_handle(handle)` and
 `detach_automerge_handle()`. When attached, every `Session.apply`
 mirrors the transaction's `ops` into the bound Automerge doc via
