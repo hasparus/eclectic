@@ -29,11 +29,21 @@ import {
 	type DocHandle
 } from '@automerge/automerge-repo';
 import { NodeFSStorageAdapter } from '@automerge/automerge-repo-storage-nodefs';
+import { type } from 'arktype';
 import { DATA_DIR } from '$lib/server_config.js';
 import { getPlatformDb } from '$lib/server/platform_db.js';
 import { getAllSitePeople, getSiteSubjectId } from '$lib/server/people.js';
 import { getDb } from '$lib/server/db.js';
+import { parseRowOptional, parseJSON } from '$lib/server/db_row.js';
 import type { TreeDoc, TreeDocPerson, TreeDocCouple } from '$lib/tree_doc.js';
+
+const DataRowSchema = type({ data: 'string' });
+// We only need the `nodes` map here; bootstrap callers don't read
+// `document_id`. Keep the schema minimal so it tolerates any
+// schema evolution that doesn't touch this field.
+const NodesEnvelopeSchema = type({
+	'nodes?': type({ '[string]': 'object' }).as<Record<string, unknown>>()
+});
 
 let repoSingleton: Repo | null = null;
 const handleCache = new Map<string, DocHandle<TreeDoc>>();
@@ -386,14 +396,16 @@ function bootstrapDocumentDocFromSql(
 	// Pull the row from the per-site documents table. The DB
 	// accessor `getDb` lives in `$lib/server/db.js`.
 	const db = getDb(siteId);
-	const row = db
-		.prepare(`SELECT data FROM documents WHERE document_id = ?`)
-		.get(documentId) as { data: string } | undefined;
+	const row = parseRowOptional(
+		DataRowSchema,
+		db.prepare(`SELECT data FROM documents WHERE document_id = ?`).get(documentId)
+	);
 	if (!row) return;
-	const parsed = JSON.parse(row.data) as { nodes?: Record<string, unknown> };
+	const parsed = parseJSON(NodesEnvelopeSchema, row.data);
 	if (!parsed.nodes) return;
+	const nodes = parsed.nodes;
 	handle.change((doc) => {
-		doc.nodes = structuredClone(parsed.nodes!);
+		doc.nodes = structuredClone(nodes);
 	});
 }
 
@@ -407,14 +419,16 @@ export function refreshDocumentDoc(siteId: string, documentId: string): void {
 	const handle = documentHandleCache.get(documentKey(siteId, documentId));
 	if (!handle) return;
 	const db = getDb(siteId);
-	const row = db
-		.prepare(`SELECT data FROM documents WHERE document_id = ?`)
-		.get(documentId) as { data: string } | undefined;
+	const row = parseRowOptional(
+		DataRowSchema,
+		db.prepare(`SELECT data FROM documents WHERE document_id = ?`).get(documentId)
+	);
 	if (!row) return;
-	const parsed = JSON.parse(row.data) as { nodes?: Record<string, unknown> };
+	const parsed = parseJSON(NodesEnvelopeSchema, row.data);
 	if (!parsed.nodes) return;
+	const nodes = parsed.nodes;
 	handle.change((doc) => {
-		doc.nodes = structuredClone(parsed.nodes!);
+		doc.nodes = structuredClone(nodes);
 	});
 }
 

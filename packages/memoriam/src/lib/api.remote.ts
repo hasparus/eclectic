@@ -111,7 +111,7 @@ function createAuthErrorResult(code: string, message: string): ErrorResult {
 	return { ok: false, code, message };
 }
 
-import { parseRow, parseRowOptional, parseRows } from '$lib/server/db_row.js';
+import { parseRow, parseRowOptional, parseRows, parseJSON } from '$lib/server/db_row.js';
 
 // Arktype schemas for SQLite rows — used wherever we read via
 // `db().prepare(sql).get(...)` or `.all(...)`. The schema runs at the
@@ -136,10 +136,22 @@ const RefRowSchema = type({ target_document_id: 'string' });
 const TimestampRowSchema = type({ 'created_at?': 'string | null | undefined' });
 const SiteIdRowSchema = type({ site_id: 'string' });
 
-export interface DocumentData {
-	document_id: string;
-	nodes: Record<string, any>;
-}
+// JSON payload inside the `documents.data` column. The row passes
+// `parseRow(DocumentRowSchema, ...)`, but the *contents* of `data`
+// are their own trust boundary (we serialise on write, anything
+// could be in there from a prior migration or a corrupt write).
+//
+// `nodes` stays open-ended (svedit schemas drive the per-node
+// shape — we'd need a discriminated union over `documentSchema`
+// to type it, see TYPE_AUDIT.md §C). What we DO validate is the
+// envelope: there's a string `document_id` and an object `nodes`
+// keyed by string ids. That alone catches "the doc is null",
+// "data is a stringified array", "document_id went missing".
+const DocumentDataSchema = type({
+	document_id: 'string',
+	nodes: type({ '[string]': 'object' }).as<Record<string, any>>()
+});
+export type DocumentData = typeof DocumentDataSchema.infer;
 
 interface PageDocumentRecord {
 	document_id: string;
@@ -292,7 +304,7 @@ function getDocFromDb(document_id: string): DocumentData {
 	if (!docRow) {
 		throw new Error(`Document not found: ${document_id}`);
 	}
-	return JSON.parse(docRow.data) as DocumentData;
+	return parseJSON(DocumentDataSchema, docRow.data);
 }
 
 /**
@@ -303,7 +315,7 @@ function getOptionalDocFromDb(document_id: string): DocumentData | null {
 	const raw = db().prepare('SELECT * FROM documents WHERE document_id = ?').get(document_id);
 	const docRow = parseRowOptional(DocumentRowSchema, raw);
 	if (!docRow) return null;
-	return JSON.parse(docRow.data) as DocumentData;
+	return parseJSON(DocumentDataSchema, docRow.data);
 }
 
 /**
@@ -371,7 +383,7 @@ function listPageDocuments(): PageDocumentRecord[] {
 	const rows = parseRows(DocumentRowSchema, raw);
 
 	return rows.map((row) => {
-		const doc = JSON.parse(row.data) as DocumentData;
+		const doc = parseJSON(DocumentDataSchema, row.data);
 		return {
 			document_id: doc.document_id,
 			nodes: doc.nodes,
@@ -1106,7 +1118,7 @@ export const getInternalLinkPreview = query(type('string'), async (href) => {
 		return null;
 	}
 
-	const pageDoc = JSON.parse(docRow.data) as DocumentData;
+	const pageDoc = parseJSON(DocumentDataSchema, docRow.data);
 	const metadata = extractPageMetadata(pageDoc);
 
 	return /** @type {InternalLinkPreview} */ ({
@@ -1459,7 +1471,7 @@ export const updatePageSlug = command(updatePageSlugInputSchema, async (input) =
 		const nowIso = new Date().toISOString();
 
 		for (const row of pageRows) {
-			const doc = JSON.parse(row.data);
+			const doc = parseJSON(DocumentDataSchema, row.data);
 			rewriteInternalPageHrefs(doc.nodes, input.document_id, newActiveSlug);
 			upsert.run(
 				row.document_id,

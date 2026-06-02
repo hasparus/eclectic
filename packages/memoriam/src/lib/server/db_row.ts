@@ -13,7 +13,7 @@
  * `undefined.foo` crash three frames deep.
  */
 
-import { type } from 'arktype';
+import { type, Type } from 'arktype';
 
 /**
  * Validate a row that the caller knows must exist. Throws on
@@ -64,4 +64,25 @@ export function parseRows<S extends type.Any>(schema: S, rows: unknown): S['infe
 		throw new Error(`parseRows: rows failed validation: ${result.summary}`);
 	}
 	return result as S['infer'][];
+}
+
+/**
+ * Parse + validate a JSON string against an arktype schema.
+ * Use this for serialised payloads stored in `*.data` columns:
+ * the row makes it past `parseRow`'s shape check, but the
+ * embedded JSON is its own trust boundary that the SQLite layer
+ * doesn't validate.
+ *
+ * Implemented via arktype's built-in `string.json.parse` morph
+ * piped into the target schema — so malformed-JSON and
+ * shape-mismatch errors both surface through the same error
+ * channel with structured locations.
+ */
+export function parseJSON<S extends Type>(schema: S, json: string): S['infer'] {
+	const parser = type('string.json.parse').pipe(schema);
+	const result = parser(json);
+	if (result instanceof type.errors) {
+		throw new Error(`parseJSON: ${result.summary}`);
+	}
+	return result as S['infer'];
 }

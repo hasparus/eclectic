@@ -1,6 +1,7 @@
 import { insert_default_node, break_text_node } from './transforms.svelte.js';
 import { is_selection_collapsed, is_mobile_browser, get_char_length } from './utils.js';
 import type Session from './Session.svelte.js';
+import type { AnnotatedText } from './types.d.ts';
 
 /**
  * The host environment a `Command` reaches into. Loosely typed —
@@ -77,7 +78,7 @@ export class SelectParentCommand extends Command {
 	}
 
 	execute(): void {
-		(this.context.session as unknown as { select_parent: () => void }).select_parent();
+		this.context.session.select_parent();
 	}
 }
 
@@ -96,36 +97,25 @@ export class ToggleAnnotationCommand extends Command {
 	active = $derived(this.is_active());
 
 	is_active(): boolean {
-		return Boolean(
-			(this.context.session as unknown as { active_annotation: (t?: string) => unknown }).active_annotation(
-				this.node_type
-			)
-		);
+		return Boolean(this.context.session.active_annotation(this.node_type));
 	}
 
 	is_enabled(): boolean {
 		const { session, editable } = this.context;
-		const annotated = session as unknown as {
-			active_annotation: (t?: string) => unknown;
-			selection: { type: string } | null;
-		};
-		const has_annotation = annotated.active_annotation(this.node_type);
+		const has_annotation = session.active_annotation(this.node_type);
 		const no_annotation_and_caret_not_collapsed =
-			!annotated.active_annotation() && !is_selection_collapsed(session.selection);
+			!session.active_annotation() && !is_selection_collapsed(session.selection);
 
 		return (
 			editable &&
-			annotated.selection?.type === 'text' &&
+			session.selection?.type === 'text' &&
 			Boolean(has_annotation || no_annotation_and_caret_not_collapsed)
 		);
 	}
 
 	execute(): void {
-		const sess = this.context.session as unknown as {
-			tr: { annotate_text: (t: string) => any };
-			apply: (tr: any) => void;
-		};
-		sess.apply(sess.tr.annotate_text(this.node_type));
+		const { session } = this.context;
+		session.apply(session.tr.annotate_text(this.node_type));
 	}
 }
 
@@ -136,25 +126,20 @@ export class ToggleAnnotationCommand extends Command {
  */
 export class AddNewLineCommand extends Command {
 	is_enabled(): boolean {
-		const session = this.context.session;
+		const { session } = this.context;
 		const selection = session.selection;
 
 		return (
 			this.context.editable &&
 			!is_mobile_browser() &&
 			selection?.type === 'text' &&
-			Boolean(
-				(session.inspect(selection.path) as { allow_newlines?: boolean } | null)?.allow_newlines
-			)
+			Boolean(session.inspect(selection.path).allow_newlines)
 		);
 	}
 
 	execute(): void {
-		const sess = this.context.session as unknown as {
-			tr: { insert_text: (text: string) => any };
-			apply: (tr: any) => void;
-		};
-		sess.apply(sess.tr.insert_text('\n'));
+		const { session } = this.context;
+		session.apply(session.tr.insert_text('\n'));
 	}
 }
 
@@ -165,9 +150,10 @@ export class BreakTextNodeCommand extends Command {
 	}
 
 	execute(): void {
-		const tr = (this.context.session as unknown as { tr: any }).tr;
+		const { session } = this.context;
+		const tr = session.tr;
 		if (break_text_node(tr)) {
-			(this.context.session as unknown as { apply: (tr: any) => void }).apply(tr);
+			session.apply(tr);
 		}
 	}
 }
@@ -183,7 +169,7 @@ export class SelectAllCommand extends Command {
 	}
 
 	execute(): void {
-		const session = this.context.session;
+		const { session } = this.context;
 		const selection = session.selection;
 
 		if (!selection) {
@@ -191,7 +177,7 @@ export class SelectAllCommand extends Command {
 		}
 
 		if (selection.type === 'text') {
-			const text_content = session.get(selection.path) as { text: string };
+			const text_content = session.get(selection.path) as AnnotatedText;
 			const text_length = get_char_length(text_content.text);
 
 			const is_all_text_selected =
@@ -210,8 +196,7 @@ export class SelectAllCommand extends Command {
 
 				if (node_path.length >= 2) {
 					const is_inside_node_array =
-						(session.inspect(node_path.slice(0, -1)) as { type?: string } | null)?.type ===
-						'node_array';
+						session.inspect(node_path.slice(0, -1)).type === 'node_array';
 
 					if (is_inside_node_array) {
 						const node_index = parseInt(String(node_path.at(-1)));
@@ -244,8 +229,7 @@ export class SelectAllCommand extends Command {
 
 				if (parent_path.length >= 2) {
 					const is_parent_node_array =
-						(session.inspect(parent_path.slice(0, -1)) as { type?: string } | null)?.type ===
-						'node_array';
+						session.inspect(parent_path.slice(0, -1)).type === 'node_array';
 
 					if (is_parent_node_array) {
 						const parent_node_index = parseInt(String(parent_path.at(-1)));
@@ -263,8 +247,7 @@ export class SelectAllCommand extends Command {
 
 			if (node_path.length >= 2) {
 				const is_inside_node_array =
-					(session.inspect(node_path.slice(0, -1)) as { type?: string } | null)?.type ===
-					'node_array';
+					session.inspect(node_path.slice(0, -1)).type === 'node_array';
 
 				if (is_inside_node_array) {
 					const node_index = parseInt(String(node_path.at(-1)));
@@ -292,12 +275,9 @@ export class InsertDefaultNodeCommand extends Command {
 	}
 
 	execute(): void {
-		const sess = this.context.session as unknown as {
-			tr: any;
-			apply: (tr: any) => void;
-		};
-		const tr = sess.tr;
+		const { session } = this.context;
+		const tr = session.tr;
 		insert_default_node(tr);
-		sess.apply(tr);
+		session.apply(tr);
 	}
 }
