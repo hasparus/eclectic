@@ -49,17 +49,17 @@
     "import/no-default-export": "warn",
     "import/no-duplicates": "warn",
     "import/prefer-default-export": "off",
-    "jsx-a11y/alt-text": "error",
+    "jsx-a11y/alt-text": "warn",
     "jsx-a11y/anchor-ambiguous-text": "off",
-    "jsx-a11y/anchor-has-content": "error",
-    "jsx-a11y/anchor-is-valid": "error",
-    "jsx-a11y/aria-activedescendant-has-tabindex": "error",
-    "jsx-a11y/aria-props": "error",
-    "jsx-a11y/aria-proptypes": "error",
-    "jsx-a11y/aria-role": "error",
-    "jsx-a11y/aria-unsupported-elements": "error",
-    "jsx-a11y/autocomplete-valid": "error",
-    "jsx-a11y/click-events-have-key-events": "error",
+    "jsx-a11y/anchor-has-content": "warn",
+    "jsx-a11y/anchor-is-valid": "warn",
+    "jsx-a11y/aria-activedescendant-has-tabindex": "warn",
+    "jsx-a11y/aria-props": "warn",
+    "jsx-a11y/aria-proptypes": "warn",
+    "jsx-a11y/aria-role": "warn",
+    "jsx-a11y/aria-unsupported-elements": "warn",
+    "jsx-a11y/autocomplete-valid": "warn",
+    "jsx-a11y/click-events-have-key-events": "warn",
     "jsx-a11y/control-has-associated-label": [
       "off",
       {
@@ -90,12 +90,12 @@
         ]
       }
     ],
-    "jsx-a11y/heading-has-content": "error",
-    "jsx-a11y/html-has-lang": "error",
-    "jsx-a11y/iframe-has-title": "error",
-    "jsx-a11y/img-redundant-alt": "error",
+    "jsx-a11y/heading-has-content": "warn",
+    "jsx-a11y/html-has-lang": "warn",
+    "jsx-a11y/iframe-has-title": "warn",
+    "jsx-a11y/img-redundant-alt": "warn",
     "jsx-a11y/interactive-supports-focus": [
-      "error",
+      "warn",
       {
         "tabbable": [
           "button",
@@ -108,14 +108,14 @@
         ]
       }
     ],
-    "jsx-a11y/label-has-associated-control": "error",
-    "jsx-a11y/media-has-caption": "error",
-    "jsx-a11y/mouse-events-have-key-events": "error",
-    "jsx-a11y/no-access-key": "error",
-    "jsx-a11y/no-autofocus": "error",
-    "jsx-a11y/no-distracting-elements": "error",
+    "jsx-a11y/label-has-associated-control": "warn",
+    "jsx-a11y/media-has-caption": "warn",
+    "jsx-a11y/mouse-events-have-key-events": "warn",
+    "jsx-a11y/no-access-key": "warn",
+    "jsx-a11y/no-autofocus": "warn",
+    "jsx-a11y/no-distracting-elements": "warn",
     "jsx-a11y/no-interactive-element-to-noninteractive-role": [
-      "error",
+      "warn",
       {
         "tr": [
           "none",
@@ -127,7 +127,7 @@
       }
     ],
     "jsx-a11y/no-noninteractive-element-interactions": [
-      "error",
+      "warn",
       {
         "handlers": [
           "onClick",
@@ -164,7 +164,7 @@
       }
     ],
     "jsx-a11y/no-noninteractive-element-to-interactive-role": [
-      "error",
+      "warn",
       {
         "ul": [
           "listbox",
@@ -206,7 +206,7 @@
       }
     ],
     "jsx-a11y/no-noninteractive-tabindex": [
-      "error",
+      "warn",
       {
         "tags": [],
         "roles": [
@@ -215,9 +215,9 @@
         "allowExpressionValues": true
       }
     ],
-    "jsx-a11y/no-redundant-roles": "error",
+    "jsx-a11y/no-redundant-roles": "warn",
     "jsx-a11y/no-static-element-interactions": [
-      "error",
+      "warn",
       {
         "allowExpressionValues": true,
         "handlers": [
@@ -230,10 +230,10 @@
         ]
       }
     ],
-    "jsx-a11y/role-has-required-aria-props": "error",
-    "jsx-a11y/role-supports-aria-props": "error",
-    "jsx-a11y/scope": "error",
-    "jsx-a11y/tabindex-no-positive": "error",
+    "jsx-a11y/role-has-required-aria-props": "warn",
+    "jsx-a11y/role-supports-aria-props": "warn",
+    "jsx-a11y/scope": "warn",
+    "jsx-a11y/tabindex-no-positive": "warn",
     "logical-assignment-operators": [
       "warn",
       "always",
@@ -241,9 +241,9 @@
         "enforceForIfStatements": true
       }
     ],
-    "no-array-constructor": "error",
+    "no-array-constructor": "warn",
     "no-async-promise-executor": "error",
-    "no-case-declarations": "error",
+    "no-case-declarations": "warn",
     "no-class-assign": "off",
     "no-compare-neg-zero": "error",
     "no-cond-assign": "error",
@@ -251,7 +251,7 @@
     "no-const-assign": "off",
     "no-constant-binary-expression": "error",
     "no-constant-condition": "error",
-    "no-control-regex": "error",
+    "no-control-regex": "warn",
     "no-debugger": "error",
     "no-delete-var": "error",
     "no-dupe-class-members": "off",
@@ -264,13 +264,13 @@
         "allowElseIf": false
       }
     ],
-    "no-empty": "error",
+    "no-empty": "warn",
     "no-empty-character-class": "error",
-    "no-empty-function": "error",
+    "no-empty-function": "warn",
     "no-empty-pattern": "error",
-    "no-empty-static-block": "error",
+    "no-empty-static-block": "warn",
     "no-ex-assign": "error",
-    "no-extra-boolean-cast": "error",
+    "no-extra-boolean-cast": "warn",
     "no-fallthrough": "error",
     "no-func-assign": "off",
     "no-global-assign": "error",
@@ -283,7 +283,7 @@
     ],
     "no-import-assign": "off",
     "no-invalid-regexp": "error",
-    "no-irregular-whitespace": "error",
+    "no-irregular-whitespace": "warn",
     "no-lonely-if": "warn",
     "no-loss-of-precision": "error",
     "no-misleading-character-class": "error",
@@ -292,7 +292,7 @@
     "no-obj-calls": "off",
     "no-prototype-builtins": "error",
     "no-redeclare": "off",
-    "no-regex-spaces": "error",
+    "no-regex-spaces": "warn",
     "no-restricted-globals": [
       "warn",
       "stop",
@@ -308,11 +308,19 @@
         "paths": [
           {
             "name": "react",
-            "importNames": ["PropsWithChildren"],
+            "importNames": [
+              "PropsWithChildren"
+            ],
             "message": "`PropsWithChildren` set `children` as optional, explicitly define `children` field in your type"
           },
-          { "name": "axios", "message": "Use `fetch/node-fetch` instead." },
-          { "name": "moment", "message": "Use `dayjs/date-fns` instead." },
+          {
+            "name": "axios",
+            "message": "Use `fetch/node-fetch` instead."
+          },
+          {
+            "name": "moment",
+            "message": "Use `dayjs/date-fns` instead."
+          },
           {
             "name": "classnames",
             "message": "Use `clsx` instead because he is faster."
@@ -331,9 +339,9 @@
     "no-unsafe-finally": "error",
     "no-unsafe-negation": "off",
     "no-unsafe-optional-chaining": "error",
-    "no-unused-expressions": "error",
-    "no-unused-labels": "error",
-    "no-unused-private-class-members": "error",
+    "no-unused-expressions": "warn",
+    "no-unused-labels": "warn",
+    "no-unused-private-class-members": "warn",
     "no-unused-vars": [
       "warn",
       {
@@ -344,52 +352,52 @@
       }
     ],
     "no-useless-backreference": "error",
-    "no-useless-catch": "error",
-    "no-useless-constructor": "error",
-    "no-useless-escape": "error",
-    "no-var": "error",
+    "no-useless-catch": "warn",
+    "no-useless-constructor": "warn",
+    "no-useless-escape": "warn",
+    "no-var": "warn",
     "no-with": "error",
     "object-shorthand": [
       "warn",
       "always"
     ],
     "perfectionist/sort-array-includes": [
-      "error",
+      "warn",
       {
         "type": "natural",
         "order": "asc"
       }
     ],
     "perfectionist/sort-decorators": [
-      "error",
+      "warn",
       {
         "type": "natural",
         "order": "asc"
       }
     ],
     "perfectionist/sort-exports": [
-      "error",
+      "warn",
       {
         "type": "natural",
         "order": "asc"
       }
     ],
     "perfectionist/sort-heritage-clauses": [
-      "error",
+      "warn",
       {
         "type": "natural",
         "order": "asc"
       }
     ],
     "perfectionist/sort-interfaces": [
-      "error",
+      "warn",
       {
         "type": "natural",
         "order": "asc"
       }
     ],
     "perfectionist/sort-intersection-types": [
-      "error",
+      "warn",
       {
         "type": "natural",
         "order": "asc"
@@ -397,21 +405,21 @@
     ],
     "perfectionist/sort-jsx-props": "warn",
     "perfectionist/sort-maps": [
-      "error",
+      "warn",
       {
         "type": "natural",
         "order": "asc"
       }
     ],
     "perfectionist/sort-named-exports": [
-      "error",
+      "warn",
       {
         "type": "natural",
         "order": "asc"
       }
     ],
     "perfectionist/sort-named-imports": [
-      "error",
+      "warn",
       {
         "type": "natural",
         "order": "asc"
@@ -434,14 +442,14 @@
       }
     ],
     "perfectionist/sort-sets": [
-      "error",
+      "warn",
       {
         "type": "natural",
         "order": "asc"
       }
     ],
     "perfectionist/sort-switch-case": [
-      "error",
+      "warn",
       {
         "type": "natural",
         "order": "asc"
@@ -460,7 +468,7 @@
       }
     ],
     "perfectionist/sort-variable-declarations": [
-      "error",
+      "warn",
       {
         "type": "natural",
         "order": "asc"
@@ -479,7 +487,7 @@
       }
     ],
     "prefer-destructuring": [
-      "error",
+      "warn",
       {
         "VariableDeclarator": {
           "object": true
@@ -487,30 +495,30 @@
       }
     ],
     "prefer-object-has-own": "warn",
-    "prefer-rest-params": "error",
-    "prefer-spread": "error",
+    "prefer-rest-params": "warn",
+    "prefer-spread": "warn",
     "promise/no-multiple-resolved": "warn",
     "promise/no-nesting": "warn",
-    "react/display-name": "error",
+    "react/display-name": "warn",
     "react/exhaustive-deps": "warn",
-    "react/hook-use-state": "error",
-    "react/iframe-missing-sandbox": "error",
-    "react/jsx-boolean-value": "error",
-    "react/jsx-curly-brace-presence": "error",
+    "react/hook-use-state": "warn",
+    "react/iframe-missing-sandbox": "warn",
+    "react/jsx-boolean-value": "warn",
+    "react/jsx-curly-brace-presence": "warn",
     "react/jsx-key": "error",
     "react/jsx-no-comment-textnodes": "error",
     "react/jsx-no-duplicate-props": "error",
     "react/jsx-no-literals": "off",
     "react/jsx-no-target-blank": "error",
     "react/jsx-no-undef": "off",
-    "react/jsx-no-useless-fragment": "error",
+    "react/jsx-no-useless-fragment": "warn",
     "react/no-children-prop": "error",
     "react/no-danger-with-children": "error",
     "react/no-direct-mutation-state": "error",
-    "react/no-find-dom-node": "error",
-    "react/no-is-mounted": "error",
+    "react/no-find-dom-node": "warn",
+    "react/no-is-mounted": "warn",
     "react/no-render-return-value": "error",
-    "react/no-string-refs": "error",
+    "react/no-string-refs": "warn",
     "react/no-unescaped-entities": "off",
     "react/no-unknown-property": "error",
     "react/no-unsafe": "off",
@@ -518,7 +526,7 @@
     "react/rules-of-hooks": "error",
     "react/self-closing-comp": "off",
     "require-await": "off",
-    "require-yield": "error",
+    "require-yield": "warn",
     "sonarjs/no-collapsible-if": "off",
     "sonarjs/no-gratuitous-expressions": "warn",
     "sonarjs/no-identical-conditions": "warn",
@@ -526,162 +534,162 @@
     "sonarjs/no-nested-switch": "warn",
     "sonarjs/no-unused-collection": "warn",
     "sonarjs/no-use-of-empty-return-value": "warn",
-    "typescript/adjacent-overload-signatures": "error",
-    "typescript/array-type": "error",
+    "typescript/adjacent-overload-signatures": "warn",
+    "typescript/array-type": "warn",
     "typescript/ban-ts-comment": [
-      "error",
+      "warn",
       {
         "minimumDescriptionLength": 10
       }
     ],
-    "typescript/ban-tslint-comment": "error",
-    "typescript/class-literal-property-style": "error",
-    "typescript/consistent-generic-constructors": "error",
-    "typescript/consistent-indexed-object-style": "error",
-    "typescript/consistent-type-assertions": "error",
-    "typescript/no-confusing-non-null-assertion": "error",
+    "typescript/ban-tslint-comment": "warn",
+    "typescript/class-literal-property-style": "warn",
+    "typescript/consistent-generic-constructors": "warn",
+    "typescript/consistent-indexed-object-style": "warn",
+    "typescript/consistent-type-assertions": "warn",
+    "typescript/no-confusing-non-null-assertion": "warn",
     "typescript/no-duplicate-enum-values": "error",
-    "typescript/no-dynamic-delete": "error",
-    "typescript/no-explicit-any": "error",
-    "typescript/no-extra-non-null-assertion": "error",
-    "typescript/no-extraneous-class": "error",
-    "typescript/no-inferrable-types": "error",
-    "typescript/no-invalid-void-type": "error",
+    "typescript/no-dynamic-delete": "warn",
+    "typescript/no-explicit-any": "warn",
+    "typescript/no-extra-non-null-assertion": "warn",
+    "typescript/no-extraneous-class": "warn",
+    "typescript/no-inferrable-types": "warn",
+    "typescript/no-invalid-void-type": "warn",
     "typescript/no-misused-new": "error",
-    "typescript/no-namespace": "error",
+    "typescript/no-namespace": "warn",
     "typescript/no-non-null-asserted-nullish-coalescing": "error",
     "typescript/no-non-null-asserted-optional-chain": "error",
-    "typescript/no-require-imports": "error",
-    "typescript/no-this-alias": "error",
-    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-require-imports": "warn",
+    "typescript/no-this-alias": "warn",
+    "typescript/no-unnecessary-type-constraint": "warn",
     "typescript/no-unsafe-declaration-merging": "error",
-    "typescript/no-unsafe-function-type": "error",
-    "typescript/no-wrapper-object-types": "error",
-    "typescript/prefer-as-const": "error",
-    "typescript/prefer-for-of": "error",
-    "typescript/prefer-function-type": "error",
-    "typescript/prefer-literal-enum-member": "error",
-    "typescript/prefer-namespace-keyword": "error",
-    "typescript/triple-slash-reference": "error",
-    "typescript/unified-signatures": "error",
-    "unicorn/catch-error-name": "error",
-    "unicorn/consistent-assert": "error",
-    "unicorn/consistent-date-clone": "error",
-    "unicorn/consistent-empty-array-spread": "error",
-    "unicorn/consistent-existence-index-check": "error",
-    "unicorn/consistent-function-scoping": "error",
-    "unicorn/empty-brace-spaces": "error",
-    "unicorn/error-message": "error",
-    "unicorn/escape-case": "error",
-    "unicorn/explicit-length-check": "error",
+    "typescript/no-unsafe-function-type": "warn",
+    "typescript/no-wrapper-object-types": "warn",
+    "typescript/prefer-as-const": "warn",
+    "typescript/prefer-for-of": "warn",
+    "typescript/prefer-function-type": "warn",
+    "typescript/prefer-literal-enum-member": "warn",
+    "typescript/prefer-namespace-keyword": "warn",
+    "typescript/triple-slash-reference": "warn",
+    "typescript/unified-signatures": "warn",
+    "unicorn/catch-error-name": "warn",
+    "unicorn/consistent-assert": "warn",
+    "unicorn/consistent-date-clone": "warn",
+    "unicorn/consistent-empty-array-spread": "warn",
+    "unicorn/consistent-existence-index-check": "warn",
+    "unicorn/consistent-function-scoping": "warn",
+    "unicorn/empty-brace-spaces": "warn",
+    "unicorn/error-message": "warn",
+    "unicorn/escape-case": "warn",
+    "unicorn/explicit-length-check": "warn",
     "unicorn/new-for-builtins": "error",
-    "unicorn/no-abusive-eslint-disable": "error",
-    "unicorn/no-accessor-recursion": "error",
-    "unicorn/no-anonymous-default-export": "error",
+    "unicorn/no-abusive-eslint-disable": "warn",
+    "unicorn/no-accessor-recursion": "warn",
+    "unicorn/no-anonymous-default-export": "warn",
     "unicorn/no-array-for-each": "warn",
-    "unicorn/no-array-method-this-argument": "error",
-    "unicorn/no-array-reduce": "error",
-    "unicorn/no-array-reverse": "error",
-    "unicorn/no-await-expression-member": "error",
+    "unicorn/no-array-method-this-argument": "warn",
+    "unicorn/no-array-reduce": "warn",
+    "unicorn/no-array-reverse": "warn",
+    "unicorn/no-await-expression-member": "warn",
     "unicorn/no-await-in-promise-methods": "error",
-    "unicorn/no-console-spaces": "error",
-    "unicorn/no-document-cookie": "error",
+    "unicorn/no-console-spaces": "warn",
+    "unicorn/no-document-cookie": "warn",
     "unicorn/no-empty-file": "warn",
-    "unicorn/no-hex-escape": "error",
-    "unicorn/no-immediate-mutation": "error",
+    "unicorn/no-hex-escape": "warn",
+    "unicorn/no-immediate-mutation": "warn",
     "unicorn/no-instanceof-array": "warn",
-    "unicorn/no-instanceof-builtins": "error",
+    "unicorn/no-instanceof-builtins": "warn",
     "unicorn/no-invalid-fetch-options": "error",
     "unicorn/no-invalid-remove-event-listener": "error",
     "unicorn/no-lonely-if": "warn",
-    "unicorn/no-magic-array-flat-depth": "error",
+    "unicorn/no-magic-array-flat-depth": "warn",
     "unicorn/no-negated-condition": "warn",
-    "unicorn/no-negation-in-equality-check": "error",
-    "unicorn/no-new-array": "error",
+    "unicorn/no-negation-in-equality-check": "warn",
+    "unicorn/no-new-array": "warn",
     "unicorn/no-new-buffer": "error",
-    "unicorn/no-object-as-default-parameter": "error",
-    "unicorn/no-process-exit": "error",
-    "unicorn/no-single-promise-in-promise-methods": "error",
-    "unicorn/no-static-only-class": "error",
+    "unicorn/no-object-as-default-parameter": "warn",
+    "unicorn/no-process-exit": "warn",
+    "unicorn/no-single-promise-in-promise-methods": "warn",
+    "unicorn/no-static-only-class": "warn",
     "unicorn/no-thenable": "error",
-    "unicorn/no-this-assignment": "error",
-    "unicorn/no-typeof-undefined": "error",
-    "unicorn/no-unnecessary-array-flat-depth": "error",
-    "unicorn/no-unnecessary-array-splice-count": "error",
-    "unicorn/no-unnecessary-await": "error",
-    "unicorn/no-unnecessary-slice-end": "error",
-    "unicorn/no-unreadable-array-destructuring": "error",
-    "unicorn/no-unreadable-iife": "error",
-    "unicorn/no-useless-collection-argument": "error",
-    "unicorn/no-useless-error-capture-stack-trace": "error",
+    "unicorn/no-this-assignment": "warn",
+    "unicorn/no-typeof-undefined": "warn",
+    "unicorn/no-unnecessary-array-flat-depth": "warn",
+    "unicorn/no-unnecessary-array-splice-count": "warn",
+    "unicorn/no-unnecessary-await": "warn",
+    "unicorn/no-unnecessary-slice-end": "warn",
+    "unicorn/no-unreadable-array-destructuring": "warn",
+    "unicorn/no-unreadable-iife": "warn",
+    "unicorn/no-useless-collection-argument": "warn",
+    "unicorn/no-useless-error-capture-stack-trace": "warn",
     "unicorn/no-useless-fallback-in-spread": "warn",
-    "unicorn/no-useless-length-check": "error",
-    "unicorn/no-useless-promise-resolve-reject": "error",
+    "unicorn/no-useless-length-check": "warn",
+    "unicorn/no-useless-promise-resolve-reject": "warn",
     "unicorn/no-useless-spread": "warn",
-    "unicorn/no-useless-switch-case": "error",
-    "unicorn/no-useless-undefined": "error",
-    "unicorn/no-zero-fractions": "error",
-    "unicorn/number-literal-case": "error",
+    "unicorn/no-useless-switch-case": "warn",
+    "unicorn/no-useless-undefined": "warn",
+    "unicorn/no-zero-fractions": "warn",
+    "unicorn/number-literal-case": "warn",
     "unicorn/numeric-separators-style": "warn",
-    "unicorn/prefer-add-event-listener": "error",
+    "unicorn/prefer-add-event-listener": "warn",
     "unicorn/prefer-array-find": "warn",
-    "unicorn/prefer-array-flat": "error",
-    "unicorn/prefer-array-flat-map": "error",
-    "unicorn/prefer-array-index-of": "error",
-    "unicorn/prefer-array-some": "error",
-    "unicorn/prefer-at": "error",
-    "unicorn/prefer-bigint-literals": "error",
-    "unicorn/prefer-blob-reading-methods": "error",
-    "unicorn/prefer-class-fields": "error",
-    "unicorn/prefer-classlist-toggle": "error",
-    "unicorn/prefer-code-point": "error",
-    "unicorn/prefer-date-now": "error",
-    "unicorn/prefer-default-parameters": "error",
-    "unicorn/prefer-dom-node-append": "error",
-    "unicorn/prefer-dom-node-dataset": "error",
-    "unicorn/prefer-dom-node-remove": "error",
-    "unicorn/prefer-dom-node-text-content": "error",
-    "unicorn/prefer-event-target": "error",
+    "unicorn/prefer-array-flat": "warn",
+    "unicorn/prefer-array-flat-map": "warn",
+    "unicorn/prefer-array-index-of": "warn",
+    "unicorn/prefer-array-some": "warn",
+    "unicorn/prefer-at": "warn",
+    "unicorn/prefer-bigint-literals": "warn",
+    "unicorn/prefer-blob-reading-methods": "warn",
+    "unicorn/prefer-class-fields": "warn",
+    "unicorn/prefer-classlist-toggle": "warn",
+    "unicorn/prefer-code-point": "warn",
+    "unicorn/prefer-date-now": "warn",
+    "unicorn/prefer-default-parameters": "warn",
+    "unicorn/prefer-dom-node-append": "warn",
+    "unicorn/prefer-dom-node-dataset": "warn",
+    "unicorn/prefer-dom-node-remove": "warn",
+    "unicorn/prefer-dom-node-text-content": "warn",
+    "unicorn/prefer-event-target": "warn",
     "unicorn/prefer-export-from": "warn",
-    "unicorn/prefer-global-this": "error",
+    "unicorn/prefer-global-this": "warn",
     "unicorn/prefer-includes": "warn",
-    "unicorn/prefer-keyboard-event-key": "error",
+    "unicorn/prefer-keyboard-event-key": "warn",
     "unicorn/prefer-logical-operator-over-ternary": "warn",
-    "unicorn/prefer-math-min-max": "error",
-    "unicorn/prefer-math-trunc": "error",
-    "unicorn/prefer-modern-dom-apis": "error",
-    "unicorn/prefer-modern-math-apis": "error",
-    "unicorn/prefer-module": "error",
-    "unicorn/prefer-native-coercion-functions": "error",
-    "unicorn/prefer-negative-index": "error",
+    "unicorn/prefer-math-min-max": "warn",
+    "unicorn/prefer-math-trunc": "warn",
+    "unicorn/prefer-modern-dom-apis": "warn",
+    "unicorn/prefer-modern-math-apis": "warn",
+    "unicorn/prefer-module": "warn",
+    "unicorn/prefer-native-coercion-functions": "warn",
+    "unicorn/prefer-negative-index": "warn",
     "unicorn/prefer-node-protocol": "warn",
-    "unicorn/prefer-number-properties": "error",
-    "unicorn/prefer-object-from-entries": "error",
-    "unicorn/prefer-optional-catch-binding": "error",
-    "unicorn/prefer-prototype-methods": "error",
-    "unicorn/prefer-reflect-apply": "error",
-    "unicorn/prefer-regexp-test": "error",
-    "unicorn/prefer-response-static-json": "error",
-    "unicorn/prefer-set-has": "error",
-    "unicorn/prefer-set-size": "error",
-    "unicorn/prefer-single-call": "error",
-    "unicorn/prefer-spread": "error",
-    "unicorn/prefer-string-raw": "error",
-    "unicorn/prefer-string-replace-all": "error",
-    "unicorn/prefer-string-slice": "error",
-    "unicorn/prefer-string-starts-ends-with": "error",
+    "unicorn/prefer-number-properties": "warn",
+    "unicorn/prefer-object-from-entries": "warn",
+    "unicorn/prefer-optional-catch-binding": "warn",
+    "unicorn/prefer-prototype-methods": "warn",
+    "unicorn/prefer-reflect-apply": "warn",
+    "unicorn/prefer-regexp-test": "warn",
+    "unicorn/prefer-response-static-json": "warn",
+    "unicorn/prefer-set-has": "warn",
+    "unicorn/prefer-set-size": "warn",
+    "unicorn/prefer-single-call": "warn",
+    "unicorn/prefer-spread": "warn",
+    "unicorn/prefer-string-raw": "warn",
+    "unicorn/prefer-string-replace-all": "warn",
+    "unicorn/prefer-string-slice": "warn",
+    "unicorn/prefer-string-starts-ends-with": "warn",
     "unicorn/prefer-string-trim-start-end": "warn",
-    "unicorn/prefer-structured-clone": "error",
-    "unicorn/prefer-ternary": "error",
-    "unicorn/prefer-top-level-await": "error",
-    "unicorn/prefer-type-error": "error",
-    "unicorn/relative-url-style": "error",
-    "unicorn/require-array-join-separator": "error",
-    "unicorn/require-module-attributes": "error",
-    "unicorn/require-module-specifiers": "error",
-    "unicorn/require-number-to-fixed-digits-argument": "error",
-    "unicorn/text-encoding-identifier-case": "error",
-    "unicorn/throw-new-error": "error",
+    "unicorn/prefer-structured-clone": "warn",
+    "unicorn/prefer-ternary": "warn",
+    "unicorn/prefer-top-level-await": "warn",
+    "unicorn/prefer-type-error": "warn",
+    "unicorn/relative-url-style": "warn",
+    "unicorn/require-array-join-separator": "warn",
+    "unicorn/require-module-attributes": "warn",
+    "unicorn/require-module-specifiers": "warn",
+    "unicorn/require-number-to-fixed-digits-argument": "warn",
+    "unicorn/text-encoding-identifier-case": "warn",
+    "unicorn/throw-new-error": "warn",
     "use-isnan": "error",
     "valid-typeof": "error",
     "yoda": "warn"
@@ -710,10 +718,10 @@
         "no-this-before-super": "off",
         "no-unreachable": "off",
         "no-unsafe-negation": "off",
-        "no-var": "error",
+        "no-var": "warn",
         "no-with": "off",
-        "prefer-rest-params": "error",
-        "prefer-spread": "error"
+        "prefer-rest-params": "warn",
+        "prefer-spread": "warn"
       }
     },
     {
