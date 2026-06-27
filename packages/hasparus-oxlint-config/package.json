@@ -1,0 +1,27 @@
+{
+  "name": "@hasparus/oxlint-config",
+  "version": "0.1.0",
+  "description": "oxlint mirror of @hasparus/eslint-config/the-guild",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./oxlintrc.json": "./oxlintrc.json"
+  },
+  "files": [
+    "oxlintrc.json"
+  ],
+  "scripts": {
+    "lint": "oxlint --config oxlintrc.json"
+  },
+  "peerDependencies": {
+    "oxlint": "^1.70.0"
+  },
+  "dependencies": {
+    "eslint-plugin-better-tailwindcss": "4.0.2",
+    "eslint-plugin-perfectionist": "5.4.0",
+    "eslint-plugin-sonarjs": "3.0.6"
+  },
+  "devDependencies": {
+    "oxlint": "1.70.0"
+  }
+}
