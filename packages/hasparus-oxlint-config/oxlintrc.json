@@ -1,5 +1,6 @@
 {
   // Generated mirror of @hasparus/eslint-config/the-guild — regen + gaps in README.
+  // n/no-restricted-import recovered via core no-restricted-imports below.
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": [
     "typescript",
@@ -302,13 +303,21 @@
       }
     ],
     "no-restricted-imports": [
-      "error",
+      "warn",
       {
-        "name": "react",
-        "importNames": [
-          "PropsWithChildren"
-        ],
-        "message": "`PropsWithChildren` set `children` as optional, explicitly define `children` field in your type"
+        "paths": [
+          {
+            "name": "react",
+            "importNames": ["PropsWithChildren"],
+            "message": "`PropsWithChildren` set `children` as optional, explicitly define `children` field in your type"
+          },
+          { "name": "axios", "message": "Use `fetch/node-fetch` instead." },
+          { "name": "moment", "message": "Use `dayjs/date-fns` instead." },
+          {
+            "name": "classnames",
+            "message": "Use `clsx` instead because he is faster."
+          }
+        ]
       }
     ],
     "no-self-assign": "error",

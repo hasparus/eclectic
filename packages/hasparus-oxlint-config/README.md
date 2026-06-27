@@ -23,8 +23,8 @@ oxlint can't reproduce these today:
 
 - `perfectionist/sort-imports` — omitted; use oxfmt's `sortImports` instead.
 - YAML / JSON / MDX **document** linting — dropped (no oxlint parser).
-- Not yet in oxlint: `no-unreachable-loop`, `n/no-restricted-import`,
-  `import/no-useless-path-segments`.
+- Not yet in oxlint: `no-unreachable-loop`, `import/no-useless-path-segments`.
+  (`n/no-restricted-import` is recovered via core `no-restricted-imports`.)
 - `jsx-a11y` rules are present but its plugin is not enabled — oxlint's rule
   options diverge from the ESLint plugin's (follow-up).
 
