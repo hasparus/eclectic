@@ -1,14 +1,14 @@
 import { Linter } from "eslint";
 import solid from "eslint-plugin-solid";
 
+import { shimLegacyPlugin } from "./fixup.js";
+
 const solidTypescript = solid.configs["flat/typescript"];
 
 const solidConfig: Linter.Config[] = [
   {
     files: ["**/*.tsx"],
-    // @ts-expect-error -- solid's rule types lag ESLint's flat Plugin type
-    // (older @typescript-eslint/utils RuleContext); runtime-checked in solid.test.ts
-    plugins: solidTypescript.plugins,
+    plugins: { solid: shimLegacyPlugin(solidTypescript.plugins.solid) },
     rules: {
       ...solidTypescript.rules,
       // React-only: nested component defs don't remount in Solid

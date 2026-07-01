@@ -21,6 +21,8 @@ import { defineConfig } from "eslint/config";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+import { shimLegacyPlugin } from "./fixup.js";
+
 // rules ported from @theguild/eslint-config/base — inlined so we don't depend
 // on @theguild (eslintrc-format + @rushstack/eslint-patch, painful on ESLint 10)
 const guildRules: Linter.Config["rules"] = {
@@ -124,7 +126,7 @@ const theGuild: Linter.Config[] = defineConfig(
   // react-hooks, which are React-DOM/hooks specific)
   {
     files: ["**/*.jsx", "**/*.tsx"],
-    plugins: { react: reactPlugin },
+    plugins: { react: shimLegacyPlugin(reactPlugin) },
     rules: {
       "react/jsx-boolean-value": "warn",
       "react/jsx-curly-brace-presence": "warn",
@@ -132,8 +134,7 @@ const theGuild: Linter.Config[] = defineConfig(
       "react/no-unstable-nested-components": ["warn", { allowAsProps: true }],
       "react/self-closing-comp": "warn",
     },
-    // explicit version so react rules skip version detection (which reads the
-    // now-removed context.getFilename on ESLint 10)
+    // explicit version so react also skips getFilename-based version detection
     settings: { react: { version: "999.999.999" } },
   },
   {
@@ -204,9 +205,10 @@ const theGuild: Linter.Config[] = defineConfig(
       },
     },
     plugins: {
+      // import-x is flat-native; n + promise call removed context.* methods
       "import-x": importX,
-      n: nPlugin,
-      promise: promisePlugin,
+      n: shimLegacyPlugin(nPlugin),
+      promise: shimLegacyPlugin(promisePlugin),
       sonarjs: sonarjsPlugin,
     },
     rules: {
