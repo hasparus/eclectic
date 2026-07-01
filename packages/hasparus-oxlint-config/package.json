@@ -1,0 +1,30 @@
+{
+  "name": "@hasparus/oxlint-config",
+  "version": "0.1.0",
+  "description": "my shared oxlint config",
+  "license": "MIT",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": "./oxlint.config.ts"
+  },
+  "files": [
+    "oxlint.config.ts"
+  ],
+  "scripts": {
+    "lint": "oxlint"
+  },
+  "peerDependencies": {
+    "oxlint": "^1.70.0"
+  },
+  "dependencies": {
+    "eslint-plugin-better-tailwindcss": "4.0.2",
+    "eslint-plugin-perfectionist": "5.4.0",
+    "eslint-plugin-sonarjs": "3.0.6"
+  },
+  "devDependencies": {
+    "oxlint": "1.70.0"
+  }
+}
