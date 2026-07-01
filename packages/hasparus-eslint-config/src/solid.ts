@@ -12,6 +12,8 @@ const solidConfig: Linter.Config[] = [
     },
     rules: {
       ...(solid.configs.typescript.rules as Linter.RulesRecord),
+      // React-only: nested component defs don't remount in Solid
+      "react/no-unstable-nested-components": "off",
     },
   },
 ];

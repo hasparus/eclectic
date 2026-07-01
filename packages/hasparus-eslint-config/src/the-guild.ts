@@ -134,6 +134,7 @@ const theGuild: Linter.Config[] = defineConfig(
       "react/jsx-boolean-value": "warn",
       "react/jsx-curly-brace-presence": "warn",
       "react/jsx-no-useless-fragment": "warn",
+      "react/no-unstable-nested-components": ["warn", { allowAsProps: true }],
       "react/self-closing-comp": "warn",
     },
   },
