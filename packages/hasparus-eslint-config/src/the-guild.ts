@@ -8,8 +8,10 @@ import eslint from "@eslint/js";
 import { Linter } from "eslint";
 import tailwindcssPlugin from "eslint-plugin-better-tailwindcss";
 import importPlugin from "eslint-plugin-import";
+import jsoncPlugin from "eslint-plugin-jsonc";
 // @ts-expect-error -- no types
 import jsxA11yPlugin from "eslint-plugin-jsx-a11y";
+import * as mdxPlugin from "eslint-plugin-mdx";
 import nPlugin from "eslint-plugin-n";
 import perfectionistPlugin from "eslint-plugin-perfectionist";
 // @ts-expect-error -- no types
@@ -177,6 +179,16 @@ const theGuild: Linter.Config[] = defineConfig(
       "unicorn/filename-case": "off",
     },
   },
+
+  // JSON — jsonc variant tolerates comments so it doesn't false-flag tsconfig
+  ...jsoncPlugin.configs["flat/recommended-with-jsonc"].map((config) => ({
+    ...config,
+    files: ["**/*.json", "**/*.jsonc", "**/*.json5"],
+  })),
+
+  // MDX + fenced code blocks
+  mdxPlugin.flat,
+  mdxPlugin.flatCodeBlocks,
 
   {
     languageOptions: {

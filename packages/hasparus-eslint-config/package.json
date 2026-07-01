@@ -21,6 +21,10 @@
     "./solid": {
       "types": "./dist/solid.d.ts",
       "default": "./dist/solid.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "default": "./dist/react.js"
     }
   },
   "files": [
