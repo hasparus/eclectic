@@ -4,6 +4,9 @@
   "description": "my shared oxlint config",
   "license": "MIT",
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": "./oxlint.config.ts"
   },
