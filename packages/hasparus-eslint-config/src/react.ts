@@ -1,4 +1,3 @@
-import { fixupPluginRules } from "@eslint/compat";
 import { Linter } from "eslint";
 import reactPlugin from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
@@ -9,19 +8,16 @@ import reactHooks from "eslint-plugin-react-hooks";
 const react: Linter.Config[] = [
   {
     files: ["**/*.jsx", "**/*.tsx"],
-    plugins: {
-      "react-hooks": fixupPluginRules(
-        reactHooks as unknown as Parameters<typeof fixupPluginRules>[0],
-      ),
-    },
+    plugins: reactHooks.configs.flat["recommended-latest"].plugins,
     rules: {
       ...reactPlugin.configs.flat.recommended!.rules,
       ...reactPlugin.configs.flat["jsx-runtime"]!.rules,
-      ...(reactHooks.configs["recommended-latest"].rules),
+      ...reactHooks.configs["recommended-latest"].rules,
     },
-    settings: { react: { version: "detect" } },
+    // explicit version so react rules skip getFilename-based version detection
+    settings: { react: { version: "999.999.999" } },
   },
 ];
 
-// eslint-disable-next-line import/no-default-export
+// eslint-disable-next-line import-x/no-default-export
 export default react;

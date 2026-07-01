@@ -3,18 +3,15 @@
  * Note that all enabled rules here are set to "warn" apart from SonarJS.
  * Only Sonar and TypeScript deserve red squiggles.
  */
-import { fixupPluginRules } from "@eslint/compat";
 import eslint from "@eslint/js";
 import { Linter } from "eslint";
 import tailwindcssPlugin from "eslint-plugin-better-tailwindcss";
-import importPlugin from "eslint-plugin-import";
+import importX from "eslint-plugin-import-x";
 import jsoncPlugin from "eslint-plugin-jsonc";
-// @ts-expect-error -- no types
 import jsxA11yPlugin from "eslint-plugin-jsx-a11y";
 import * as mdxPlugin from "eslint-plugin-mdx";
 import nPlugin from "eslint-plugin-n";
 import perfectionistPlugin from "eslint-plugin-perfectionist";
-// @ts-expect-error -- no types
 import promisePlugin from "eslint-plugin-promise";
 import reactPlugin from "eslint-plugin-react";
 import sonarjsPlugin from "eslint-plugin-sonarjs";
@@ -29,11 +26,11 @@ import tseslint from "typescript-eslint";
 const guildRules: Linter.Config["rules"] = {
   "array-callback-return": "warn",
   eqeqeq: ["warn", "always", { null: "ignore" }],
-  "import/extensions": "off",
-  "import/first": "warn",
-  "import/no-default-export": "warn",
-  "import/no-duplicates": "warn",
-  "import/no-useless-path-segments": "warn",
+  "import-x/extensions": "off",
+  "import-x/first": "warn",
+  "import-x/no-default-export": "warn",
+  "import-x/no-duplicates": "warn",
+  "import-x/no-useless-path-segments": "warn",
   "logical-assignment-operators": [
     "warn",
     "always",
@@ -127,11 +124,7 @@ const theGuild: Linter.Config[] = defineConfig(
   // react-hooks, which are React-DOM/hooks specific)
   {
     files: ["**/*.jsx", "**/*.tsx"],
-    plugins: {
-      react: fixupPluginRules(
-        reactPlugin as unknown as Parameters<typeof fixupPluginRules>[0],
-      ),
-    },
+    plugins: { react: reactPlugin },
     rules: {
       "react/jsx-boolean-value": "warn",
       "react/jsx-curly-brace-presence": "warn",
@@ -139,10 +132,12 @@ const theGuild: Linter.Config[] = defineConfig(
       "react/no-unstable-nested-components": ["warn", { allowAsProps: true }],
       "react/self-closing-comp": "warn",
     },
+    // explicit version so react rules skip version detection (which reads the
+    // now-removed context.getFilename on ESLint 10)
+    settings: { react: { version: "999.999.999" } },
   },
   {
-    ...(jsxA11yPlugin as { flatConfigs: { recommended: Linter.Config } })
-      .flatConfigs.recommended,
+    ...jsxA11yPlugin.flatConfigs.recommended,
     files: ["**/*.jsx", "**/*.tsx"],
   },
 
@@ -209,11 +204,9 @@ const theGuild: Linter.Config[] = defineConfig(
       },
     },
     plugins: {
-      import: fixupPluginRules(importPlugin),
-      n: fixupPluginRules(nPlugin),
-      promise: fixupPluginRules(
-        promisePlugin as Parameters<typeof fixupPluginRules>[0],
-      ),
+      "import-x": importX,
+      n: nPlugin,
+      promise: promisePlugin,
       sonarjs: sonarjsPlugin,
     },
     rules: {
@@ -313,7 +306,7 @@ const theGuild: Linter.Config[] = defineConfig(
   {
     files: ["**/*.d.ts", "**/*.config.*", "*.config.*"],
     rules: {
-      "import/no-default-export": "off",
+      "import-x/no-default-export": "off",
       "no-var": "off",
     },
   },
@@ -334,5 +327,5 @@ const theGuild: Linter.Config[] = defineConfig(
   },
 );
 
-// eslint-disable-next-line import/no-default-export
+// eslint-disable-next-line import-x/no-default-export
 export default theGuild;
