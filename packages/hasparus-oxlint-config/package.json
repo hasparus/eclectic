@@ -1,17 +1,17 @@
 {
   "name": "@hasparus/oxlint-config",
   "version": "0.1.0",
-  "description": "oxlint mirror of @hasparus/eslint-config/the-guild",
+  "description": "my shared oxlint config",
   "license": "MIT",
   "type": "module",
   "exports": {
-    "./oxlintrc.json": "./oxlintrc.json"
+    ".": "./oxlint.config.ts"
   },
   "files": [
-    "oxlintrc.json"
+    "oxlint.config.ts"
   ],
   "scripts": {
-    "lint": "oxlint --config oxlintrc.json"
+    "lint": "oxlint"
   },
   "peerDependencies": {
     "oxlint": "^1.70.0"

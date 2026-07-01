@@ -1,29 +1,29 @@
-{
-  // Generated mirror of @hasparus/eslint-config/the-guild — regen + gaps in README.
-  // n/no-restricted-import recovered via core no-restricted-imports below.
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": [
+import { defineConfig, type DummyRule } from "oxlint";
+
+/** perfectionist default: natural, ascending. */
+const natural: DummyRule = ["warn", { type: "natural", order: "asc" }];
+
+export default defineConfig({
+  plugins: [
     "typescript",
     "unicorn",
     "import",
     "promise",
     "react"
   ],
-  "jsPlugins": [
+  jsPlugins: [
     "eslint-plugin-perfectionist",
     "eslint-plugin-sonarjs",
     "eslint-plugin-better-tailwindcss"
   ],
-  "categories": {
-    "correctness": "off"
-  },
-  "env": {
+  categories: { correctness: "off" },
+  env: {
     "browser": true,
     "node": true,
     "builtin": true,
     "es2026": true
   },
-  "ignorePatterns": [
+  ignorePatterns: [
     "dist",
     ".astro",
     "src/routeTree.gen.ts",
@@ -32,7 +32,7 @@
     "**/.cache/**/*",
     ".git"
   ],
-  "rules": {
+  rules: {
     "constructor-super": "off",
     "curly": "off",
     "eqeqeq": [
@@ -361,70 +361,16 @@
       "warn",
       "always"
     ],
-    "perfectionist/sort-array-includes": [
-      "warn",
-      {
-        "type": "natural",
-        "order": "asc"
-      }
-    ],
-    "perfectionist/sort-decorators": [
-      "warn",
-      {
-        "type": "natural",
-        "order": "asc"
-      }
-    ],
-    "perfectionist/sort-exports": [
-      "warn",
-      {
-        "type": "natural",
-        "order": "asc"
-      }
-    ],
-    "perfectionist/sort-heritage-clauses": [
-      "warn",
-      {
-        "type": "natural",
-        "order": "asc"
-      }
-    ],
-    "perfectionist/sort-interfaces": [
-      "warn",
-      {
-        "type": "natural",
-        "order": "asc"
-      }
-    ],
-    "perfectionist/sort-intersection-types": [
-      "warn",
-      {
-        "type": "natural",
-        "order": "asc"
-      }
-    ],
+    "perfectionist/sort-array-includes": natural,
+    "perfectionist/sort-decorators": natural,
+    "perfectionist/sort-exports": natural,
+    "perfectionist/sort-heritage-clauses": natural,
+    "perfectionist/sort-interfaces": natural,
+    "perfectionist/sort-intersection-types": natural,
     "perfectionist/sort-jsx-props": "warn",
-    "perfectionist/sort-maps": [
-      "warn",
-      {
-        "type": "natural",
-        "order": "asc"
-      }
-    ],
-    "perfectionist/sort-named-exports": [
-      "warn",
-      {
-        "type": "natural",
-        "order": "asc"
-      }
-    ],
-    "perfectionist/sort-named-imports": [
-      "warn",
-      {
-        "type": "natural",
-        "order": "asc"
-      }
-    ],
+    "perfectionist/sort-maps": natural,
+    "perfectionist/sort-named-exports": natural,
+    "perfectionist/sort-named-imports": natural,
     "perfectionist/sort-object-types": [
       "warn",
       {
@@ -441,20 +387,8 @@
         "type": "natural"
       }
     ],
-    "perfectionist/sort-sets": [
-      "warn",
-      {
-        "type": "natural",
-        "order": "asc"
-      }
-    ],
-    "perfectionist/sort-switch-case": [
-      "warn",
-      {
-        "type": "natural",
-        "order": "asc"
-      }
-    ],
+    "perfectionist/sort-sets": natural,
+    "perfectionist/sort-switch-case": natural,
     "perfectionist/sort-union-types": [
       "warn",
       {
@@ -467,13 +401,7 @@
         "type": "natural"
       }
     ],
-    "perfectionist/sort-variable-declarations": [
-      "warn",
-      {
-        "type": "natural",
-        "order": "asc"
-      }
-    ],
+    "perfectionist/sort-variable-declarations": natural,
     "prefer-arrow-callback": [
       "warn",
       {
@@ -692,73 +620,27 @@
     "unicorn/throw-new-error": "warn",
     "use-isnan": "error",
     "valid-typeof": "error",
-    "yoda": "warn"
+    "yoda": "warn",
   },
-  "overrides": [
+  overrides: [
     {
-      "files": [
-        "**/*.ts",
-        "**/*.tsx",
-        "**/*.mts",
-        "**/*.cts"
-      ],
-      "rules": {
-        "constructor-super": "off",
-        "getter-return": "off",
-        "no-class-assign": "off",
-        "no-const-assign": "off",
-        "no-dupe-class-members": "off",
-        "no-dupe-keys": "off",
-        "no-func-assign": "off",
-        "no-import-assign": "off",
-        "no-new-native-nonconstructor": "off",
-        "no-obj-calls": "off",
-        "no-redeclare": "off",
-        "no-setter-return": "off",
-        "no-this-before-super": "off",
-        "no-unreachable": "off",
-        "no-unsafe-negation": "off",
-        "no-var": "warn",
-        "no-with": "off",
-        "prefer-rest-params": "warn",
-        "prefer-spread": "warn"
-      }
+      files: ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
+      rules: { "no-with": "off" },
     },
     {
-      "files": [
-        "**/*.ts",
-        "**/*.tsx",
-        "**/*.mts",
-        "**/*.cts"
-      ],
-      "rules": {
-        "typescript/consistent-type-assertions": "warn"
-      }
+      files: ["**/*.d.ts", "**/*.config.*", "*.config.*"],
+      rules: { "import/no-default-export": "off", "no-var": "off" },
     },
     {
-      "files": [
-        "**/*.d.ts",
-        "**/*.config.*",
-        "*.config.*"
-      ],
-      "rules": {
-        "import/no-default-export": "off",
-        "no-var": "off"
-      }
-    },
-    {
-      "files": [
-        "**/*.tsx",
-        "**/*.jsx"
-      ],
-      "rules": {
+      files: ["**/*.tsx", "**/*.jsx"],
+      rules: {
         "better-tailwindcss/enforce-canonical-classes": "warn",
         "better-tailwindcss/no-conflicting-classes": "warn",
         "better-tailwindcss/no-deprecated-classes": "warn",
         "better-tailwindcss/no-duplicate-classes": "warn",
         "better-tailwindcss/no-unknown-classes": "warn",
-        "better-tailwindcss/no-unnecessary-whitespace": "warn"
-      }
-    }
-  ]
-}
+        "better-tailwindcss/no-unnecessary-whitespace": "warn",
+      },
+    },
+  ],
+});
