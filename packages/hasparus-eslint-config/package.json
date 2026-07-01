@@ -1,6 +1,6 @@
 {
   "name": "@hasparus/eslint-config",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -13,6 +13,14 @@
     "./the-guild": {
       "types": "./dist/the-guild.d.ts",
       "default": "./dist/the-guild.js"
+    },
+    "./astro": {
+      "types": "./dist/astro.d.ts",
+      "default": "./dist/astro.js"
+    },
+    "./solid": {
+      "types": "./dist/solid.d.ts",
+      "default": "./dist/solid.js"
     }
   },
   "files": [
@@ -32,7 +40,9 @@
     "@eslint/eslintrc": "3.3.3",
     "@eslint/js": "9.39.2",
     "@theguild/eslint-config": "0.13.4",
-    "eslint-plugin-better-tailwindcss": "4.0.2",
+    "@typescript-eslint/parser": "8.61.1",
+    "astro-eslint-parser": "2.0.0",
+    "eslint-plugin-better-tailwindcss": "4.6.0",
     "eslint-plugin-import": "2.32.0",
     "eslint-plugin-jsonc": "2.21.0",
     "eslint-plugin-jsx-a11y": "6.10.2",
@@ -42,6 +52,7 @@
     "eslint-plugin-promise": "7.2.1",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "7.0.1",
+    "eslint-plugin-solid": "0.14.5",
     "eslint-plugin-sonarjs": "3.0.6",
     "eslint-plugin-unicorn": "62.0.0",
     "eslint-plugin-yml": "3.0.0",
