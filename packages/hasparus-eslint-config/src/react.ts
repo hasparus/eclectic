@@ -15,13 +15,9 @@ const react: Linter.Config[] = [
       ...reactPlugin.configs.flat.recommended!.rules,
       ...reactPlugin.configs.flat["jsx-runtime"]!.rules,
       ...reactHooks.configs["recommended-latest"].rules,
-<<<<<<< Updated upstream
-||||||| Stash base
-=======
       // TS already validates element props — including react-three-fiber's
       // typed JSX elements, which this rule can't see and false-flags.
       "react/no-unknown-property": "off",
->>>>>>> Stashed changes
     },
     // explicit version so react rules skip getFilename-based version detection
     settings: { react: { version: "999.999.999" } },
