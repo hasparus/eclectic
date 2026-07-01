@@ -38,11 +38,10 @@ test("react preset lints tsx without crashing and fires react rules", async () =
       ...reactConfig,
     ],
   });
-  const [result] = await eslint.lintText("export const A = () => <div>3 > 2</div>;", {
-    filePath: "a.tsx",
-  });
+  const [result] = await eslint.lintText(
+    "export const A = () => [1, 2].map(() => <div />);",
+    { filePath: "a.tsx" },
+  );
   expect(result?.fatalErrorCount).toBe(0);
-  expect(
-    result?.messages.some((m) => m.ruleId === "react/no-unescaped-entities"),
-  ).toBe(true);
+  expect(result?.messages.some((m) => m.ruleId === "react/jsx-key")).toBe(true);
 });
