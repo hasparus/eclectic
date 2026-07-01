@@ -141,7 +141,8 @@ const theGuild: Linter.Config[] = defineConfig(
     },
   },
   {
-    ...jsxA11yPlugin.flatConfigs.recommended,
+    ...(jsxA11yPlugin as { flatConfigs: { recommended: Linter.Config } })
+      .flatConfigs.recommended,
     files: ["**/*.jsx", "**/*.tsx"],
   },
 
@@ -158,7 +159,12 @@ const theGuild: Linter.Config[] = defineConfig(
       "@typescript-eslint/no-redundant-type-constituents": "error",
       "@typescript-eslint/no-unnecessary-boolean-literal-compare": "warn",
       "@typescript-eslint/no-unnecessary-type-assertion": "warn",
+      "@typescript-eslint/no-unsafe-argument": "error",
+      "@typescript-eslint/no-unsafe-assignment": "error",
+      "@typescript-eslint/no-unsafe-call": "error",
       "@typescript-eslint/no-unsafe-enum-comparison": "error",
+      "@typescript-eslint/no-unsafe-member-access": "error",
+      "@typescript-eslint/no-unsafe-return": "error",
       "@typescript-eslint/only-throw-error": "error",
     },
   },
@@ -205,7 +211,9 @@ const theGuild: Linter.Config[] = defineConfig(
     plugins: {
       import: fixupPluginRules(importPlugin),
       n: fixupPluginRules(nPlugin),
-      promise: fixupPluginRules(promisePlugin),
+      promise: fixupPluginRules(
+        promisePlugin as Parameters<typeof fixupPluginRules>[0],
+      ),
       sonarjs: sonarjsPlugin,
     },
     rules: {
