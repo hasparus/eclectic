@@ -51,6 +51,7 @@ const astro: Linter.Config[] = [
         "error",
         { ignore: tailwindClassIgnore },
       ],
+      "no-undef": "off",
     },
   },
 ];
