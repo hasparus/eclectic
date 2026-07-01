@@ -1,1 +1,2 @@
-export { default as theGuild } from "./the-guild.js";
+// eslint-disable-next-line import-x/no-default-export
+export { default } from "./the-guild.js";
