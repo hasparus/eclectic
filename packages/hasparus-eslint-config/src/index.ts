@@ -1,1 +1,1 @@
-export { default, default as theGuild } from "./the-guild.js";
+export { default } from "./the-guild.js";

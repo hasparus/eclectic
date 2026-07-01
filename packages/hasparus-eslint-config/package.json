@@ -1,6 +1,6 @@
 {
   "name": "@hasparus/eslint-config",
-  "version": "2.4.0",
+  "version": "3.0.0",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -9,10 +9,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./the-guild": {
-      "types": "./dist/the-guild.d.ts",
-      "default": "./dist/the-guild.js"
     },
     "./astro": {
       "types": "./dist/astro.d.ts",
