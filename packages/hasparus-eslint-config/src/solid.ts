@@ -12,10 +12,6 @@ const solidConfig: Linter.Config[] = [
     },
     rules: {
       ...(solid.configs.typescript.rules as Linter.RulesRecord),
-      "react-hooks/immutability": "off",
-      "react-hooks/refs": "off",
-      "react/display-name": "off",
-      "react/no-unknown-property": "off",
     },
   },
 ];

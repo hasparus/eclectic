@@ -3,64 +3,29 @@
  * Note that all enabled rules here are set to "warn" apart from SonarJS.
  * Only Sonar and TypeScript deserve red squiggles.
  */
-import { fixupConfigRules, fixupPluginRules } from "@eslint/compat";
-import { FlatCompat } from "@eslint/eslintrc";
+import { fixupPluginRules } from "@eslint/compat";
 import eslint from "@eslint/js";
 import { Linter } from "eslint";
 import tailwindcssPlugin from "eslint-plugin-better-tailwindcss";
 import importPlugin from "eslint-plugin-import";
+// @ts-expect-error -- no types
+import jsxA11yPlugin from "eslint-plugin-jsx-a11y";
 import nPlugin from "eslint-plugin-n";
 import perfectionistPlugin from "eslint-plugin-perfectionist";
 // @ts-expect-error -- no types
 import promisePlugin from "eslint-plugin-promise";
+import reactPlugin from "eslint-plugin-react";
 import sonarjsPlugin from "eslint-plugin-sonarjs";
 import eslintPluginUnicorn from "eslint-plugin-unicorn";
 import ymlPlugin from "eslint-plugin-yml";
 import { defineConfig } from "eslint/config";
 import globals from "globals";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import tseslint from "typescript-eslint";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-  recommendedConfig: eslint.configs.recommended,
-});
-
-const redefinedLater = new Set([
-  "@typescript-eslint",
-  "better-tailwindcss",
-  "import",
-  "n",
-  "perfectionist",
-  "promise",
-  "sonarjs",
-  "unicorn",
-]);
-
-const guildSubconfigs = fixupConfigRules(
-  compat.config({
-    extends: [
-      "@theguild/eslint-config/react",
-      "@theguild/eslint-config/json",
-      // yml removed - using eslint-plugin-yml flat config directly
-      "@theguild/eslint-config/mdx",
-    ],
-  }),
-)
-  .map((config) => {
-    if (!config.plugins) return config;
-    const plugins = Object.fromEntries(
-      Object.entries(config.plugins).filter(
-        ([name]) => !redefinedLater.has(name),
-      ),
-    );
-    return { ...config, plugins };
-  });
-
-// rules from @theguild/eslint-config/base (can't import directly — uses @rushstack/eslint-patch)
+// rules ported from @theguild/eslint-config/base — inlined so we don't depend
+// on @theguild (eslintrc-format + @rushstack/eslint-patch, painful on ESLint 10)
 const guildRules: Linter.Config["rules"] = {
+  "array-callback-return": "warn",
   eqeqeq: ["warn", "always", { null: "ignore" }],
   "import/extensions": "off",
   "import/first": "warn",
@@ -85,18 +50,24 @@ const guildRules: Linter.Config["rules"] = {
   ],
   "no-console": "warn",
   "no-else-return": ["warn", { allowElseIf: false }],
+  "no-eval": "warn",
+  "no-extend-native": "warn",
   "no-implicit-coercion": [
     "warn",
     { boolean: false, disallowTemplateShorthand: true },
   ],
   "no-lonely-if": "warn",
+  "no-new-func": "warn",
+  "no-new-wrappers": "warn",
   "no-restricted-globals": [
     "warn",
     "stop",
     "close",
     { message: "Use Number.isNaN instead", name: "isNaN" },
   ],
+  "no-script-url": "warn",
   "no-self-compare": "warn",
+  "no-template-curly-in-string": "warn",
   "no-unreachable-loop": "warn",
   "object-shorthand": ["warn", "always"],
   "prefer-arrow-callback": ["warn", { allowNamedFunctions: true }],
@@ -105,10 +76,14 @@ const guildRules: Linter.Config["rules"] = {
   "promise/no-multiple-resolved": "warn",
   "promise/no-nesting": "warn",
   quotes: "off",
+  "sonarjs/no-all-duplicated-branches": "error",
+  "sonarjs/no-collection-size-mischeck": "error",
+  "sonarjs/no-duplicated-branches": "error",
+  "sonarjs/no-element-overwrite": "error",
   "sonarjs/no-gratuitous-expressions": "error",
   "sonarjs/no-identical-conditions": "error",
+  "sonarjs/no-identical-expressions": "error",
   "sonarjs/no-nested-switch": "error",
-  "sonarjs/no-one-iteration-loop": "off",
   "sonarjs/no-unused-collection": "error",
   "sonarjs/no-use-of-empty-return-value": "error",
   "unicorn/no-array-for-each": "warn",
@@ -145,7 +120,46 @@ const theGuild: Linter.Config[] = defineConfig(
   eslint.configs.recommended,
   ...tseslint.configs.strict,
   ...tseslint.configs.stylistic,
-  ...guildSubconfigs,
+
+  // framework-agnostic JSX hygiene (Solid-safe; no react/recommended or
+  // react-hooks, which are React-DOM/hooks specific)
+  {
+    files: ["**/*.jsx", "**/*.tsx"],
+    plugins: {
+      react: fixupPluginRules(
+        reactPlugin as unknown as Parameters<typeof fixupPluginRules>[0],
+      ),
+    },
+    rules: {
+      "react/jsx-boolean-value": "warn",
+      "react/jsx-curly-brace-presence": "warn",
+      "react/jsx-no-useless-fragment": "warn",
+      "react/self-closing-comp": "warn",
+    },
+  },
+  {
+    ...jsxA11yPlugin.flatConfigs.recommended,
+    files: ["**/*.jsx", "**/*.tsx"],
+  },
+
+  // type-aware rules — the high-value subset (skip no-unsafe-* noise)
+  {
+    files: ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
+    rules: {
+      "@typescript-eslint/await-thenable": "warn",
+      "@typescript-eslint/no-base-to-string": "warn",
+      "@typescript-eslint/no-duplicate-type-constituents": "error",
+      "@typescript-eslint/no-floating-promises": "warn",
+      "@typescript-eslint/no-implied-eval": "error",
+      "@typescript-eslint/no-misused-promises": "error",
+      "@typescript-eslint/no-redundant-type-constituents": "error",
+      "@typescript-eslint/no-unnecessary-boolean-literal-compare": "warn",
+      "@typescript-eslint/no-unnecessary-type-assertion": "warn",
+      "@typescript-eslint/no-unsafe-enum-comparison": "error",
+      "@typescript-eslint/only-throw-error": "error",
+    },
+  },
+
   ...ymlPlugin.configs["flat/standard"].map((config) => ({
     ...config,
     files: ["*.yaml", "**/*.yaml", "*.yml", "**/*.yml"],
@@ -269,9 +283,9 @@ const theGuild: Linter.Config[] = defineConfig(
   {
     rules: {
       ...guildRules,
-      "unicorn/no-array-sort": "off",
       "react/jsx-filename-extension": "off",
       "unicorn/no-array-callback-reference": "off",
+      "unicorn/no-array-sort": "off",
     },
   },
 
