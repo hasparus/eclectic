@@ -3,6 +3,7 @@
  * Note that all enabled rules here are set to "warn" apart from SonarJS.
  * Only Sonar and TypeScript deserve red squiggles.
  */
+import { fixupConfigRules, fixupPluginRules } from "@eslint/compat";
 import { FlatCompat } from "@eslint/eslintrc";
 import eslint from "@eslint/js";
 import { Linter } from "eslint";
@@ -27,18 +28,34 @@ const compat = new FlatCompat({
   recommendedConfig: eslint.configs.recommended,
 });
 
-const guildSubconfigs = compat
-  .config({
+const redefinedLater = new Set([
+  "@typescript-eslint",
+  "better-tailwindcss",
+  "import",
+  "n",
+  "perfectionist",
+  "promise",
+  "sonarjs",
+  "unicorn",
+]);
+
+const guildSubconfigs = fixupConfigRules(
+  compat.config({
     extends: [
       "@theguild/eslint-config/react",
       "@theguild/eslint-config/json",
       // yml removed - using eslint-plugin-yml flat config directly
       "@theguild/eslint-config/mdx",
     ],
-  })
+  }),
+)
   .map((config) => {
     if (!config.plugins) return config;
-    const { "@typescript-eslint": _, unicorn: __, ...plugins } = config.plugins;
+    const plugins = Object.fromEntries(
+      Object.entries(config.plugins).filter(
+        ([name]) => !redefinedLater.has(name),
+      ),
+    );
     return { ...config, plugins };
   });
 
@@ -94,14 +111,12 @@ const guildRules: Linter.Config["rules"] = {
   "sonarjs/no-one-iteration-loop": "off",
   "sonarjs/no-unused-collection": "error",
   "sonarjs/no-use-of-empty-return-value": "error",
-  // "unicorn/filename-case": "warn",
   "unicorn/no-array-for-each": "warn",
   "unicorn/no-array-push-push": "warn",
   "unicorn/no-empty-file": "warn",
   "unicorn/no-instanceof-array": "warn",
   "unicorn/no-lonely-if": "warn",
   "unicorn/no-negated-condition": "warn",
-  // conflicts with Prettier
   "unicorn/no-nested-ternary": "off",
   "unicorn/no-useless-fallback-in-spread": "warn",
   "unicorn/no-useless-spread": "warn",
@@ -131,7 +146,6 @@ const theGuild: Linter.Config[] = defineConfig(
   ...tseslint.configs.strict,
   ...tseslint.configs.stylistic,
   ...guildSubconfigs,
-  // yml configs with file patterns and ignores
   ...ymlPlugin.configs["flat/standard"].map((config) => ({
     ...config,
     files: ["*.yaml", "**/*.yaml", "*.yml", "**/*.yml"],
@@ -162,9 +176,9 @@ const theGuild: Linter.Config[] = defineConfig(
       },
     },
     plugins: {
-      import: importPlugin,
-      n: nPlugin,
-      promise: promisePlugin,
+      import: fixupPluginRules(importPlugin),
+      n: fixupPluginRules(nPlugin),
+      promise: fixupPluginRules(promisePlugin),
       sonarjs: sonarjsPlugin,
     },
     rules: {
@@ -255,11 +269,8 @@ const theGuild: Linter.Config[] = defineConfig(
   {
     rules: {
       ...guildRules,
-      // I know `toSorted` exists, and I want to mutate stuff in place.
       "unicorn/no-array-sort": "off",
-      // This is just a better extension and I don't wanna rename files depending on content.
       "react/jsx-filename-extension": "off",
-      // TypeScript should suffice here, and if not, I'd assume we have tests
       "unicorn/no-array-callback-reference": "off",
     },
   },
