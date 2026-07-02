@@ -13,9 +13,10 @@ rank — so there's a hard deadline and probably more traffic than usual.
 The site is Polish-only, which conveniently lets us skip headless i18n
 (Polylang/WPML) entirely.
 
-Research details with sources: [research/current-site.md](research/current-site.md),
-[research/ludamus.md](research/ludamus.md),
-[research/wordpress-headless.md](research/wordpress-headless.md).
+Research details with sources:
+[current-site.md](notes/bachanalia-website/research/current-site.md),
+[ludamus.md](notes/bachanalia-website/research/ludamus.md),
+[wordpress-headless.md](notes/bachanalia-website/research/wordpress-headless.md).
 
 ## Architecture
 
@@ -117,6 +118,13 @@ organizer panel. The current WP "ZGŁOSZENIA PROGRAMU" page becomes a landing
 page linking into the ludamus proposal flow. This needs a **Bachanalia sphere**
 set up (spheres resolve by hostname, e.g. `bachanalia.zagrajmy.net`).
 
+Ad Astra has already agreed to run the programme through ludamus (they
+managed it by hand before). Owed to them: an **onboarding video** for
+organizers — a walkthrough of the organizer lifecycle (event setup with
+spaces/time slots/tracks → call for proposals → accepting and scheduling
+sessions into the agenda → enrollment windows and waitlist offer/claim →
+the panel and print view during the con).
+
 ## Site map (v1)
 
 Carried over from the current site, trimmed:
@@ -162,8 +170,9 @@ Phases 3 and 4 are independent and can run in parallel.
       locally; also check `/graphql` and response headers for hosting hints.)
 - [ ] Who controls DNS and the WP hosting? Can we add the `wp.` subdomain and
       install plugins?
-- [ ] Does Ad Astra agree to run programme/enrollment through ludamus, and do
-      we set up `bachanalia.zagrajmy.net` under the existing deployment?
+- [x] ~~Does Ad Astra agree to run programme/enrollment through ludamus?~~
+      Yes — agreed. Remaining: set up the sphere (`bachanalia.zagrajmy.net`)
+      and record the organizer onboarding video.
 - [ ] What happens to historical content (past editions' pages/posts) —
       migrate, archive, or drop?
 - [ ] Design direction — anything to reuse from the current branding, or
