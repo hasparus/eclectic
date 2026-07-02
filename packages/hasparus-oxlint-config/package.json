@@ -1,6 +1,6 @@
 {
   "name": "@hasparus/oxlint-config",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "my shared oxlint config",
   "license": "MIT",
   "type": "module",
@@ -8,13 +8,19 @@
     "access": "public"
   },
   "exports": {
-    ".": "./oxlint.config.ts"
+    ".": {
+      "types": "./oxlint.config.ts",
+      "default": "./oxlint.config.js"
+    }
   },
   "files": [
-    "oxlint.config.ts"
+    "oxlint.config.ts",
+    "oxlint.config.js"
   ],
   "scripts": {
-    "lint": "oxlint"
+    "build": "tsc oxlint.config.ts --module esnext --moduleResolution bundler --target esnext --skipLibCheck",
+    "lint": "oxlint",
+    "prepublishOnly": "bun run build"
   },
   "peerDependencies": {
     "oxlint": "^1.70.0"
@@ -25,6 +31,7 @@
     "eslint-plugin-sonarjs": "3.0.6"
   },
   "devDependencies": {
-    "oxlint": "1.70.0"
+    "oxlint": "1.70.0",
+    "typescript": "^5.9.3"
   }
 }
