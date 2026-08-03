@@ -3,6 +3,17 @@ import { defineConfig, type DummyRule } from "oxlint";
 /** perfectionist default: natural, ascending. */
 const natural: DummyRule = ["warn", { type: "natural", order: "asc" }];
 
+/** Repo root, or one level of monorepo package. */
+const NEXT_ROOTS = [".", "*/*"];
+
+/**
+ * Next's App Router file conventions, all of which are read by default export.
+ * `route` is absent on purpose: route handlers export GET/POST by name.
+ * The numeric suffixes are the copies Next allows for image routes.
+ */
+const NEXT_APP_FILES =
+  "{page,layout,template,default,loading,error,global-error,not-found,forbidden,unauthorized,global-not-found,robots,sitemap,manifest,icon,apple-icon,opengraph-image,twitter-image}{,[0-9],[0-9][0-9]}";
+
 export default defineConfig({
   plugins: [
     "typescript",
@@ -631,21 +642,39 @@ export default defineConfig({
       files: ["**/*.d.ts", "**/*.config.*", "*.config.*"],
       rules: { "import/no-default-export": "off", "no-var": "off" },
     },
+    /**
+     * Next resolves its file conventions by their default export.
+     *
+     * Anchored rather than `**‍/app/**`, which would also exempt any module
+     * named `error` or `default` that happens to sit under a directory called
+     * `app`. The three roots are a plain app, a `src` app, and one level of
+     * monorepo; anything deeper adds its own override.
+     */
     {
-      /** Next resolves its file conventions by their default export. */
       files: [
-        "**/app/**/{page,layout,template,default,loading,error,global-error,not-found,robots,sitemap,manifest,icon,apple-icon,opengraph-image,twitter-image}.{js,jsx,ts,tsx}",
-        "**/pages/**/*.{js,jsx,ts,tsx}",
+        ...NEXT_ROOTS.flatMap((root) => [
+          `${root}/app/**/${NEXT_APP_FILES}.{js,jsx,ts,tsx}`,
+          `${root}/src/app/**/${NEXT_APP_FILES}.{js,jsx,ts,tsx}`,
+        ]),
+        // Pages Router, repo root only: `*/*/pages/**` would swallow the
+        // `components/pages/` folder that plain React projects keep.
+        "./pages/**/*.{js,jsx,ts,tsx}",
+        "./src/pages/**/*.{js,jsx,ts,tsx}",
       ],
       rules: { "import/no-default-export": "off" },
     },
+    /**
+     * A Playwright locator is not a DOM node. Its `innerText()` reads what the
+     * page renders and `textContent()` reads the source, so the rule's fix
+     * rewrites the assertion rather than tidying it.
+     *
+     * Spec files only: a helper under `e2e/` may hold real DOM code, and
+     * `page.evaluate(() => document.body.innerText)` is a real DOM node even
+     * inside a spec. A suite living in `tests/` wants its own override — that
+     * name belongs to unit tests too often to claim here.
+     */
     {
-      /**
-       * A Playwright locator is not a DOM node. Its `innerText()` reads what
-       * the page renders and `textContent()` reads the source, so swapping one
-       * for the other rewrites the assertion.
-       */
-      files: ["**/e2e/**", "**/playwright/**"],
+      files: ["**/e2e/**/*.{spec,test}.{js,jsx,ts,tsx,mjs,cjs}", "**/playwright/**/*.{spec,test}.{js,jsx,ts,tsx,mjs,cjs}"],
       rules: { "unicorn/prefer-dom-node-text-content": "off" },
     },
     {

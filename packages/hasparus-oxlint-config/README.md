@@ -20,6 +20,28 @@ export default defineConfig({
 `perfectionist`, `sonarjs`, and `better-tailwindcss` run through oxlint's
 `jsPlugins` and ship as dependencies of this package.
 
+## What it turns off for you
+
+Two rules are wrong often enough in a particular place that the config says so:
+
+- **`import/no-default-export`** in Next's file conventions — `app/page.tsx`,
+  `layout`, `sitemap`, `robots` and the rest, plus `pages/**`. Next reads them
+  by default export. `app/api/**/route.ts` keeps the rule, because route
+  handlers export `GET`/`POST` by name.
+- **`unicorn/prefer-dom-node-text-content`** in `e2e/**` and `playwright/**`
+  spec files. A Playwright locator is not a DOM node: `innerText()` reads what
+  the page renders and `textContent()` reads the source, so the rule's fix
+  rewrites the assertion. Helpers beside the specs keep the rule, since a
+  `page.evaluate` body really does hold DOM nodes.
+
+The paths are anchored to the repo root and one level of monorepo package. A
+Next app nested deeper, or a Playwright suite in `tests/`, wants three lines of
+its own:
+
+```ts
+overrides: [{ files: ["tests/**/*.spec.ts"], rules: { "unicorn/prefer-dom-node-text-content": "off" } }],
+```
+
 ## License
 
 MIT

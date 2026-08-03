@@ -1,6 +1,6 @@
 {
   "name": "@hasparus/oxlint-config",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "my shared oxlint config",
   "license": "MIT",
   "type": "module",
@@ -20,7 +20,8 @@
   "scripts": {
     "build": "tsc oxlint.config.ts --module esnext --moduleResolution bundler --target esnext --skipLibCheck",
     "lint": "oxlint",
-    "prepublishOnly": "bun run build"
+    "prepublishOnly": "bun run build",
+    "test": "bun test"
   },
   "peerDependencies": {
     "oxlint": "^1.70.0"
