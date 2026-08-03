@@ -1,27 +1,55 @@
-import { defineConfig, type DummyRule } from "oxlint";
+import { defineConfig, type DummyRule, type OxlintOverride } from "oxlint";
 
 /** perfectionist default: natural, ascending. */
-const natural: DummyRule = ["warn", { type: "natural", order: "asc" }];
+const natural: DummyRule = ["warn", { order: "asc", type: "natural" }];
+
+/** App Router conventions. `route` exports GET/POST by name, so it is absent. */
+const NEXT_APP_FILES =
+  "{page,layout,template,default,loading,error,global-error,not-found,forbidden,unauthorized,global-not-found,robots,sitemap,manifest}";
+
+/** Image routes, the only conventions that take a numeric suffix. */
+const NEXT_IMAGE_FILES = "{icon,apple-icon,opengraph-image,twitter-image}{,[0-9],[0-9][0-9]}";
+
+/**
+ * Spread into your own `overrides`. `extends` drops a base config's overrides,
+ * so these apply only where the consuming config declares them.
+ *
+ * Every glob leads with `**`: a relative one resolves against the config that
+ * declares it. The filename is the only thing left to narrow on, which is why
+ * the Pages Router is absent — every file under `pages` is a route, so
+ * `**‍/pages/**` would swallow a `components/pages/` folder.
+ */
+export const overrides: OxlintOverride[] = [
+  /** Next reads its file conventions by default export. */
+  {
+    files: [
+      `**/app/**/${NEXT_APP_FILES}.{js,jsx,ts,tsx}`,
+      `**/app/**/${NEXT_IMAGE_FILES}.{js,jsx,ts,tsx}`,
+    ],
+    rules: { "import/no-default-export": "off" },
+  },
+  /**
+   * A Playwright locator is not a DOM node: `innerText()` reads what the page
+   * renders, `textContent()` reads the source. The rule's fix swaps one for
+   * the other and rewrites the assertion. Spec files only — a `page.evaluate`
+   * body, and any helper beside the specs, does hold DOM nodes.
+   */
+  {
+    files: [
+      "**/e2e/**/*.{spec,test}.{js,jsx,ts,tsx,mjs,cjs}",
+      "**/playwright/**/*.{spec,test}.{js,jsx,ts,tsx,mjs,cjs}",
+    ],
+    rules: { "unicorn/prefer-dom-node-text-content": "off" },
+  },
+];
 
 export default defineConfig({
-  plugins: [
-    "typescript",
-    "unicorn",
-    "import",
-    "promise",
-    "react"
-  ],
-  jsPlugins: [
-    "eslint-plugin-perfectionist",
-    "eslint-plugin-sonarjs",
-    "eslint-plugin-better-tailwindcss"
-  ],
   categories: { correctness: "off" },
   env: {
-    "browser": true,
-    "node": true,
-    "builtin": true,
-    "es2026": true
+    browser: true,
+    builtin: true,
+    es2026: true,
+    node: true,
   },
   ignorePatterns: [
     "dist",
@@ -30,17 +58,45 @@ export default defineConfig({
     "node_modules",
     "**/.wrangler/tmp/**/*",
     "**/.cache/**/*",
-    ".git"
+    ".git",
   ],
+  jsPlugins: [
+    "eslint-plugin-perfectionist",
+    "eslint-plugin-sonarjs",
+    "eslint-plugin-better-tailwindcss",
+  ],
+  overrides: [
+    {
+      files: ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
+      rules: { "no-with": "off" },
+    },
+    {
+      files: ["**/*.d.ts", "**/*.config.*", "*.config.*"],
+      rules: { "import/no-default-export": "off", "no-var": "off" },
+    },
+    ...overrides,
+    {
+      files: ["**/*.tsx", "**/*.jsx"],
+      rules: {
+        "better-tailwindcss/enforce-canonical-classes": "warn",
+        "better-tailwindcss/no-conflicting-classes": "warn",
+        "better-tailwindcss/no-deprecated-classes": "warn",
+        "better-tailwindcss/no-duplicate-classes": "warn",
+        "better-tailwindcss/no-unknown-classes": "warn",
+        "better-tailwindcss/no-unnecessary-whitespace": "warn",
+      },
+    },
+  ],
+  plugins: ["typescript", "unicorn", "import", "promise", "react"],
   rules: {
     "constructor-super": "off",
-    "curly": "off",
-    "eqeqeq": [
+    curly: "off",
+    eqeqeq: [
       "warn",
       "always",
       {
-        "null": "ignore"
-      }
+        null: "ignore",
+      },
     ],
     "for-direction": "error",
     "getter-return": "off",
@@ -63,16 +119,8 @@ export default defineConfig({
     "jsx-a11y/control-has-associated-label": [
       "off",
       {
-        "ignoreElements": [
-          "audio",
-          "canvas",
-          "embed",
-          "input",
-          "textarea",
-          "tr",
-          "video"
-        ],
-        "ignoreRoles": [
+        ignoreElements: ["audio", "canvas", "embed", "input", "textarea", "tr", "video"],
+        ignoreRoles: [
           "grid",
           "listbox",
           "menu",
@@ -82,13 +130,10 @@ export default defineConfig({
           "tablist",
           "toolbar",
           "tree",
-          "treegrid"
+          "treegrid",
         ],
-        "includeRoles": [
-          "alert",
-          "dialog"
-        ]
-      }
+        includeRoles: ["alert", "dialog"],
+      },
     ],
     "jsx-a11y/heading-has-content": "warn",
     "jsx-a11y/html-has-lang": "warn",
@@ -97,16 +142,8 @@ export default defineConfig({
     "jsx-a11y/interactive-supports-focus": [
       "warn",
       {
-        "tabbable": [
-          "button",
-          "checkbox",
-          "link",
-          "searchbox",
-          "spinbutton",
-          "switch",
-          "textbox"
-        ]
-      }
+        tabbable: ["button", "checkbox", "link", "searchbox", "spinbutton", "switch", "textbox"],
+      },
     ],
     "jsx-a11y/label-has-associated-control": "warn",
     "jsx-a11y/media-has-caption": "warn",
@@ -117,19 +154,17 @@ export default defineConfig({
     "jsx-a11y/no-interactive-element-to-noninteractive-role": [
       "warn",
       {
-        "tr": [
-          "none",
-          "presentation"
-        ],
-        "canvas": [
-          "img"
-        ]
-      }
+        canvas: ["img"],
+        tr: ["none", "presentation"],
+      },
     ],
     "jsx-a11y/no-noninteractive-element-interactions": [
       "warn",
       {
-        "handlers": [
+        alert: ["onKeyUp", "onKeyDown", "onKeyPress"],
+        body: ["onError", "onLoad"],
+        dialog: ["onKeyUp", "onKeyDown", "onKeyPress"],
+        handlers: [
           "onClick",
           "onError",
           "onLoad",
@@ -137,98 +172,38 @@ export default defineConfig({
           "onMouseUp",
           "onKeyPress",
           "onKeyDown",
-          "onKeyUp"
-        ],
-        "alert": [
           "onKeyUp",
-          "onKeyDown",
-          "onKeyPress"
         ],
-        "body": [
-          "onError",
-          "onLoad"
-        ],
-        "dialog": [
-          "onKeyUp",
-          "onKeyDown",
-          "onKeyPress"
-        ],
-        "iframe": [
-          "onError",
-          "onLoad"
-        ],
-        "img": [
-          "onError",
-          "onLoad"
-        ]
-      }
+        iframe: ["onError", "onLoad"],
+        img: ["onError", "onLoad"],
+      },
     ],
     "jsx-a11y/no-noninteractive-element-to-interactive-role": [
       "warn",
       {
-        "ul": [
-          "listbox",
-          "menu",
-          "menubar",
-          "radiogroup",
-          "tablist",
-          "tree",
-          "treegrid"
-        ],
-        "ol": [
-          "listbox",
-          "menu",
-          "menubar",
-          "radiogroup",
-          "tablist",
-          "tree",
-          "treegrid"
-        ],
-        "li": [
-          "menuitem",
-          "menuitemradio",
-          "menuitemcheckbox",
-          "option",
-          "row",
-          "tab",
-          "treeitem"
-        ],
-        "table": [
-          "grid"
-        ],
-        "td": [
-          "gridcell"
-        ],
-        "fieldset": [
-          "radiogroup",
-          "presentation"
-        ]
-      }
+        fieldset: ["radiogroup", "presentation"],
+        li: ["menuitem", "menuitemradio", "menuitemcheckbox", "option", "row", "tab", "treeitem"],
+        ol: ["listbox", "menu", "menubar", "radiogroup", "tablist", "tree", "treegrid"],
+        table: ["grid"],
+        td: ["gridcell"],
+        ul: ["listbox", "menu", "menubar", "radiogroup", "tablist", "tree", "treegrid"],
+      },
     ],
     "jsx-a11y/no-noninteractive-tabindex": [
       "warn",
       {
-        "tags": [],
-        "roles": [
-          "tabpanel"
-        ],
-        "allowExpressionValues": true
-      }
+        allowExpressionValues: true,
+        roles: ["tabpanel"],
+        tags: [],
+      },
     ],
     "jsx-a11y/no-redundant-roles": "warn",
     "jsx-a11y/no-static-element-interactions": [
       "warn",
       {
-        "allowExpressionValues": true,
-        "handlers": [
-          "onClick",
-          "onMouseDown",
-          "onMouseUp",
-          "onKeyPress",
-          "onKeyDown",
-          "onKeyUp"
-        ]
-      }
+        allowExpressionValues: true,
+        handlers: ["onClick", "onMouseDown", "onMouseUp", "onKeyPress", "onKeyDown", "onKeyUp"],
+      },
     ],
     "jsx-a11y/role-has-required-aria-props": "warn",
     "jsx-a11y/role-supports-aria-props": "warn",
@@ -238,8 +213,8 @@ export default defineConfig({
       "warn",
       "always",
       {
-        "enforceForIfStatements": true
-      }
+        enforceForIfStatements: true,
+      },
     ],
     "no-array-constructor": "warn",
     "no-async-promise-executor": "error",
@@ -261,8 +236,8 @@ export default defineConfig({
     "no-else-return": [
       "warn",
       {
-        "allowElseIf": false
-      }
+        allowElseIf: false,
+      },
     ],
     "no-empty": "warn",
     "no-empty-character-class": "error",
@@ -277,9 +252,9 @@ export default defineConfig({
     "no-implicit-coercion": [
       "warn",
       {
-        "boolean": false,
-        "disallowTemplateShorthand": true
-      }
+        boolean: false,
+        disallowTemplateShorthand: true,
+      },
     ],
     "no-import-assign": "off",
     "no-invalid-regexp": "error",
@@ -298,35 +273,34 @@ export default defineConfig({
       "stop",
       "close",
       {
-        "message": "Use Number.isNaN instead",
-        "name": "isNaN"
-      }
+        message: "Use Number.isNaN instead",
+        name: "isNaN",
+      },
     ],
     "no-restricted-imports": [
       "warn",
       {
-        "paths": [
+        paths: [
           {
-            "name": "react",
-            "importNames": [
-              "PropsWithChildren"
-            ],
-            "message": "`PropsWithChildren` set `children` as optional, explicitly define `children` field in your type"
+            importNames: ["PropsWithChildren"],
+            message:
+              "`PropsWithChildren` set `children` as optional, explicitly define `children` field in your type",
+            name: "react",
           },
           {
-            "name": "axios",
-            "message": "Use `fetch/node-fetch` instead."
+            message: "Use `fetch/node-fetch` instead.",
+            name: "axios",
           },
           {
-            "name": "moment",
-            "message": "Use `dayjs/date-fns` instead."
+            message: "Use `dayjs/date-fns` instead.",
+            name: "moment",
           },
           {
-            "name": "classnames",
-            "message": "Use `clsx` instead because he is faster."
-          }
-        ]
-      }
+            message: "Use `clsx` instead because he is faster.",
+            name: "classnames",
+          },
+        ],
+      },
     ],
     "no-self-assign": "error",
     "no-self-compare": "warn",
@@ -345,11 +319,11 @@ export default defineConfig({
     "no-unused-vars": [
       "warn",
       {
-        "argsIgnorePattern": "^_",
-        "caughtErrorsIgnorePattern": "^_",
-        "destructuredArrayIgnorePattern": "^_",
-        "varsIgnorePattern": "^_"
-      }
+        argsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_",
+        destructuredArrayIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+      },
     ],
     "no-useless-backreference": "error",
     "no-useless-catch": "warn",
@@ -357,10 +331,7 @@ export default defineConfig({
     "no-useless-escape": "warn",
     "no-var": "warn",
     "no-with": "error",
-    "object-shorthand": [
-      "warn",
-      "always"
-    ],
+    "object-shorthand": ["warn", "always"],
     "perfectionist/sort-array-includes": natural,
     "perfectionist/sort-decorators": natural,
     "perfectionist/sort-exports": natural,
@@ -374,53 +345,49 @@ export default defineConfig({
     "perfectionist/sort-object-types": [
       "warn",
       {
-        "order": "asc",
-        "partitionByComment": true,
-        "type": "natural"
-      }
+        order: "asc",
+        partitionByComment: true,
+        type: "natural",
+      },
     ],
     "perfectionist/sort-objects": [
       "warn",
       {
-        "order": "asc",
-        "partitionByComment": true,
-        "type": "natural"
-      }
+        order: "asc",
+        partitionByComment: true,
+        type: "natural",
+      },
     ],
     "perfectionist/sort-sets": natural,
     "perfectionist/sort-switch-case": natural,
     "perfectionist/sort-union-types": [
       "warn",
       {
-        "groups": [
-          "unknown",
-          "keyword",
-          "nullish"
-        ],
-        "order": "asc",
-        "type": "natural"
-      }
+        groups: ["unknown", "keyword", "nullish"],
+        order: "asc",
+        type: "natural",
+      },
     ],
     "perfectionist/sort-variable-declarations": natural,
     "prefer-arrow-callback": [
       "warn",
       {
-        "allowNamedFunctions": true
-      }
+        allowNamedFunctions: true,
+      },
     ],
     "prefer-const": [
       "warn",
       {
-        "destructuring": "all"
-      }
+        destructuring: "all",
+      },
     ],
     "prefer-destructuring": [
       "warn",
       {
-        "VariableDeclarator": {
-          "object": true
-        }
-      }
+        VariableDeclarator: {
+          object: true,
+        },
+      },
     ],
     "prefer-object-has-own": "warn",
     "prefer-rest-params": "warn",
@@ -467,8 +434,8 @@ export default defineConfig({
     "typescript/ban-ts-comment": [
       "warn",
       {
-        "minimumDescriptionLength": 10
-      }
+        minimumDescriptionLength: 10,
+      },
     ],
     "typescript/ban-tslint-comment": "warn",
     "typescript/class-literal-property-style": "warn",
@@ -620,27 +587,6 @@ export default defineConfig({
     "unicorn/throw-new-error": "warn",
     "use-isnan": "error",
     "valid-typeof": "error",
-    "yoda": "warn",
+    yoda: "warn",
   },
-  overrides: [
-    {
-      files: ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
-      rules: { "no-with": "off" },
-    },
-    {
-      files: ["**/*.d.ts", "**/*.config.*", "*.config.*"],
-      rules: { "import/no-default-export": "off", "no-var": "off" },
-    },
-    {
-      files: ["**/*.tsx", "**/*.jsx"],
-      rules: {
-        "better-tailwindcss/enforce-canonical-classes": "warn",
-        "better-tailwindcss/no-conflicting-classes": "warn",
-        "better-tailwindcss/no-deprecated-classes": "warn",
-        "better-tailwindcss/no-duplicate-classes": "warn",
-        "better-tailwindcss/no-unknown-classes": "warn",
-        "better-tailwindcss/no-unnecessary-whitespace": "warn",
-      },
-    },
-  ],
 });
