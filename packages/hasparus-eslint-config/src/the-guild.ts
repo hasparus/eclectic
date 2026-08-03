@@ -95,7 +95,9 @@ const guildRules: Linter.Config["rules"] = {
   "unicorn/no-negated-condition": "warn",
   "unicorn/no-nested-ternary": "off",
   "unicorn/no-useless-fallback-in-spread": "warn",
-  "unicorn/no-useless-spread": "warn",
+  // its autofix strips load-bearing `[...nodeList]` snapshots taken before
+  // DOM mutation, silently introducing bugs (e.g. skipping every other node)
+  "unicorn/no-useless-spread": "off",
   "unicorn/numeric-separators-style": "warn",
   "unicorn/prefer-array-find": "warn",
   "unicorn/prefer-export-from": ["warn", { ignoreUsedVariables: true }],
