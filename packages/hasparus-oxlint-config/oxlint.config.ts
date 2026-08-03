@@ -632,6 +632,23 @@ export default defineConfig({
       rules: { "import/no-default-export": "off", "no-var": "off" },
     },
     {
+      /** Next resolves its file conventions by their default export. */
+      files: [
+        "**/app/**/{page,layout,template,default,loading,error,global-error,not-found,robots,sitemap,manifest,icon,apple-icon,opengraph-image,twitter-image}.{js,jsx,ts,tsx}",
+        "**/pages/**/*.{js,jsx,ts,tsx}",
+      ],
+      rules: { "import/no-default-export": "off" },
+    },
+    {
+      /**
+       * A Playwright locator is not a DOM node. Its `innerText()` reads what
+       * the page renders and `textContent()` reads the source, so swapping one
+       * for the other rewrites the assertion.
+       */
+      files: ["**/e2e/**", "**/playwright/**"],
+      rules: { "unicorn/prefer-dom-node-text-content": "off" },
+    },
+    {
       files: ["**/*.tsx", "**/*.jsx"],
       rules: {
         "better-tailwindcss/enforce-canonical-classes": "warn",
