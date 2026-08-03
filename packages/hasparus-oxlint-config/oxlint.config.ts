@@ -249,13 +249,13 @@ export default defineConfig({
     "no-fallthrough": "error",
     "no-func-assign": "off",
     "no-global-assign": "error",
-    "no-implicit-coercion": [
-      "warn",
-      {
-        boolean: false,
-        disallowTemplateShorthand: true,
-      },
-    ],
+    /**
+     * `disallowTemplateShorthand` is right about `${x}` alone and its fix is
+     * wrong about everything else: it replaces the whole literal with
+     * `String(x)`, so `${x}\n` loses the newline and ` ${x}` loses the space.
+     * Both shipped from one `--fix` run before anyone noticed.
+     */
+    "no-implicit-coercion": ["warn", { boolean: false, disallowTemplateShorthand: false }],
     "no-import-assign": "off",
     "no-invalid-regexp": "error",
     "no-irregular-whitespace": "warn",
