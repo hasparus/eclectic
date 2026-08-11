@@ -71,3 +71,24 @@ test("a missing tsgolint is announced, not swallowed", () => {
     "@hasparus/oxlint-config",
   );
 });
+
+/**
+ * The exemption is spelled with the deprecated bare-string specifier because
+ * the `{ from: "package" }` form matches none of these. If that changes
+ * upstream this test is what says so: the runner call comes back reported.
+ */
+test("a test runner's calls are exempt from no-floating-promises, real ones are not", () => {
+  const source = `${SENTINEL}declare function test(name: string, fn: () => void): Promise<void>;
+declare function work(): Promise<void>;
+test("x", () => {});
+work();
+`;
+  const found = lint([["src/a.test.ts", source]]);
+
+  expect(found["src/a.test.ts"], "src/a.test.ts was never linted").toContain(SENTINEL_RULE);
+  expect(found["src/a.test.ts"]).toContain("typescript/no-floating-promises");
+  expect(
+    found["src/a.test.ts"]?.filter((id) => id === "typescript/no-floating-promises"),
+    "only `work()` should report, not `test()`",
+  ).toHaveLength(1);
+});
