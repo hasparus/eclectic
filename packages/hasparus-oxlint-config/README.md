@@ -20,6 +20,29 @@ export default defineConfig({
 `perfectionist`, `sonarjs`, and `better-tailwindcss` run through oxlint's
 `jsPlugins` and ship as dependencies of this package.
 
+## Type-aware linting
+
+Every type-aware rule oxlint has is on, and `options.typeAware` comes with
+them, so plain `oxlint` runs the lot — there is no `--type-aware` to remember
+and no lint script to change. The option travels through `extends` and takes
+effect from your root config; files covered by a nested config are linted with
+it too.
+
+The rules run in `oxlint-tsgolint`, a peer dependency, which most package
+managers install for you. Without it oxlint lints nothing at all, so the config
+says as much on stderr, with the one command that fixes it.
+
+Severities match [`@hasparus/eslint-config`](../hasparus-eslint-config) where
+it has an opinion, so a file that passes one linter passes the other. Only
+`typescript/require-await` is off, because the ESLint rule of that name is off
+here too.
+
+To decline the whole thing:
+
+```ts
+export default defineConfig({ extends: [base], options: { typeAware: false } });
+```
+
 ## What it turns off for you
 
 Two rules are wrong often enough in a particular place that the config says so:
