@@ -538,7 +538,9 @@ export default defineConfig({
      *
      * Off on purpose: `typescript/require-await`, because the base turns the
      * ESLint rule of that name off and the type-aware twin says the same
-     * thing. Nothing else is left out. The three TypeScript rules disabled in
+     * thing. `prefer-readonly-parameter-types` and `strict-boolean-expressions`
+     * are out too — measured over a real consumer they account for 349 reports
+     * against idiomatic code, which buries the rules that find defects. The three TypeScript rules disabled in
      * the ESLint config — `consistent-type-definitions`, `no-empty-object-
      * type`, `no-non-null-assertion` — read syntax, not types, so none of them
      * lands in this set to begin with.
@@ -585,7 +587,6 @@ export default defineConfig({
     "typescript/prefer-optional-chain": "warn",
     "typescript/prefer-promise-reject-errors": "warn",
     "typescript/prefer-readonly": "warn",
-    "typescript/prefer-readonly-parameter-types": "warn",
     "typescript/prefer-reduce-type-parameter": "warn",
     "typescript/prefer-regexp-exec": "warn",
     "typescript/prefer-return-this-type": "warn",
@@ -597,7 +598,6 @@ export default defineConfig({
     "typescript/restrict-plus-operands": "warn",
     "typescript/restrict-template-expressions": "warn",
     "typescript/return-await": "warn",
-    "typescript/strict-boolean-expressions": "warn",
     "typescript/strict-void-return": "warn",
     "typescript/switch-exhaustiveness-check": "warn",
     "typescript/unbound-method": "warn",

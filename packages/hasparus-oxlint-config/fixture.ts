@@ -58,11 +58,7 @@ export function withoutJsPlugins({
 }: Config) {
   const owned = jsPlugins.map((name) => name.replace("eslint-plugin-", "") + "/");
   const keep = (by: Rules) =>
-    Object.fromEntries(
-      Object.entries(by).filter(
-        ([id]: readonly [string, unknown]) => !owned.some((p) => id.startsWith(p)),
-      ),
-    );
+    Object.fromEntries(Object.entries(by).filter(([id]) => !owned.some((p) => id.startsWith(p))));
 
   return {
     ...rest,
