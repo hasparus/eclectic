@@ -621,7 +621,13 @@ export default defineConfig({
     "typescript/only-throw-error": "error",
     "typescript/prefer-find": "warn",
     "typescript/prefer-includes": "warn",
-    "typescript/prefer-nullish-coalescing": "warn",
+    /**
+     * On a string, `||` is usually the point rather than a slip: an empty
+     * environment variable, a label trimmed to nothing, a blank thumbnail all
+     * have to fall through to the next branch, and `??` keeps the empty
+     * string. Left on for every other type, where `??` is the safer operator.
+     */
+    "typescript/prefer-nullish-coalescing": ["warn", { ignorePrimitives: { string: true } }],
     "typescript/prefer-optional-chain": "warn",
     "typescript/prefer-promise-reject-errors": "warn",
     "typescript/prefer-readonly": "warn",
