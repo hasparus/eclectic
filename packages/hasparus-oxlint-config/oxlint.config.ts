@@ -1,7 +1,62 @@
+import { existsSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { defineConfig, type DummyRule, type OxlintOverride } from "oxlint";
 
 /** perfectionist default: natural, ascending. */
 const natural: DummyRule = ["warn", { order: "asc", type: "natural" }];
+
+/**
+ * `options.typeAware` reaches the linter through `extends`, so a consuming root
+ * config inherits it and plain `oxlint` runs the type-aware rules. The binary
+ * they need does not travel with it: oxlint looks for `node_modules/.bin/
+ * tsgolint` upwards from the working directory, and without it refuses the run
+ * behind a single line of output. Say it louder, with the fix.
+ *
+ * A miss here is the whole point, so it prints rather than throws: a config
+ * that throws is reported as a load failure, message buried under a stack
+ * trace, and takes `--print-config` and the editor down with it. oxlint already
+ * exits non-zero on its own, so there is nothing left to enforce.
+ */
+function findTsgolint(from: string) {
+  // npm writes a `.cmd` shim beside the shell one on Windows.
+  const shims = ["tsgolint", "tsgolint.cmd"];
+
+  for (let dir = from; ; dir = dirname(dir)) {
+    if (shims.some((shim) => existsSync(join(dir, "node_modules", ".bin", shim)))) return true;
+    if (dirname(dir) === dir) return false;
+  }
+}
+
+/**
+ * The LSP loads this file too, and its stderr is a log nobody reads. A test or
+ * a script importing the config is not a lint run either, so the banner waits
+ * for the binary itself to be the thing that ran.
+ */
+const isOxlintCli =
+  basename(process.argv[1] ?? "") === "oxlint" && !process.argv.includes("--lsp");
+
+/** oxlint takes this path over the lookup, so a value here settles the question. */
+const configuredTsgolint = process.env.OXLINT_TSGOLINT_PATH ?? "";
+
+if (isOxlintCli && configuredTsgolint === "" && !findTsgolint(process.cwd())) {
+  process.stderr.write(`
+╔══════════════════════════════════════════════════════════════════════╗
+║   @hasparus/oxlint-config: type-aware linting cannot run             ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+  This config turns on oxlint's type-aware rules — no-floating-promises,
+  no-unsafe-argument, no-unnecessary-type-parameters and the rest. They
+  run in tsgolint, which is not installed here, so oxlint will refuse to
+  lint anything at all.
+
+      npm install --save-dev oxlint-tsgolint
+
+  That is the whole fix. \`options.typeAware\` is already set, so plain
+  \`oxlint\` picks the rules up — no \`--type-aware\` flag to add. To decline
+  them instead, set \`options: { typeAware: false }\` in your root config.
+
+`);
+}
 
 /** App Router conventions. `route` exports GET/POST by name, so it is absent. */
 const NEXT_APP_FILES =
@@ -65,6 +120,12 @@ export default defineConfig({
     "eslint-plugin-sonarjs",
     "eslint-plugin-better-tailwindcss",
   ],
+  /**
+   * Type-aware rules that are not asked for are rules that silently do
+   * nothing, so this asks. It survives `extends`, which means a consumer gets
+   * them from plain `oxlint` with no flag and no lint script to remember.
+   */
+  options: { typeAware: true },
   overrides: [
     {
       files: ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
@@ -467,6 +528,80 @@ export default defineConfig({
     "typescript/prefer-namespace-keyword": "warn",
     "typescript/triple-slash-reference": "warn",
     "typescript/unified-signatures": "warn",
+    /**
+     * Everything tsgolint implements, which is the whole of oxlint's
+     * type-aware set. The sixteen @hasparus/eslint-config already runs keep
+     * the severity they have there — errors for the `no-unsafe-*` family,
+     * `only-throw-error` and the type-constituent pair, warnings for the rest
+     * — so a file that passes one linter passes the other. The rest default to
+     * `warn` like everything above.
+     *
+     * Off on purpose: `typescript/require-await`, because the base turns the
+     * ESLint rule of that name off and the type-aware twin says the same
+     * thing. Nothing else is left out. The three TypeScript rules disabled in
+     * the ESLint config — `consistent-type-definitions`, `no-empty-object-
+     * type`, `no-non-null-assertion` — read syntax, not types, so none of them
+     * lands in this set to begin with.
+     */
+    "typescript/await-thenable": "warn",
+    "typescript/consistent-return": "warn",
+    "typescript/consistent-type-exports": "warn",
+    "typescript/dot-notation": "warn",
+    "typescript/no-array-delete": "warn",
+    "typescript/no-base-to-string": "warn",
+    "typescript/no-confusing-void-expression": "warn",
+    "typescript/no-deprecated": "warn",
+    "typescript/no-duplicate-type-constituents": "error",
+    "typescript/no-floating-promises": "warn",
+    "typescript/no-for-in-array": "warn",
+    "typescript/no-implied-eval": "error",
+    "typescript/no-meaningless-void-operator": "warn",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-misused-spread": "warn",
+    "typescript/no-mixed-enums": "warn",
+    "typescript/no-redundant-type-constituents": "error",
+    "typescript/no-unnecessary-boolean-literal-compare": "warn",
+    "typescript/no-unnecessary-condition": "warn",
+    "typescript/no-unnecessary-qualifier": "warn",
+    "typescript/no-unnecessary-template-expression": "warn",
+    "typescript/no-unnecessary-type-arguments": "warn",
+    "typescript/no-unnecessary-type-assertion": "warn",
+    "typescript/no-unnecessary-type-conversion": "warn",
+    "typescript/no-unnecessary-type-parameters": "warn",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-enum-comparison": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/no-unsafe-type-assertion": "warn",
+    "typescript/no-unsafe-unary-minus": "warn",
+    "typescript/no-useless-default-assignment": "warn",
+    "typescript/non-nullable-type-assertion-style": "warn",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-find": "warn",
+    "typescript/prefer-includes": "warn",
+    "typescript/prefer-nullish-coalescing": "warn",
+    "typescript/prefer-optional-chain": "warn",
+    "typescript/prefer-promise-reject-errors": "warn",
+    "typescript/prefer-readonly": "warn",
+    "typescript/prefer-readonly-parameter-types": "warn",
+    "typescript/prefer-reduce-type-parameter": "warn",
+    "typescript/prefer-regexp-exec": "warn",
+    "typescript/prefer-return-this-type": "warn",
+    "typescript/prefer-string-starts-ends-with": "warn",
+    "typescript/promise-function-async": "warn",
+    "typescript/related-getter-setter-pairs": "warn",
+    "typescript/require-array-sort-compare": "warn",
+    "typescript/require-await": "off",
+    "typescript/restrict-plus-operands": "warn",
+    "typescript/restrict-template-expressions": "warn",
+    "typescript/return-await": "warn",
+    "typescript/strict-boolean-expressions": "warn",
+    "typescript/strict-void-return": "warn",
+    "typescript/switch-exhaustiveness-check": "warn",
+    "typescript/unbound-method": "warn",
+    "typescript/use-unknown-in-catch-callback-variable": "warn",
     "unicorn/catch-error-name": "warn",
     "unicorn/consistent-assert": "warn",
     "unicorn/consistent-date-clone": "warn",
