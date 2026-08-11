@@ -6,6 +6,16 @@ import { defineConfig, type DummyRule, type OxlintOverride } from "oxlint";
 const natural: DummyRule = ["warn", { order: "asc", type: "natural" }];
 
 /**
+ * The discriminant leads. `ok`, `type` and `kind` are what a reader switches
+ * on, and sorting them alphabetically buries them among the fields they
+ * select — `{ data: T; ok: true }` reads backwards from how it is used.
+ */
+const discriminantFirst = {
+  customGroups: [{ elementNamePattern: "^(kind|ok|type)$", groupName: "discriminant" }],
+  groups: ["discriminant", "unknown"],
+};
+
+/**
  * `options.typeAware` reaches the linter through `extends`, so a consuming root
  * config inherits it and plain `oxlint` runs the type-aware rules. The binary
  * they need does not travel with it: oxlint looks for `node_modules/.bin/
@@ -397,7 +407,10 @@ export default defineConfig({
     "perfectionist/sort-decorators": natural,
     "perfectionist/sort-exports": natural,
     "perfectionist/sort-heritage-clauses": natural,
-    "perfectionist/sort-interfaces": natural,
+    "perfectionist/sort-interfaces": [
+      "warn",
+      { order: "asc", type: "natural", ...discriminantFirst },
+    ],
     "perfectionist/sort-intersection-types": natural,
     "perfectionist/sort-jsx-props": "warn",
     "perfectionist/sort-maps": natural,
@@ -409,6 +422,7 @@ export default defineConfig({
         order: "asc",
         partitionByComment: true,
         type: "natural",
+        ...discriminantFirst,
       },
     ],
     "perfectionist/sort-objects": [
