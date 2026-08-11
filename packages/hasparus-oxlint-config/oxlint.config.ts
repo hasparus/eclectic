@@ -664,7 +664,12 @@ export default defineConfig({
     "unicorn/no-array-method-this-argument": "warn",
     "unicorn/no-array-reduce": "warn",
     "unicorn/no-array-reverse": "warn",
-    "unicorn/no-await-expression-member": "warn",
+    /**
+     * `(await params).slug` and `(await cookies()).get(…)` are the forms Next
+     * documents, and an App Router page reaches for them constantly. A name
+     * for each one is a line and a noun that say nothing.
+     */
+    "unicorn/no-await-expression-member": "off",
     "unicorn/no-await-in-promise-methods": "error",
     "unicorn/no-console-spaces": "warn",
     "unicorn/no-document-cookie": "warn",
