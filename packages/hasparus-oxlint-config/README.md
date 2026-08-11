@@ -24,9 +24,11 @@ export default defineConfig({
 
 Every type-aware rule oxlint has is on, and `options.typeAware` comes with
 them, so plain `oxlint` runs the lot — there is no `--type-aware` to remember
-and no lint script to change. The option travels through `extends`, so it only
-takes effect from your root config; a nested config that extends this one
-inherits the rules and loses the switch.
+and no lint script to change. The option travels through `extends` and takes
+effect from your root config, which is the only place oxlint reads it; files
+covered by a nested config are linted with it too. Extending this config from a
+nested config is not a way to lose the switch quietly — oxlint refuses a nested
+config that extends a JS or TS one outright.
 
 The rules run in `oxlint-tsgolint`, a peer dependency, which most package
 managers install for you. Without it oxlint lints nothing at all, so the config
