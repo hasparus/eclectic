@@ -1,6 +1,6 @@
 {
   "name": "@hasparus/oxlint-config",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "my shared oxlint config",
   "license": "MIT",
   "files": [
