@@ -554,7 +554,31 @@ export default defineConfig({
     "typescript/no-confusing-void-expression": "warn",
     "typescript/no-deprecated": "warn",
     "typescript/no-duplicate-type-constituents": "error",
-    "typescript/no-floating-promises": "warn",
+    /**
+     * A test runner's `test`/`it`/`describe` hand back a promise nobody is
+     * meant to await, and a suite of any size buries every real finding under
+     * them — 94 to 1 on the repo this was measured against.
+     *
+     * Named as bare strings rather than `{ from: "package" }` because the
+     * package form matches nothing here: tsgolint does not attribute these
+     * declarations to a package, so `bun:test`, `bun-types` and `@types/bun`
+     * all fail to match. The string form is deprecated upstream; when it goes,
+     * the package form has to work first.
+     */
+    "typescript/no-floating-promises": [
+      "warn",
+      {
+        allowForKnownSafeCalls: [
+          "test",
+          "it",
+          "describe",
+          "beforeAll",
+          "beforeEach",
+          "afterAll",
+          "afterEach",
+        ],
+      },
+    ],
     "typescript/no-for-in-array": "warn",
     "typescript/no-implied-eval": "error",
     "typescript/no-meaningless-void-operator": "warn",
