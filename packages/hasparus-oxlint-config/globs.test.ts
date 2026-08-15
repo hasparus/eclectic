@@ -62,6 +62,26 @@ test("import/no-default-export is off for Next's file conventions and on elsewhe
   off("src/lib/app/error.ts");
 });
 
+test("agent tooling directories are ignored, at the root and further down", () => {
+  const found = lint([
+    [".claude/hooks/stop.ts", SENTINEL],
+    [".cursor/rules/thing.ts", SENTINEL],
+    ["packages/ui/.claude/skills/x/run.ts", SENTINEL],
+
+    // A directory whose name merely starts the same way is somebody's source.
+    ["src/claude/client.ts", SENTINEL],
+    ["src/thing.ts", SENTINEL],
+  ]);
+
+  // Ignored and clean both report nothing; only the sentinel tells them apart.
+  expect(found[".claude/hooks/stop.ts"]).toEqual([]);
+  expect(found[".cursor/rules/thing.ts"]).toEqual([]);
+  expect(found["packages/ui/.claude/skills/x/run.ts"]).toEqual([]);
+
+  expect(found["src/claude/client.ts"]).toContain(SENTINEL_RULE);
+  expect(found["src/thing.ts"]).toContain(SENTINEL_RULE);
+});
+
 test("unicorn/prefer-dom-node-text-content is off for Playwright specs only", () => {
   const found = lint([
     ["e2e/cart.spec.ts", INNER_TEXT],

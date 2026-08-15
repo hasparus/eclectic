@@ -9,16 +9,60 @@ mostly warnings except definitive bugs, which get a red squiggly.
 ```ts
 // oxlint.config.ts
 import { defineConfig } from "oxlint";
-import base from "@hasparus/oxlint-config";
+import base, { ignorePatterns, overrides } from "@hasparus/oxlint-config";
 
 export default defineConfig({
   extends: [base],
-  overrides: [{ files: ["src/**/*.ts"], rules: { "no-console": "warn" } }],
+  ignorePatterns: [...ignorePatterns],
+  overrides: [...overrides, { files: ["src/**/*.ts"], rules: { "no-console": "warn" } }],
 });
 ```
 
-`perfectionist`, `sonarjs`, and `better-tailwindcss` run through oxlint's
-`jsPlugins` and ship as dependencies of this package.
+`ignorePatterns` and `overrides` come along by hand because oxlint reads both
+from the root config only — see [below](#what-it-turns-off-for-you).
+
+`perfectionist`, `sonarjs`, `better-tailwindcss`, and `anti-slop` run through
+oxlint's `jsPlugins` and travel with this package.
+
+## anti-slop
+
+[anti-slop](https://github.com/dmmulroy/anti-slop) is fifteen rules against the
+shapes code takes when whoever wrote it could not see the type it needed —
+`unknown` in a signature, `Record<string, unknown>` standing in for a shape, an
+assertion claiming what nothing checked. A model writes them by the dozen and so
+does a person in a hurry; the rules do not care which.
+
+It publishes source to vendor rather than a package to depend on, so the copy
+lives in [`anti-slop/`](./anti-slop) and ships inside this one. Nothing to
+install, nothing to register — `extends` brings the plugin and all fifteen
+rules, under `anti-slop/`.
+
+Two departures from upstream:
+
+- **Warnings, not errors.** None of the fifteen is a bug, and
+  `require-safety-comment-for-type-assertion` asks for a sentence of prose no
+  `--fix` can write. Over this repo they come to seventeen reports across twenty
+  source files.
+- **`no-runtime-typeof` runs with `allowInTypeGuards`.** The rule's answer to a
+  `typeof` check is to parse at the I/O boundary instead, which presumes a
+  parser. The checks it catches in practice are not reading I/O at all — they
+  are discriminating a union TypeScript itself models with `typeof`. The option
+  passes one inside a type predicate or assertion function and still reports one
+  sitting in the middle of a function meant to be doing something else, so the
+  narrowing keeps costing a name.
+
+To decline the lot, spell them off:
+
+```ts
+export default defineConfig({
+  extends: [base],
+  rules: Object.fromEntries(
+    Object.keys(base.rules)
+      .filter((id) => id.startsWith("anti-slop/"))
+      .map((id) => [id, "off"]),
+  ),
+});
+```
 
 ## Type-aware linting
 
@@ -58,13 +102,18 @@ Two rules are wrong often enough in a particular place that the config says so:
   `page.evaluate` body really does hold DOM nodes.
 
 They ship as a named export rather than inside the base, because `extends`
-drops a base config's `overrides`. Spread them into your own:
+drops a base config's `overrides`. `ignorePatterns` is the same story — oxlint
+reads those from the root config only — so it is a named export too, covering
+build output and the directories coding agents install their own assets into
+(`.claude`, `.cursor`, `.codex` and the rest; a repo that lints those is
+reviewing somebody else's code). Spread both into your own:
 
 ```ts
-import base, { overrides } from "@hasparus/oxlint-config";
+import base, { ignorePatterns, overrides } from "@hasparus/oxlint-config";
 
 export default defineConfig({
   extends: [base],
+  ignorePatterns: [...ignorePatterns],
   overrides: [...overrides],
 });
 ```
