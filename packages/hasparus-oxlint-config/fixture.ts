@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import type { DummyRule, ExternalPluginEntry } from "oxlint";
 
 /**
  * Runs the shipped config over files laid out on disk and reads the rule ids
@@ -39,16 +40,32 @@ export const TSGOLINT = join(
 );
 
 /**
- * The JS plugins would have to resolve from the fixture tree and own no rule
- * under test. Their rules go with them, since oxlint refuses a config naming a
- * plugin it has not loaded. Globs and options are untouched.
+ * A plugin named by package resolves from the fixture tree, which has no
+ * `node_modules` anywhere above it, so those have to go — and their rules with
+ * them, since oxlint refuses a config naming a plugin it has not loaded. None
+ * of them owns a rule under test.
+ *
+ * anti-slop stays. Its specifier is an absolute `file:` URL, which resolves
+ * from anywhere, and that it does is half of what these tests are for. Globs
+ * and options are untouched.
  */
-type Rules = Readonly<Record<string, unknown>>;
+type Rules = Readonly<Record<string, DummyRule | undefined>>;
 export type Config = {
-  readonly jsPlugins?: readonly string[];
+  readonly jsPlugins?: readonly ExternalPluginEntry[];
   readonly overrides?: readonly { readonly rules?: Rules }[];
   readonly rules?: Rules;
 };
+
+/** An entry is a package name or `{ name, specifier }`. Name the half that is not a name. */
+const isAliased = (entry: ExternalPluginEntry): entry is Exclude<ExternalPluginEntry, string> =>
+  typeof entry !== "string";
+
+/** `eslint-plugin-perfectionist` owns `perfectionist/…`; an alias owns its own name. */
+const prefix = (entry: ExternalPluginEntry) =>
+  (isAliased(entry) ? entry.name : entry.replace("eslint-plugin-", "")) + "/";
+
+/** Absolute, so it resolves from the fixture tree as readily as from here. */
+const survives = (entry: ExternalPluginEntry) => isAliased(entry) && URL.canParse(entry.specifier);
 
 export function withoutJsPlugins({
   jsPlugins = [],
@@ -56,12 +73,13 @@ export function withoutJsPlugins({
   rules = {},
   ...rest
 }: Config) {
-  const owned = jsPlugins.map((name) => name.replace("eslint-plugin-", "") + "/");
+  const owned = jsPlugins.filter((entry) => !survives(entry)).map(prefix);
   const keep = (by: Rules) =>
     Object.fromEntries(Object.entries(by).filter(([id]) => !owned.some((p) => id.startsWith(p))));
 
   return {
     ...rest,
+    jsPlugins: jsPlugins.filter(survives),
     overrides: overrides.map((o) => ({ ...o, rules: keep(o.rules ?? {}) })),
     rules: keep(rules),
   };

@@ -58,6 +58,23 @@ if (isOxlintCli && configuredTsgolint === "" && !findTsgolint(process.cwd())) {
 `);
 }
 
+/**
+ * anti-slop ships source to vendor rather than a package to depend on, so its
+ * fifteen rules travel inside this one, under `anti-slop/`.
+ *
+ * The specifier has to be absolute. A relative one resolves against the config
+ * that declares it, and `extends` inlines this config into the consumer's, so
+ * `./anti-slop/index.js` would be hunted for beside *their* file and found
+ * nowhere. A `file:` URL rather than a path, because a Windows path is not a
+ * valid import specifier.
+ *
+ * `.js`, not the `.ts` upstream registers: oxlint reads a TypeScript plugin
+ * only under Bun, Deno, or Node >= 22.18, and a config a consumer installs
+ * does not get to pick their runtime. `anti-slop/*.ts` stays as the readable
+ * source, and the build compiles it beside itself.
+ */
+const ANTI_SLOP = new URL("anti-slop/index.js", import.meta.url).href;
+
 /** App Router conventions. `route` exports GET/POST by name, so it is absent. */
 const NEXT_APP_FILES =
   "{page,layout,template,default,loading,error,global-error,not-found,forbidden,unauthorized,global-not-found,robots,sitemap,manifest}";
@@ -98,6 +115,44 @@ export const overrides: OxlintOverride[] = [
   },
 ];
 
+/**
+ * Spread into your own, the same as `overrides` and for the same reason:
+ * oxlint reads ignore patterns from the root config only, so a base config's
+ * are dropped on the way through `extends`.
+ */
+export const ignorePatterns: string[] = [
+  "dist",
+  ".astro",
+  "src/routeTree.gen.ts",
+  "node_modules",
+  "**/.wrangler/tmp/**/*",
+  "**/.cache/**/*",
+  ".git",
+  /**
+   * Where coding agents keep their own furniture — skills, hooks, prompts,
+   * whatever `npx skills add` last dropped in. Installed assets, the same as
+   * `node_modules`, and a repo that lints them is reviewing someone else's
+   * code. Named one by one rather than as `.*`, because plenty of dot
+   * directories do hold source worth reading.
+   *
+   * Bare names, like `dist` and `.astro` above: a pattern with a slash in it
+   * anchors to the directory of the config that declares it, and a bare one
+   * matches the directory at any depth — which is where a monorepo keeps the
+   * second and third copy.
+   */
+  ".agent",
+  ".agents",
+  ".claude",
+  ".codex",
+  ".continue",
+  ".cursor",
+  ".gemini",
+  ".opencode",
+  ".pi",
+  ".roo",
+  ".windsurf",
+];
+
 export default defineConfig({
   categories: { correctness: "off" },
   env: {
@@ -106,16 +161,9 @@ export default defineConfig({
     es2026: true,
     node: true,
   },
-  ignorePatterns: [
-    "dist",
-    ".astro",
-    "src/routeTree.gen.ts",
-    "node_modules",
-    "**/.wrangler/tmp/**/*",
-    "**/.cache/**/*",
-    ".git",
-  ],
+  ignorePatterns,
   jsPlugins: [
+    { name: "anti-slop", specifier: ANTI_SLOP },
     "eslint-plugin-perfectionist",
     "eslint-plugin-sonarjs",
     "eslint-plugin-better-tailwindcss",
@@ -150,6 +198,46 @@ export default defineConfig({
   ],
   plugins: ["typescript", "unicorn", "import", "promise", "react"],
   rules: {
+    /**
+     * anti-slop, vendored — fifteen rules against the shapes code takes when
+     * whoever wrote it could not see the type it needed: `unknown` in a
+     * signature, `Record<string, unknown>` standing in for a shape, an
+     * assertion claiming what nothing checked. A model writes them by the
+     * dozen and so does a person in a hurry; the rules do not care which.
+     *
+     * Upstream turns all fifteen on as errors. They are warnings here for the
+     * reason everything else is: none of them is a bug, and the last one asks
+     * for a sentence of prose no `--fix` can write. Measured over this
+     * repository they come to seventeen reports across twenty source files,
+     * which is a morning's work, not a wall.
+     */
+    "anti-slop/no-chained-type-assertions": "warn",
+    "anti-slop/no-conditional-empty-object-spread": "warn",
+    "anti-slop/no-known-value-widening": "warn",
+    "anti-slop/no-module-mocking": "warn",
+    "anti-slop/no-object-parameters": "warn",
+    "anti-slop/no-reflect-apply": "warn",
+    "anti-slop/no-reflect-get": "warn",
+    /**
+     * The rule's answer to a `typeof` check is to parse the value at its I/O
+     * boundary instead, which presumes a parser. Nothing here has one, and the
+     * checks it catches in practice are not reading I/O at all — they are
+     * discriminating a union TypeScript itself models with `typeof`, the way
+     * oxlint's own `string | { name, specifier }` plugin entry is modelled.
+     *
+     * `allowInTypeGuards` is the narrow version of that concession: a `typeof`
+     * inside a type predicate or an assertion function passes, one sitting in
+     * the middle of a function that is meant to be doing something else does
+     * not. It still costs a name, which is the point.
+     */
+    "anti-slop/no-runtime-typeof": ["warn", { allowInTypeGuards: true }],
+    "anti-slop/no-shape-in-symbol-names": "warn",
+    "anti-slop/no-unknown-parameters": "warn",
+    "anti-slop/no-unknown-returns": "warn",
+    "anti-slop/no-unknown-type-aliases": "warn",
+    "anti-slop/no-unsafe-dictionary-type": "warn",
+    "anti-slop/no-widen-then-assert": "warn",
+    "anti-slop/require-safety-comment-for-type-assertion": "warn",
     "constructor-super": "off",
     curly: "off",
     eqeqeq: [
