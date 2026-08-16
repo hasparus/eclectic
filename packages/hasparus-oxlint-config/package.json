@@ -19,7 +19,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc --module esnext --moduleResolution bundler --target esnext --skipLibCheck oxlint.config.ts && tsc --module esnext --moduleResolution bundler --target esnext --skipLibCheck --allowImportingTsExtensions --rewriteRelativeImportExtensions anti-slop/index.ts",
+    "build": "tsc -p tsconfig.build.json",
     "lint": "oxlint --deny-warnings --ignore-pattern \"anti-slop/**\"",
     "prepublishOnly": "bun run build",
     "test": "bun test"
