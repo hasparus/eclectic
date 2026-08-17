@@ -110,3 +110,4 @@ test("unicorn/prefer-dom-node-text-content is off for Playwright specs only", ()
   expect(found["e2e/helpers/dom.ts"]).toContain(rule);
   expect(found["src/components/Thing.ts"]).toContain(rule);
 });
+

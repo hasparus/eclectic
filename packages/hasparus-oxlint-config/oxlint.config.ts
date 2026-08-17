@@ -6,6 +6,16 @@ import { defineConfig, type DummyRule, type OxlintOverride } from "oxlint";
 const natural: DummyRule = ["warn", { order: "asc", type: "natural" }];
 
 /**
+ * The discriminant leads. `ok`, `type` and `kind` are what a reader switches
+ * on, and sorting them alphabetically buries them among the fields they
+ * select — `{ data: T; ok: true }` reads backwards from how it is used.
+ */
+const discriminantFirst = {
+  customGroups: [{ elementNamePattern: "^(kind|ok|type)$", groupName: "discriminant" }],
+  groups: ["discriminant", "unknown"],
+};
+
+/**
  * `options.typeAware` reaches the linter through `extends`, so a consuming root
  * config inherits it and plain `oxlint` runs the type-aware rules. The binary
  * they need does not travel with it: oxlint looks for `node_modules/.bin/
@@ -485,7 +495,10 @@ export default defineConfig({
     "perfectionist/sort-decorators": natural,
     "perfectionist/sort-exports": natural,
     "perfectionist/sort-heritage-clauses": natural,
-    "perfectionist/sort-interfaces": natural,
+    "perfectionist/sort-interfaces": [
+      "warn",
+      { order: "asc", type: "natural", ...discriminantFirst },
+    ],
     "perfectionist/sort-intersection-types": natural,
     "perfectionist/sort-jsx-props": "warn",
     "perfectionist/sort-maps": natural,
@@ -497,6 +510,7 @@ export default defineConfig({
         order: "asc",
         partitionByComment: true,
         type: "natural",
+        ...discriminantFirst,
       },
     ],
     "perfectionist/sort-objects": [
@@ -695,7 +709,13 @@ export default defineConfig({
     "typescript/only-throw-error": "error",
     "typescript/prefer-find": "warn",
     "typescript/prefer-includes": "warn",
-    "typescript/prefer-nullish-coalescing": "warn",
+    /**
+     * On a string, `||` is usually the point rather than a slip: an empty
+     * environment variable, a label trimmed to nothing, a blank thumbnail all
+     * have to fall through to the next branch, and `??` keeps the empty
+     * string. Left on for every other type, where `??` is the safer operator.
+     */
+    "typescript/prefer-nullish-coalescing": ["warn", { ignorePrimitives: { string: true } }],
     "typescript/prefer-optional-chain": "warn",
     "typescript/prefer-promise-reject-errors": "warn",
     "typescript/prefer-readonly": "warn",
@@ -732,7 +752,12 @@ export default defineConfig({
     "unicorn/no-array-method-this-argument": "warn",
     "unicorn/no-array-reduce": "warn",
     "unicorn/no-array-reverse": "warn",
-    "unicorn/no-await-expression-member": "warn",
+    /**
+     * `(await params).slug` and `(await cookies()).get(…)` are the forms Next
+     * documents, and an App Router page reaches for them constantly. A name
+     * for each one is a line and a noun that say nothing.
+     */
+    "unicorn/no-await-expression-member": "off",
     "unicorn/no-await-in-promise-methods": "error",
     "unicorn/no-console-spaces": "warn",
     "unicorn/no-document-cookie": "warn",
