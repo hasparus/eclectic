@@ -1,0 +1,13 @@
+{
+  "name": "paw-ornament",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Generative laser-cut paw ornaments, exported as SVG",
+  "type": "module",
+  "main": "src/generator.js",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "render": "node scripts/render.mjs out"
+  },
+  "license": "MIT"
+}
