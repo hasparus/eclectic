@@ -61,6 +61,13 @@ header p { margin: 0; color: var(--muted); max-width: 66ch; }
 @media (min-width: 901px) { .board { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); } }
 .stage { position: relative; aspect-ratio: 1 / 0.97; max-width: 100%; }
 .stage > svg { width: 100%; height: 100%; display: block; touch-action: manipulation; }
+.laser-btn { background: var(--cut); color: #fff; border-color: var(--cut); }
+.laser-btn:hover:not(:disabled) { border-color: var(--ink); }
+.stage[data-view="material"] .pad-hit:not(:hover):not(.selected) { stroke: transparent; }
+.stage[data-view="material"] .pad-hit.selected { fill: transparent; stroke-dasharray: 2 5; }
+.ribbon { pointer-events: none; }
+.reveal { animation: reveal 1.1s ease-out; }
+@keyframes reveal { from { opacity: 0.15; filter: brightness(1.6); } to { opacity: 1; filter: none; } }
 .busy { position: absolute; top: 2px; right: 4px; font: 500 12px var(--font-data); color: var(--muted); opacity: 0; transition: opacity .2s; pointer-events: none; }
 .stage.working .busy { opacity: 1; }
 .material { fill: var(--material); }
@@ -159,10 +166,20 @@ footer { font-size: 13px; color: var(--muted); max-width: 80ch; }
       <div class="stats" id="stats" aria-live="polite"></div>
       <div class="actions">
         <div class="seg" role="radiogroup" aria-label="View">
-          <input type="radio" name="view" id="view-fill" value="fill" checked><label for="view-fill" data-i18n="stencil"></label>
+          <input type="radio" name="view" id="view-material" value="material" checked><label for="view-material" data-i18n="material"></label>
+          <input type="radio" name="view" id="view-fill" value="fill"><label for="view-fill" data-i18n="stencil"></label>
           <input type="radio" name="view" id="view-cut" value="cut"><label for="view-cut" data-i18n="cutLines"></label>
         </div>
+        <button type="button" class="laser-btn" id="laser"></button>
         <label class="check"><input type="checkbox" id="show-thin" checked> <span data-i18n="showThin"></span></label>
+      </div>
+      <div class="actions" id="material-row">
+        <div class="seg" role="radiogroup" aria-label="Material">
+          <input type="radio" name="material" id="material-birch" value="birch"><label for="material-birch" id="material-birch-label"></label>
+          <input type="radio" name="material" id="material-walnut" value="walnut"><label for="material-walnut" id="material-walnut-label"></label>
+          <input type="radio" name="material" id="material-gold" value="gold"><label for="material-gold" id="material-gold-label"></label>
+          <input type="radio" name="material" id="material-paper" value="paper"><label for="material-paper" id="material-paper-label"></label>
+        </div>
       </div>
       <div class="actions" id="exports">
         <button class="primary" id="save-svg-fill" data-i18n="saveSvg"></button>

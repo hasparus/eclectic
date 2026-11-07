@@ -3,6 +3,13 @@ import type { MainMotif, ToeMotif } from "../params";
 export type Lang = "pl" | "en";
 
 const pl = {
+  material: "Materiał",
+  laser: "Wytnij laserem",
+  stop: "Zatrzymaj",
+  laserTime: "Czas lasera",
+  laserProgress: (pct: number, done: string, total: string) => `Laser tnie: ${pct}% · ${done} z ${total} przy 20 mm/s. Najpierw otwory, kontur na końcu.`,
+  laserDone: (total: string) => `Wycięte. Przy 20 mm/s zajmie to ok. ${total} min. Tak będzie wyglądać gotowa ozdoba.`,
+  materials: { birch: "Sklejka", walnut: "Orzech", gold: "Złoty akryl", paper: "Papier" },
   title: "Warsztat ozdób z łapką",
   lede: "Generator ozdób z łapką do wycięcia laserem. Każdy opuszek może mieć inny wzór, a projekt zawsze wychodzi jako jeden element, gotowy do cięcia.",
   stencil: "Szablon",
@@ -97,6 +104,13 @@ const pl = {
 export type Strings = typeof pl;
 
 const en: Strings = {
+  material: "Material",
+  laser: "Laser-cut it",
+  stop: "Stop",
+  laserTime: "Laser time",
+  laserProgress: (pct: number, done: string, total: string) => `Cutting: ${pct}% · ${done} of ${total} at 20 mm/s. Openings first, outline last.`,
+  laserDone: (total: string) => `Done. At 20 mm/s the cut takes about ${total} min. This is how the finished ornament will look.`,
+  materials: { birch: "Birch ply", walnut: "Walnut", gold: "Gold acrylic", paper: "Paper" },
   title: "Paw Ornament Workshop",
   lede: "Generates laser-cut paw ornaments. Every pad can carry its own pattern, and every design comes out as one connected piece, ready to cut.",
   stencil: "Stencil",

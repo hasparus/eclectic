@@ -10,7 +10,7 @@ export function run(job: Job) {
   const r = generate(job.params, job.opts);
   if (job.kind === "crop") return { d: pathData(r.loops) };
   if (job.kind === "preview" || job.format === "path") {
-    return { d: pathData(r.loops), bbox: r.bbox, u: r.unitsPerMm, stats: r.stats, pads: r.pads, thinSpots: r.thinSpots, params: r.params };
+    return { d: pathData(r.loops), bbox: r.bbox, u: r.unitsPerMm, stats: r.stats, pads: r.pads, hole: r.hole, thinSpots: r.thinSpots, params: r.params };
   }
   const [type, mode] = job.format.split("-") as ["svg" | "pdf", "fill" | "cut"];
   return { data: type === "svg" ? toSVG(r, { mode }) : toPDF(r, { mode }), stats: r.stats };

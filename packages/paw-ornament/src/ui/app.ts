@@ -4,6 +4,7 @@ import { DEFAULTS, MAIN_MOTIFS, MAIN_PAD, normalizeParams, padWindow, TOE_MOTIFS
 import type { Job } from "../worker";
 import { Engine, Superseded } from "./engine";
 import { detectLang, formatNumber, STRINGS, type Lang, type Strings } from "./i18n";
+import { LASER_MM_PER_S, MATERIALS, formatDuration, materialFilter, ribbon, runLaser, Swing, type LaserRun, type Material } from "./showcase";
 import { textMask } from "./text";
 
 interface Preview {
@@ -12,6 +13,7 @@ interface Preview {
   u: number;
   stats: Stats;
   pads: PadInfo[];
+  hole: { x: number; y: number; r: number } | null;
   thinSpots: ThinSpot[];
   params: Params;
 }
@@ -62,7 +64,11 @@ let params = loadParams();
 let selected = Number(storage.get(`${KEY}:pad`) ?? 1) || 0;
 let lang: Lang = detectLang(storage.get(`${KEY}:lang`));
 let S: Strings = STRINGS[lang];
-let view: "fill" | "cut" = "fill";
+type View = "fill" | "cut" | "material" | "laser";
+let view: View = "material";
+let material: Material = (MATERIALS as readonly string[]).includes(storage.get(`${KEY}:material`) ?? "") ? (storage.get(`${KEY}:material`) as Material) : "birch";
+const swing = new Swing();
+let laser: LaserRun | null = null;
 let showThin = true;
 let last: Preview | null = null;
 let padInfo: PadInfo[] = [];
@@ -160,6 +166,7 @@ function show(res: Preview): void {
   const padsChanged = !last || last.params.paw !== res.params.paw || last.params.widthMm !== res.params.widthMm || last.params.ringMm !== res.params.ringMm || last.params.borderMm !== res.params.borderMm;
   last = res;
   padInfo = res.pads;
+  if (laser) return; // the laser keeps cutting the design it started with; the newest one is drawn after
   drawPreview();
   if (padsChanged) {
     drawPicker();
@@ -168,24 +175,42 @@ function show(res: Preview): void {
 }
 
 function drawPreview(): void {
-  if (!last) return;
-  const { d, bbox, u, stats, pads, thinSpots } = last;
+  if (!last || laser) return;
+  const { d, bbox, u, stats, pads, thinSpots, hole } = last;
   const svg = $<SVGSVGElement>("preview");
+  swing.stop();
   const m = 5 * u;
   const ruleH = 9 * u;
-  svg.setAttribute("viewBox", `${bbox.x - m} ${bbox.y - m} ${bbox.w + 2 * m} ${bbox.h + 2 * m + ruleH}`);
+  const hang = view === "material" && hole ? 16 * u : 0;
+  const region = { x: bbox.x - m, y: bbox.y - m - hang, w: bbox.w + 2 * m, h: bbox.h + 2 * m + ruleH + hang };
+  svg.setAttribute("viewBox", `${region.x} ${region.y} ${region.w} ${region.h}`);
   svg.replaceChildren();
-  svgEl("path", { d, class: view === "cut" ? "cutline" : "material", "fill-rule": "evenodd" }, svg);
-  const overlay = svgEl("g", { "aria-hidden": "true" }, svg);
+  const stage = $("stage");
+  stage.dataset.view = view;
+  let host: SVGElement = svg;
+  if (view === "material") {
+    const defs = svgEl("defs", {}, svg);
+    materialFilter(defs, "mat", material, u, region);
+    const g = svgEl("g", {}, svg);
+    host = g;
+    if (hole) ribbon(g, hole.x, hole.y, hole.r, bbox.y - hang + 4 * u, u);
+    svgEl("path", { d, fill: "#000", "fill-rule": "evenodd", filter: "url(#mat)" }, g);
+    if (hole) swing.start(g, [hole.x, bbox.y - hang + 4 * u]);
+  } else {
+    svgEl("path", { d, class: view === "cut" ? "cutline" : "material", "fill-rule": "evenodd" }, svg);
+  }
+  const overlay = svgEl("g", { "aria-hidden": "true" }, host);
   for (const pad of pads) {
     const hit = svgEl("path", { d: outlinePath(pad.outline), class: `pad-hit${pad.index === selected ? " selected" : ""}` }, overlay);
     hit.addEventListener("click", () => select(pad.index));
-    const title = svgEl("title", {}, hit);
-    title.textContent = S.pad[pad.index]!;
+    svgEl("title", {}, hit).textContent = S.pad[pad.index]!;
   }
-  if (showThin) for (const t of thinSpots) svgEl("circle", { cx: t.x, cy: t.y, r: Math.max(t.r, 2.2 * u), class: "thin" }, svg);
+  if (showThin) for (const t of thinSpots) svgEl("circle", { cx: t.x, cy: t.y, r: Math.max(t.r, 2.2 * u), class: "thin" }, host);
+  drawRule(svg, bbox, u, stats, m);
+  drawStats();
+}
 
-  // millimetre rule under the ornament
+function drawRule(svg: SVGSVGElement, bbox: Preview["bbox"], u: number, stats: Stats, m: number): void {
   const g = svgEl("g", { class: "rule" }, svg);
   const y = bbox.y + bbox.h + m * 0.8;
   const mm = Math.floor(stats.widthMm);
@@ -198,7 +223,58 @@ function drawPreview(): void {
     if (i % labelEvery === 0) svgEl("text", { x, y: y + 5.6 * u, "font-size": 2.5 * u, "text-anchor": "middle" }, g).textContent = String(i);
   }
   svgEl("text", { x: bbox.x + mm * u + 1.5 * u, y: y + 5.6 * u, "font-size": 2.5 * u }, g).textContent = "mm";
-  drawStats();
+}
+
+function setView(next: View): void {
+  view = next;
+  const radio = document.getElementById(`view-${next}`) as HTMLInputElement | null;
+  if (radio) radio.checked = true;
+  $("material-row").hidden = next !== "material";
+  drawPreview();
+}
+
+function startLaser(): void {
+  if (laser) {
+    laser.stop();
+    laser = null;
+    $("laser").textContent = S.laser;
+    setView("material");
+    note("");
+    return;
+  }
+  if (!last) return;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    setView("material");
+    note(S.laserDone(formatDuration(last.stats.cutLengthMm / LASER_MM_PER_S)));
+    return;
+  }
+  const { d, bbox, u, stats } = last;
+  swing.stop();
+  const svg = $<SVGSVGElement>("preview");
+  const m = 5 * u;
+  const region = { x: bbox.x - m, y: bbox.y - m, w: bbox.w + 2 * m, h: bbox.h + 2 * m };
+  svg.setAttribute("viewBox", `${region.x} ${region.y} ${region.w} ${region.h + 9 * u}`);
+  svg.replaceChildren();
+  $("stage").dataset.view = "laser";
+  const total = formatDuration(stats.cutLengthMm / LASER_MM_PER_S);
+  $("laser").textContent = S.stop;
+  laser = runLaser(
+    svg,
+    d,
+    u,
+    region,
+    (f) => note(S.laserProgress(Math.round(f * 100), formatDuration((f * stats.cutLengthMm) / LASER_MM_PER_S), total)),
+    () => {
+      laser = null;
+      $("laser").textContent = S.laser;
+      setView("material");
+      const preview = $("preview");
+      preview.classList.remove("reveal");
+      void preview.getBoundingClientRect();
+      preview.classList.add("reveal");
+      note(S.laserDone(total));
+    },
+  );
 }
 
 function drawStats(): void {
@@ -217,6 +293,7 @@ function drawStats(): void {
   item(S.size, `${f(stats.widthMm)} × ${f(stats.heightMm)} mm`);
   item(S.cutPath, stats.cutLengthMm >= 1000 ? `${f(stats.cutLengthMm / 1000, 2)} m` : `${Math.round(stats.cutLengthMm)} mm`);
   item(S.openings, String(stats.openings));
+  item(S.laserTime, `≈ ${formatDuration(stats.cutLengthMm / LASER_MM_PER_S)}`);
   const pill = (text: string, warn = false) => {
     const p = document.createElement("span");
     p.className = warn ? "pill warn" : "pill";
@@ -545,6 +622,8 @@ function applyLanguage(): void {
     const v = S[el.dataset.i18n as keyof Strings];
     if (typeof v === "string") el.textContent = v;
   }
+  $("laser").textContent = laser ? S.stop : S.laser;
+  for (const mat of MATERIALS) $(`material-${mat}-label`).textContent = S.materials[mat];
   drawPreview();
   drawPicker();
   schedulePalette();
@@ -597,11 +676,14 @@ function wire(): void {
     thumbSeeds = Array.from({ length: 6 }, randomSeed);
     void drawThumbs();
   });
-  for (const el of Array.from(document.querySelectorAll<HTMLInputElement>('input[name="view"]')))
+  for (const el of Array.from(document.querySelectorAll<HTMLInputElement>('input[name="view"]'))) el.addEventListener("change", () => setView(el.value as View));
+  for (const el of Array.from(document.querySelectorAll<HTMLInputElement>('input[name="material"]')))
     el.addEventListener("change", () => {
-      view = el.value as "fill" | "cut";
+      material = el.value as Material;
+      storage.set(`${KEY}:material`, material);
       drawPreview();
     });
+  $("laser").addEventListener("click", startLaser);
   input("show-thin").addEventListener("change", () => {
     showThin = input("show-thin").checked;
     drawPreview();
@@ -634,5 +716,7 @@ function wire(): void {
 
 if (!Number.isInteger(selected) || selected < 0 || selected > MAIN_PAD) selected = 1;
 wire();
+(document.getElementById(`material-${material}`) as HTMLInputElement).checked = true;
+setView(view);
 applyLanguage();
 refresh();

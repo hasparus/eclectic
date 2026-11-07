@@ -47,6 +47,8 @@ export interface Result {
   unitsPerMm: number;
   bbox: { x: number; y: number; w: number; h: number };
   pads: PadInfo[];
+  /** Hanging hole centre and radius in world units, if there is one. */
+  hole: { x: number; y: number; r: number } | null;
   thinSpots: ThinSpot[];
   stats: Stats;
 }
@@ -192,6 +194,7 @@ export function generate(input: unknown, opts: GenerateOptions = {}): Result {
     unitsPerMm: u,
     bbox: { x: bx0, y: by0, w: bx1 - bx0, h: by1 - by0 },
     pads: pads.map((pd) => ({ index: pd.index, kind: pd.kind, outline: pd.outline, box: pd.box })),
+    hole,
     thinSpots,
     stats: {
       widthMm: (bx1 - bx0) / u,
