@@ -2,9 +2,9 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Pacifico&family=Lobster&family=Fredoka:wght@600&display=swap">
 <style>
-/* Layout: a cutting board on the left (the ornament, a millimetre rule, the cut stats), a tool rail on the right, variations underneath. */
+/* Layout: a cutting board (ornament, millimetre rule, cut stats, exports) beside a tool rail (pads first, then cutting), variations underneath. */
 :root {
   --bg: #eef0f2;
   --surface: #f8f9fa;
@@ -14,8 +14,12 @@
   --line: #c9ced4;
   --material: #15181c;
   --cut: #d6332b;
+  --select: #2b62d6;
+  --select-soft: rgba(43, 98, 214, 0.1);
   --ok: #1f7a4d;
   --ok-bg: #dcefe4;
+  --warn: #9a4d00;
+  --warn-bg: #fbe8cf;
   --focus: #2b62d6;
   --font-display: "Young Serif", Georgia, "Times New Roman", serif;
   --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -24,64 +28,76 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #16191d; --surface: #1d2126; --board: #262b31; --ink: #e9ecef; --muted: #9aa3ad;
-    --line: #353b43; --material: #e4d9c6; --cut: #ff6a5e; --ok: #7fd4a4; --ok-bg: #1d3a2b; --focus: #7fa6ff;
+    --bg: #16191d; --surface: #1d2126; --board: #262b31; --ink: #e9ecef; --muted: #9aa3ad; --line: #353b43;
+    --material: #e4d9c6; --cut: #ff6a5e; --select: #7fa6ff; --select-soft: rgba(127, 166, 255, 0.2);
+    --ok: #7fd4a4; --ok-bg: #1d3a2b; --warn: #ffb35c; --warn-bg: #3d2a12; --focus: #7fa6ff;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #16191d; --surface: #1d2126; --board: #262b31; --ink: #e9ecef; --muted: #9aa3ad;
-  --line: #353b43; --material: #e4d9c6; --cut: #ff6a5e; --ok: #7fd4a4; --ok-bg: #1d3a2b; --focus: #7fa6ff;
+  --bg: #16191d; --surface: #1d2126; --board: #262b31; --ink: #e9ecef; --muted: #9aa3ad; --line: #353b43;
+  --material: #e4d9c6; --cut: #ff6a5e; --select: #7fa6ff; --select-soft: rgba(127, 166, 255, 0.2);
+  --ok: #7fd4a4; --ok-bg: #1d3a2b; --warn: #ffb35c; --warn-bg: #3d2a12; --focus: #7fa6ff;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body {
   background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body);
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: 20px 40px;
 }
-.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 22px; }
-header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 24px; }
+.wrap { max-width: 1200px; margin: 0 auto; display: grid; gap: 22px; }
+header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 24px; }
+header > div:first-child { display: grid; gap: 6px; min-width: 0; flex: 1 1 420px; }
 h1 { font: 400 clamp(26px, 4vw, 36px)/1.1 var(--font-display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
-header p { margin: 0; color: var(--muted); max-width: 60ch; }
-.studio { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 22px; align-items: start; }
-@media (max-width: 860px) { .studio { grid-template-columns: minmax(0, 1fr); } }
+header p { margin: 0; color: var(--muted); max-width: 66ch; }
+.studio { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 22px; align-items: start; }
+@media (max-width: 900px) { .studio { grid-template-columns: minmax(0, 1fr); } }
 
 /* board */
-.board { background: var(--board); border-radius: var(--radius); padding: 18px; display: grid; gap: 14px; min-width: 0; }
-.stage { position: relative; aspect-ratio: 1 / 0.95; max-width: 100%; display: grid; place-items: center; }
-.stage svg { width: 100%; height: 100%; display: block; }
-.stage .busy { position: absolute; top: 4px; right: 6px; font: 500 12px var(--font-data); color: var(--muted); opacity: 0; transition: opacity .2s; }
+.board { background: var(--board); border-radius: var(--radius); padding: 18px; display: grid; gap: 12px; min-width: 0; }
+@media (min-width: 901px) { .board { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); } }
+.stage { position: relative; aspect-ratio: 1 / 0.97; max-width: 100%; }
+.stage > svg { width: 100%; height: 100%; display: block; touch-action: manipulation; }
+.busy { position: absolute; top: 2px; right: 4px; font: 500 12px var(--font-data); color: var(--muted); opacity: 0; transition: opacity .2s; pointer-events: none; }
 .stage.working .busy { opacity: 1; }
 .material { fill: var(--material); }
 .cutline { fill: none; stroke: var(--cut); stroke-width: 1.1px; vector-effect: non-scaling-stroke; }
+.pad-hit { fill: transparent; stroke: transparent; stroke-width: 2px; vector-effect: non-scaling-stroke; cursor: pointer; }
+.pad-hit:hover { stroke: var(--select); stroke-dasharray: 5 4; }
+.pad-hit.selected { stroke: var(--select); fill: var(--select-soft); stroke-dasharray: none; }
+.thin { fill: none; stroke: var(--warn); stroke-width: 2px; vector-effect: non-scaling-stroke; pointer-events: none; }
 .rule line { stroke: var(--muted); vector-effect: non-scaling-stroke; stroke-width: 1px; }
 .rule text { fill: var(--muted); font-family: var(--font-data); }
-.stats { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; font: 13px var(--font-data); font-variant-numeric: tabular-nums; color: var(--muted); }
+.hint { font-size: 13px; color: var(--muted); margin: 0; }
+.stats { display: flex; flex-wrap: wrap; gap: 6px 20px; align-items: center; font: 13px var(--font-data); font-variant-numeric: tabular-nums; color: var(--muted); min-height: 24px; }
 .stats b { color: var(--ink); font-weight: 500; }
 .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 99px; background: var(--ok-bg); color: var(--ok); font: 500 12px var(--font-body); }
 .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.warn { background: var(--warn-bg); color: var(--warn); }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .note { font-size: 13px; color: var(--muted); min-height: 1.5em; }
+.note textarea { display: block; margin-top: 6px; width: 100%; height: 110px; font: 12px var(--font-data); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
 
-/* buttons + inputs */
-button { font: 500 14px var(--font-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
-button:hover { border-color: var(--muted); }
+/* controls */
+button { font: 500 14px var(--font-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 13px; cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--muted); }
 button.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-button:disabled { opacity: .55; cursor: progress; }
+button:disabled { opacity: .5; cursor: default; }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-
-/* tool rail */
-.rail { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; display: grid; gap: 18px; }
-.group { display: grid; gap: 10px; }
+.rail { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; display: grid; gap: 16px; min-width: 0; }
+.group { display: grid; gap: 10px; min-width: 0; }
 .group + .group { border-top: 1px solid var(--line); padding-top: 16px; }
 .label { font: 600 11px var(--font-body); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
-.seedrow { display: flex; gap: 8px; }
-.seedrow input { flex: 1; min-width: 0; font: 500 15px var(--font-data); padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
-.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row input[type="text"] { flex: 1 1 120px; min-width: 0; }
+input[type="text"] { font: 500 15px var(--font-data); padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+.seg { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg.full { display: grid; }
 .seg input { position: absolute; opacity: 0; pointer-events: none; }
-.seg label { text-align: center; padding: 7px 10px; font-size: 13.5px; cursor: pointer; border-left: 1px solid var(--line); color: var(--muted); }
+.seg label { text-align: center; padding: 6px 12px; font-size: 13.5px; cursor: pointer; border-left: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
 .seg label:first-of-type { border-left: 0; }
 .seg input:checked + label { background: var(--ink); color: var(--bg); }
 .seg input:focus-visible + label { outline: 2px solid var(--focus); outline-offset: -2px; }
@@ -89,386 +105,152 @@ button:disabled { opacity: .55; cursor: progress; }
 .field output { font: 13px var(--font-data); font-variant-numeric: tabular-nums; color: var(--muted); }
 .field input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--ink); }
 .field.disabled { opacity: .45; }
-.hint { font-size: 12.5px; color: var(--muted); margin: -4px 0 0; }
+.small { font-size: 12.5px; color: var(--muted); margin: -4px 0 0; }
 .check { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
 .check input { accent-color: var(--ink); width: 16px; height: 16px; }
 
+/* pad picker + palette */
+.picker-wrap { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; align-items: center; }
+#picker { width: 100%; height: auto; display: block; }
+#picker path { fill: var(--board); stroke: var(--muted); stroke-width: 1.5px; vector-effect: non-scaling-stroke; cursor: pointer; }
+#picker path:hover { stroke: var(--select); }
+#picker path[aria-checked="true"] { fill: var(--select-soft); stroke: var(--select); stroke-width: 2.5px; }
+#picker path:focus-visible { outline: none; stroke: var(--focus); stroke-width: 3px; }
+.picked { display: grid; gap: 2px; font-size: 14px; }
+.picked b { font: 400 18px var(--font-display); }
+.palette { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
+.tile { padding: 6px 6px 4px; display: grid; gap: 3px; background: var(--board); border: 2px solid transparent; border-radius: 8px; font-size: 12px; color: var(--muted); }
+.tile svg { width: 100%; aspect-ratio: 1; display: block; }
+.tile[aria-pressed="true"] { border-color: var(--select); color: var(--ink); }
+.tile .material { opacity: 0; transition: opacity .15s; }
+.tile.ready .material { opacity: 1; }
+
 /* variations */
-.variations { display: grid; gap: 12px; }
+.variations { display: grid; gap: 10px; }
 .variations .head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .variations h2 { font: 400 22px var(--font-display); margin: 0; }
 .thumbs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
-@media (max-width: 860px) { .thumbs { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .thumbs { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .thumb { padding: 10px 10px 8px; background: var(--board); border: 1px solid transparent; display: grid; gap: 6px; text-align: center; font: 12px var(--font-data); color: var(--muted); }
-.thumb:hover { border-color: var(--muted); }
 .thumb svg { width: 100%; aspect-ratio: 1; display: block; }
-footer { font-size: 13px; color: var(--muted); max-width: 75ch; }
+footer { font-size: 13px; color: var(--muted); max-width: 80ch; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
 <div class="wrap">
   <header>
-    <h1>Paw Ornament Workshop</h1>
-    <p>Generates laser-cut paw ornaments with snowflakes in the toes and a winter forest in the pad. Every design comes out as one connected piece, ready to cut.</p>
+    <div>
+      <h1 data-i18n="title">Paw Ornament Workshop</h1>
+      <p data-i18n="lede"></p>
+    </div>
+    <div class="seg" role="radiogroup" aria-label="Language">
+      <input type="radio" name="lang" id="lang-pl" value="pl"><label for="lang-pl">PL</label>
+      <input type="radio" name="lang" id="lang-en" value="en"><label for="lang-en">EN</label>
+    </div>
   </header>
 
   <section class="studio">
     <div class="board">
       <div class="stage" id="stage">
-        <svg id="preview" viewBox="0 0 1000 950" role="img" aria-label="Paw ornament preview"></svg>
-        <span class="busy" id="busy">cutting…</span>
+        <svg id="preview" viewBox="0 0 1000 970" role="img" aria-label="Paw ornament preview"></svg>
+        <span class="busy" data-i18n="working"></span>
       </div>
-      <div class="stats" id="stats"><span>Generating…</span></div>
+      <p class="hint" data-i18n="padsHint"></p>
+      <div class="stats" id="stats" aria-live="polite"></div>
       <div class="actions">
-        <div class="seg" role="radiogroup" aria-label="Preview">
-          <input type="radio" name="view" id="view-fill" value="fill" checked><label for="view-fill">Stencil</label>
-          <input type="radio" name="view" id="view-cut" value="cut"><label for="view-cut">Cut lines</label>
+        <div class="seg" role="radiogroup" aria-label="View">
+          <input type="radio" name="view" id="view-fill" value="fill" checked><label for="view-fill" data-i18n="stencil"></label>
+          <input type="radio" name="view" id="view-cut" value="cut"><label for="view-cut" data-i18n="cutLines"></label>
         </div>
-        <button class="primary" id="save-fill">Download SVG</button>
-        <button id="save-cut">Download cut file</button>
-        <button id="copy">Copy SVG</button>
+        <label class="check"><input type="checkbox" id="show-thin" checked> <span data-i18n="showThin"></span></label>
+      </div>
+      <div class="actions" id="exports">
+        <button class="primary" id="save-svg-fill" data-i18n="saveSvg"></button>
+        <button id="save-svg-cut" data-i18n="saveCut"></button>
+        <button id="save-pdf-fill" data-i18n="savePdf"></button>
+        <button id="save-png" data-i18n="savePng"></button>
+        <button id="copy" data-i18n="copy"></button>
       </div>
       <div class="note" id="note" role="status"></div>
     </div>
 
     <form class="rail" id="controls" autocomplete="off">
       <div class="group">
-        <span class="label">Seed</span>
-        <div class="seedrow">
-          <input id="seed" name="seed" value="lapka" aria-label="Seed" spellcheck="false">
-          <button type="button" id="dice" title="New random seed">Shuffle</button>
+        <span class="label" data-i18n="seed"></span>
+        <div class="row">
+          <input type="text" id="seed" spellcheck="false" aria-label="Seed">
+          <button type="button" id="dice" data-i18n="shuffle"></button>
         </div>
+        <div class="row">
+          <button type="button" id="undo" data-i18n="undo" aria-keyshortcuts="Control+Z"></button>
+          <button type="button" id="redo" data-i18n="redo" aria-keyshortcuts="Control+Shift+Z"></button>
+          <div class="seg" role="radiogroup" aria-label="Paw" style="margin-left:auto">
+            <input type="radio" name="paw" id="paw-dog" value="dog"><label for="paw-dog" data-i18n="dog"></label>
+            <input type="radio" name="paw" id="paw-cat" value="cat"><label for="paw-cat" data-i18n="cat"></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <span class="label" data-i18n="pads"></span>
+        <div class="picker-wrap">
+          <svg id="picker" role="radiogroup" aria-label="Pads"></svg>
+          <div class="picked" id="picked"></div>
+        </div>
+        <div class="palette" id="palette"></div>
+        <div class="row">
+          <button type="button" id="reroll" data-i18n="reroll"></button>
+          <button type="button" id="apply-toes" data-i18n="applyToes"></button>
+          <button type="button" id="mix-toes" data-i18n="mixToes"></button>
+        </div>
+      </div>
+
+      <div class="group" id="scene-group">
+        <span class="label" data-i18n="scene"></span>
+        <div id="name-fields" class="group" style="gap:8px">
+          <label class="field"><span data-i18n="nameText"></span><input type="text" id="name-text" maxlength="24" style="grid-column:1/-1"></label>
+          <div class="seg full" role="radiogroup" aria-label="Typeface">
+            <input type="radio" name="font" id="font-Pacifico" value="Pacifico"><label for="font-Pacifico" style="font-family:Pacifico,cursive">Pacifico</label>
+            <input type="radio" name="font" id="font-Lobster" value="Lobster"><label for="font-Lobster" style="font-family:Lobster,cursive">Lobster</label>
+            <input type="radio" name="font" id="font-Fredoka" value="Fredoka"><label for="font-Fredoka" style="font-family:Fredoka,sans-serif;font-weight:600">Fredoka</label>
+          </div>
+        </div>
+        <label class="field"><span data-i18n="trees"></span> <output id="trees-out"></output><input type="range" id="trees" min="0" max="1" step="0.05"></label>
+        <label class="field"><span data-i18n="wind"></span> <output id="wind-out"></output><input type="range" id="wind" min="0" max="4" step="1"></label>
+        <label class="field"><span data-i18n="waves"></span> <output id="waves-out"></output><input type="range" id="waves" min="0" max="5" step="1"></label>
+        <label class="check" id="branch-field"><input type="checkbox" id="branches"> <span data-i18n="branch"></span></label>
+      </div>
+
+      <div class="group">
+        <span class="label" data-i18n="cutting"></span>
+        <label class="field"><span data-i18n="width"></span> <output id="widthMm-out"></output><input type="range" id="widthMm" min="50" max="160" step="1"></label>
+        <label class="field"><span data-i18n="line"></span> <output id="lineMm-out"></output><input type="range" id="lineMm" min="0.4" max="1.6" step="0.05"></label>
+        <p class="small" data-i18n="lineHint"></p>
+        <label class="field"><span data-i18n="rim"></span> <output id="borderMm-out"></output><input type="range" id="borderMm" min="2" max="7" step="0.1"></label>
+        <label class="field"><span data-i18n="bridge"></span> <output id="ringMm-out"></output><input type="range" id="ringMm" min="1" max="4" step="0.1"></label>
+        <label class="field"><span data-i18n="kerf"></span> <output id="kerfMm-out"></output><input type="range" id="kerfMm" min="0" max="0.4" step="0.01"></label>
+        <p class="small" data-i18n="kerfHint"></p>
+        <label class="field"><span data-i18n="minFeature"></span> <output id="minFeatureMm-out"></output><input type="range" id="minFeatureMm" min="0.2" max="1.5" step="0.05"></label>
+        <label class="check"><input type="checkbox" id="web"> <span data-i18n="web"></span></label>
+        <label class="check"><input type="checkbox" id="hole"> <span data-i18n="hole"></span></label>
+        <label class="field" id="hole-field"><span data-i18n="holeSize"></span> <output id="holeMm-out"></output><input type="range" id="holeMm" min="3" max="10" step="0.5"></label>
       </div>
       <div class="group">
-        <span class="label">Paw</span>
-        <div class="seg" role="radiogroup" aria-label="Paw">
-          <input type="radio" name="paw" id="paw-dog" value="dog" checked><label for="paw-dog">Dog</label>
-          <input type="radio" name="paw" id="paw-cat" value="cat"><label for="paw-cat">Cat</label>
-        </div>
-        <span class="label">Toe pads</span>
-        <div class="seg" role="radiogroup" aria-label="Toe pads">
-          <input type="radio" name="toes" id="toes-snowflake" value="snowflake" checked><label for="toes-snowflake">Snowflakes</label>
-          <input type="radio" name="toes" id="toes-filigree" value="filigree"><label for="toes-filigree">Vines</label>
-          <input type="radio" name="toes" id="toes-empty" value="empty"><label for="toes-empty">Open</label>
-        </div>
-        <span class="label">Main pad</span>
-        <div class="seg" role="radiogroup" aria-label="Main pad">
-          <input type="radio" name="scene" id="scene-forest" value="forest" checked><label for="scene-forest">Winter forest</label>
-          <input type="radio" name="scene" id="scene-empty" value="empty"><label for="scene-empty">Open</label>
-        </div>
-      </div>
-      <div class="group" id="forest-group">
-        <span class="label">Forest</span>
-        <label class="field">Trees <output id="trees-out"></output><input type="range" id="trees" name="trees" min="0" max="1" step="0.05" value="0.6"></label>
-        <label class="field">Wind gusts <output id="wind-out"></output><input type="range" id="wind" name="wind" min="0" max="4" step="1" value="2"></label>
-        <label class="field">Snow drifts <output id="waves-out"></output><input type="range" id="waves" name="waves" min="0" max="5" step="1" value="3"></label>
-        <label class="check"><input type="checkbox" id="branches" name="branches" checked> Bare branch</label>
-      </div>
-      <div class="group">
-        <span class="label">Cutting</span>
-        <label class="field">Finished width <output id="widthMm-out"></output><input type="range" id="widthMm" name="widthMm" min="50" max="160" step="1" value="90"></label>
-        <label class="field">Detail line <output id="lineMm-out"></output><input type="range" id="lineMm" name="lineMm" min="0.4" max="1.6" step="0.05" value="0.75"></label>
-        <p class="hint">Lines under about 0.8 mm get fragile in 3 mm plywood.</p>
-        <label class="field">Outer rim <output id="borderMm-out"></output><input type="range" id="borderMm" name="borderMm" min="2" max="7" step="0.1" value="3.6"></label>
-        <label class="field">Bridge between pads <output id="ringMm-out"></output><input type="range" id="ringMm" name="ringMm" min="1" max="4" step="0.1" value="1.8"></label>
-        <label class="check"><input type="checkbox" id="web" name="web" checked> Piercings between pads</label>
-        <label class="check"><input type="checkbox" id="hole" name="hole" checked> Hanging hole</label>
-        <label class="field" id="hole-field">Hole diameter <output id="holeMm-out"></output><input type="range" id="holeMm" name="holeMm" min="3" max="10" step="0.5" value="5"></label>
-      </div>
-      <div class="group">
-        <button type="button" id="reset">Reset to defaults</button>
+        <button type="button" id="reset" data-i18n="reset"></button>
       </div>
     </form>
   </section>
 
   <section class="variations">
     <div class="head">
-      <h2>Variations</h2>
-      <button type="button" id="more">Shuffle variations</button>
+      <h2 data-i18n="variations"></h2>
+      <button type="button" id="more" data-i18n="moreVariations"></button>
     </div>
+    <p class="hint" data-i18n="variationsHint"></p>
     <div class="thumbs" id="thumbs"></div>
   </section>
 
-  <footer>
-    Black is material, white is cut away. The stencil file is a single even-odd path; the cut file is the same outline as red 0.1 mm hairlines, the usual cut layer in laser software. Loose pieces are removed and openings smaller than 0.6 mm² are filled, so nothing falls out of the sheet.
-  </footer>
+  <footer data-i18n="footer"></footer>
 </div>
 
-<script type="text/plain" id="gen-src">
-/*GENERATOR*/
-</script>
-<script>
-(() => {
-  "use strict";
-  const $ = (id) => document.getElementById(id);
-  const SVGNS = "http://www.w3.org/2000/svg";
-  const SRC = $("gen-src").textContent;
-  const DEF = { seed: "lapka", paw: "dog", toes: "snowflake", scene: "forest", trees: 0.6, wind: 2, waves: 3, branches: true, widthMm: 90, lineMm: 0.75, borderMm: 3.6, ringMm: 1.8, web: true, hole: true, holeMm: 5 };
-  const WORDS = ["szron", "zima", "snieg", "sanki", "mroz", "sopel", "choinka", "bombka", "lapka", "gwiazdka", "kulig", "gwiazda", "puch", "zaspa"];
-  const fmt = (v, d = 1) => Number(v).toFixed(d);
-
-  // ------------------------------------------------ generator (worker, or inline fallback)
-  const WORKER_TAIL = `
-self.onmessage = (e) => {
-  const { id, want, params } = e.data;
-  try {
-    const r = generate(params);
-    if (want === "export") {
-      self.postMessage({ id, svgFill: toSVG(r), svgCut: toSVG(r, { mode: "cut" }), stats: r.stats });
-    } else {
-      self.postMessage({ id, d: pathData(r.loops), bbox: r.bbox, u: r.unitsPerMm, stats: r.stats });
-    }
-  } catch (err) { self.postMessage({ id, error: String(err && err.message || err) }); }
-};`;
-  let worker = null;
-  let local = null;
-  const pending = new Map();
-  let nextId = 1;
-  const runLocal = (want, params) => {
-    local = local || new Function(SRC + "\nreturn { generate, toSVG, pathData };")();
-    const r = local.generate(params);
-    return want === "export"
-      ? { svgFill: local.toSVG(r), svgCut: local.toSVG(r, { mode: "cut" }), stats: r.stats }
-      : { d: local.pathData(r.loops), bbox: r.bbox, u: r.unitsPerMm, stats: r.stats };
-  };
-  try {
-    worker = new Worker(URL.createObjectURL(new Blob([SRC + WORKER_TAIL], { type: "text/javascript" })));
-    worker.onmessage = (e) => {
-      const p = pending.get(e.data.id);
-      if (!p) return;
-      pending.delete(e.data.id);
-      e.data.error ? p.reject(new Error(e.data.error)) : p.resolve(e.data);
-    };
-    worker.onerror = () => {
-      worker = null;
-      for (const [, p] of pending) p.retry();
-      pending.clear();
-    };
-  } catch { worker = null; }
-  function run(want, params) {
-    return new Promise((resolve, reject) => {
-      const go = () => setTimeout(() => { try { resolve(runLocal(want, params)); } catch (e) { reject(e); } }, 0);
-      if (!worker) return go();
-      const id = nextId++;
-      pending.set(id, { resolve, reject, retry: go });
-      worker.postMessage({ id, want, params });
-    });
-  }
-
-  // ------------------------------------------------ state
-  const form = $("controls");
-  const ranges = ["trees", "wind", "waves", "widthMm", "lineMm", "borderMm", "ringMm", "holeMm"];
-  const checks = ["branches", "web", "hole"];
-  const radios = ["paw", "toes", "scene"];
-  function readParams() {
-    const p = { seed: $("seed").value.trim() || "lapka" };
-    for (const k of ranges) p[k] = Number($(k).value);
-    for (const k of checks) p[k] = $(k).checked;
-    for (const k of radios) p[k] = form.querySelector(`input[name="${k}"]:checked`).value;
-    return p;
-  }
-  function writeParams(p) {
-    $("seed").value = p.seed;
-    for (const k of ranges) $(k).value = p[k];
-    for (const k of checks) $(k).checked = !!p[k];
-    for (const k of radios) { const el = $(`${k}-${p[k]}`); if (el) el.checked = true; }
-    syncLabels();
-  }
-  function syncLabels() {
-    $("trees-out").textContent = Math.round($("trees").value * 100) + "%";
-    $("wind-out").textContent = $("wind").value;
-    $("waves-out").textContent = $("waves").value;
-    $("widthMm-out").textContent = $("widthMm").value + " mm";
-    for (const k of ["lineMm", "borderMm", "ringMm"]) $(`${k}-out`).textContent = fmt($(k).value, k === "lineMm" ? 2 : 1) + " mm";
-    $("holeMm-out").textContent = fmt($("holeMm").value) + " mm";
-    const forest = form.querySelector('input[name="scene"]:checked').value === "forest";
-    $("forest-group").querySelectorAll("input").forEach((el) => (el.disabled = !forest));
-    $("forest-group").querySelectorAll(".field").forEach((el) => el.classList.toggle("disabled", !forest));
-    $("holeMm").disabled = !$("hole").checked;
-    $("hole-field").classList.toggle("disabled", !$("hole").checked);
-  }
-  const STORE = "paw-ornament:v1";
-  function save() { try { localStorage.setItem(STORE, JSON.stringify(readParams())); } catch {} }
-  function restore() {
-    try { const s = JSON.parse(localStorage.getItem(STORE) || "null"); if (s) return { ...DEF, ...s }; } catch {}
-    return { ...DEF };
-  }
-
-  // ------------------------------------------------ preview
-  let last = null;
-  let busy = false;
-  let queued = null;
-  let thumbsDirty = true;
-  function schedule() { syncLabels(); save(); queued = readParams(); thumbsDirty = true; if (!busy) pump(); }
-  async function pump() {
-    if (!queued) { if (thumbsDirty) renderThumbs(); return; }
-    const params = queued;
-    queued = null;
-    busy = true;
-    $("stage").classList.add("working");
-    try {
-      const res = await run("preview", { ...params, resolution: 900 });
-      last = { params, ...res };
-      drawPreview();
-    } catch (e) {
-      $("note").textContent = "This combination could not be generated: " + e.message;
-    }
-    busy = false;
-    $("stage").classList.remove("working");
-    pump();
-  }
-  function el(tag, attrs, parent) {
-    const n = document.createElementNS(SVGNS, tag);
-    for (const k in attrs) n.setAttribute(k, attrs[k]);
-    if (parent) parent.appendChild(n);
-    return n;
-  }
-  function drawPreview() {
-    if (!last) return;
-    const { d, bbox, u, stats } = last;
-    const svg = $("preview");
-    const m = 6 * u;
-    const ruleH = 9 * u;
-    svg.setAttribute("viewBox", `${bbox.x - m} ${bbox.y - m} ${bbox.w + 2 * m} ${bbox.h + 2 * m + ruleH}`);
-    svg.replaceChildren();
-    const view = form.ownerDocument.querySelector('input[name="view"]:checked').value;
-    el("path", { d, class: view === "cut" ? "cutline" : "material", "fill-rule": "evenodd" }, svg);
-    // millimetre rule under the ornament
-    const g = el("g", { class: "rule" }, svg);
-    const y = bbox.y + bbox.h + m * 0.9;
-    const mm = Math.floor(stats.widthMm);
-    el("line", { x1: bbox.x, y1: y, x2: bbox.x + mm * u, y2: y }, g);
-    for (let i = 0; i <= mm; i++) {
-      const x = bbox.x + i * u;
-      const h = i % 10 === 0 ? 2.4 * u : i % 5 === 0 ? 1.6 * u : 0.9 * u;
-      el("line", { x1: x, y1: y, x2: x, y2: y + h }, g);
-      if (i % 10 === 0) el("text", { x, y: y + 5.6 * u, "font-size": 2.5 * u, "text-anchor": "middle" }, g).textContent = i;
-    }
-    el("text", { x: bbox.x + mm * u + 1.5 * u, y: y + 5.6 * u, "font-size": 2.5 * u }, g).textContent = "mm";
-
-    const s = $("stats");
-    s.replaceChildren();
-    const item = (label, value) => { const sp = document.createElement("span"); sp.append(label + " "); const b = document.createElement("b"); b.textContent = value; sp.append(b); s.append(sp); };
-    item("Size", `${fmt(stats.widthMm)} × ${fmt(stats.heightMm)} mm`);
-    item("Cut path", stats.cutLengthMm >= 1000 ? `${fmt(stats.cutLengthMm / 1000, 2)} m` : `${Math.round(stats.cutLengthMm)} mm`);
-    item("Openings", String(stats.openings));
-    const pill = document.createElement("span");
-    pill.className = "pill";
-    pill.textContent = "One connected piece";
-    pill.title = `${stats.specksFilled} specks under 0.6 mm² filled, ${stats.islandsRemoved} loose pieces removed`;
-    s.append(pill);
-  }
-  document.querySelectorAll('input[name="view"]').forEach((r) => r.addEventListener("change", drawPreview));
-
-  // ------------------------------------------------ variations
-  const randomSeed = () => WORDS[Math.floor(Math.random() * WORDS.length)] + "-" + Math.floor(10 + Math.random() * 90);
-  let thumbSeeds = Array.from({ length: 6 }, randomSeed);
-  let thumbJob = 0;
-  async function renderThumbs() {
-    thumbsDirty = false;
-    const job = ++thumbJob;
-    const box = $("thumbs");
-    if (box.children.length !== thumbSeeds.length) {
-      box.replaceChildren();
-      thumbSeeds.forEach(() => {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.className = "thumb";
-        b.append(document.createElementNS(SVGNS, "svg"), document.createElement("span"));
-        box.append(b);
-      });
-    }
-    const base = readParams();
-    for (let i = 0; i < thumbSeeds.length; i++) {
-      if (job !== thumbJob || queued) return;
-      const seed = thumbSeeds[i];
-      const btn = box.children[i];
-      btn.lastChild.textContent = seed;
-      btn.setAttribute("aria-label", `Use seed ${seed}`);
-      btn.onclick = () => { $("seed").value = seed; schedule(); window.scrollTo({ top: 0, behavior: "smooth" }); };
-      const r = await run("preview", { ...base, seed, resolution: 320 });
-      if (job !== thumbJob) return;
-      const svg = btn.firstChild;
-      const m = 3 * r.u;
-      svg.setAttribute("viewBox", `${r.bbox.x - m} ${r.bbox.y - m} ${r.bbox.w + 2 * m} ${r.bbox.h + 2 * m}`);
-      svg.replaceChildren();
-      el("path", { d: r.d, class: "material", "fill-rule": "evenodd" }, svg);
-    }
-  }
-  $("more").addEventListener("click", () => { thumbSeeds = Array.from({ length: 6 }, randomSeed); renderThumbs(); });
-
-  // ------------------------------------------------ export
-  const note = (t) => ($("note").textContent = t);
-  async function exportSVG(mode) {
-    const params = readParams();
-    note("Preparing a full-resolution file…");
-    const res = await run("export", { ...params, resolution: 1400 });
-    return { svg: mode === "cut" ? res.svgCut : res.svgFill, name: `paw-${params.paw}-${params.seed.replace(/[^\w-]+/g, "_")}${mode === "cut" ? "-cut" : ""}.svg` };
-  }
-  let downloads;
-  const downloadsReady = (async () => {
-    try { downloads = window.claude && window.claude.use ? await window.claude.use("downloads") : null; } catch { downloads = null; }
-    return downloads;
-  })();
-  async function saveFile(mode) {
-    const btns = [$("save-fill"), $("save-cut"), $("copy")];
-    btns.forEach((b) => (b.disabled = true));
-    try {
-      const { svg, name } = await exportSVG(mode);
-      const dl = await downloadsReady;
-      if (dl) {
-        try {
-          await dl.save({ filename: name, data: svg });
-          note(`Saved ${name}.`);
-        } catch (e) {
-          if (e && e.code === "declined") note("Download cancelled.");
-          else if (e && e.code === "rate_limited") note("A save prompt is already open. Finish it, then try again.");
-          else note("Downloads are unavailable here. Use Copy SVG and paste it into a .svg file.");
-        }
-      } else {
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
-        a.download = name;
-        document.body.append(a);
-        a.click();
-        a.remove();
-        note(`Downloaded ${name}. If nothing happened, use Copy SVG instead.`);
-      }
-    } catch (e) {
-      note("Export failed: " + e.message);
-    } finally {
-      btns.forEach((b) => (b.disabled = false));
-    }
-  }
-  $("save-fill").addEventListener("click", () => saveFile("fill"));
-  $("save-cut").addEventListener("click", () => saveFile("cut"));
-  $("copy").addEventListener("click", async () => {
-    // start the clipboard write inside the click so the browser allows it
-    const view = document.querySelector('input[name="view"]:checked').value;
-    const job = exportSVG(view === "cut" ? "cut" : "fill").then((r) => r.svg);
-    try {
-      if (navigator.clipboard && window.ClipboardItem) {
-        await navigator.clipboard.write([new ClipboardItem({ "text/plain": job.then((t) => new Blob([t], { type: "text/plain" })) })]);
-      } else {
-        await navigator.clipboard.writeText(await job);
-      }
-      note("SVG copied. Paste it into a text file saved as .svg.");
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = await job;
-      ta.setAttribute("readonly", "");
-      ta.style.cssText = "width:100%;height:120px;font:12px var(--font-data)";
-      $("note").replaceChildren("Copying is blocked here. Select the text below and copy it:", ta);
-      ta.select();
-    }
-  });
-
-  // ------------------------------------------------ wiring
-  form.addEventListener("input", schedule);
-  form.addEventListener("submit", (e) => e.preventDefault());
-  $("dice").addEventListener("click", () => { $("seed").value = randomSeed(); schedule(); });
-  $("reset").addEventListener("click", () => { writeParams({ ...DEF }); schedule(); });
-  writeParams(restore());
-  schedule();
-})();
-</script>
+<script>/*APP*/</script>

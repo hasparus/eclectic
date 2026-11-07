@@ -160,6 +160,12 @@ export function generate(input: unknown, opts: GenerateOptions = {}): Result {
     for (let i = 0; i < data.length; i++) data[i] = data[i]! - grow;
   }
 
+  // a window cuts through material at its edges: frame it with cut so every contour closes
+  if (win) {
+    const { nx, ny, data, cs } = field;
+    for (let i = 0; i < nx; i++) data[i] = data[(ny - 1) * nx + i] = cs;
+    for (let j = 0; j < ny; j++) data[j * nx] = data[j * nx + nx - 1] = cs;
+  }
   const loops = traceContours(field).map((l) => simplifyLoop(l, field.cs * 0.3));
   let bx0 = Infinity;
   let by0 = Infinity;
