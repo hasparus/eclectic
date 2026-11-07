@@ -109,3 +109,31 @@ describe("generate", () => {
     for (const p of r.pads) expect(p.outline.length).toBeGreaterThan(20);
   });
 });
+
+describe("edge cases found in review", () => {
+  test("kerf never brings back loose pieces", () => {
+    for (const seed of ["lapka", "finn", "zima"]) {
+      for (const kerfMm of [0.1, 0.3, 0.5]) {
+        const r = generate({ seed, kerfMm, resolution: 700 });
+        expect(pieces(r)).toBe(1);
+      }
+    }
+  });
+
+  test("a small ornament with a thick rim stays whole and true to size", () => {
+    for (const paw of ["dog", "cat"] as const) {
+      const r = generate({ paw, widthMm: 50, borderMm: 7, resolution: 500 });
+      expect(pieces(r)).toBe(1);
+      expect(Math.abs(r.stats.widthMm - 50)).toBeLessThan(0.5);
+    }
+  });
+
+  test("a big hanging hole keeps a bridge from the toes", () => {
+    const r = generate({ widthMm: 50, holeMm: 10, borderMm: 4, resolution: 500 });
+    expect(r.hole).not.toBeNull();
+    const { x, y, r: hr } = r.hole!;
+    const gap = Math.min(...r.pads.flatMap((p) => p.outline.map(([px, py]) => Math.hypot(px - x, py - y) - hr))) / r.unitsPerMm;
+    expect(gap).toBeGreaterThan(1.8 - 0.1);
+    expect(pieces(r)).toBe(1);
+  });
+});

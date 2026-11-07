@@ -1,6 +1,6 @@
 import { connectIslands, fillSpecks, findThinSpots, type ThinSpot } from "./core/cleanup";
 import { Drawing, Field } from "./core/field";
-import { clamp, type Box, type Vec } from "./core/math";
+import type { Box, Vec } from "./core/math";
 import { Rng } from "./core/rng";
 import type { Sdf } from "./core/sdf";
 import { simplifyLoop, traceContours } from "./core/trace";
@@ -88,7 +88,9 @@ export function generate(input: unknown, opts: GenerateOptions = {}): Result {
   const open = outputs.map((o) => !o.solid);
 
   const win = opts.window;
-  const field = win ? Field.over(win.x0, win.y0, win.x1, win.y1, p.resolution) : Field.over(0, 0, SIZE, SIZE, p.resolution);
+  // a thick rim on a small ornament can reach past the nominal canvas, so pad it
+  const pad = border + ring + 40;
+  const field = win ? Field.over(win.x0, win.y0, win.x1, win.y1, p.resolution) : Field.over(-pad, -pad, SIZE + pad, SIZE + pad, p.resolution);
   const sdfs = pads.map((pd) => pd.sdf);
   const holeD: Sdf = hole ? (x, y) => Math.sqrt((x - hole.x) ** 2 + (y - hole.y) ** 2) - hole.r : () => Infinity;
 
@@ -160,6 +162,8 @@ export function generate(input: unknown, opts: GenerateOptions = {}): Result {
     const grow = (p.kerfMm / 2) * u;
     const { data } = field;
     for (let i = 0; i < data.length; i++) data[i] = data[i]! - grow;
+    // growing can revive the specks of removed islands; drop whatever is loose again
+    if (!win) connectIslands(field, Infinity, 0, 0);
   }
 
   // a window cuts through material at its edges: frame it with cut so every contour closes
@@ -211,10 +215,10 @@ export function generate(input: unknown, opts: GenerateOptions = {}): Result {
   };
 }
 
-/** Clamp helper re-exported for callers sizing windows around pads. */
+/** A pad box grown by `margin`, for rendering one pad on its own. */
 export const padWindow = (box: Box, margin: number): Box => ({
-  x0: clamp(box.x0 - margin, 0, SIZE),
-  y0: clamp(box.y0 - margin, 0, SIZE),
-  x1: clamp(box.x1 + margin, 0, SIZE),
-  y1: clamp(box.y1 + margin, 0, SIZE),
+  x0: box.x0 - margin,
+  y0: box.y0 - margin,
+  x1: box.x1 + margin,
+  y1: box.y1 + margin,
 });

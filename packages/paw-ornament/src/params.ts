@@ -116,6 +116,9 @@ const num = (v: unknown, fallback: number, [lo, hi]: readonly [number, number]) 
   const n = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN;
   return Number.isFinite(n) ? clamp(n, lo, hi) : fallback;
 };
+// control characters are not allowed in XML (the SVG title) and are never meant
+// eslint-disable-next-line no-control-regex
+const printable = (s: string) => s.replace(/[\u0000-\u001f\u007f-\u009f]/g, "");
 const bool = (v: unknown, fallback: boolean) => (typeof v === "boolean" ? v : fallback);
 const oneOf = <T extends string>(v: unknown, list: readonly T[], fallback: T): T =>
   list.includes(v as T) ? (v as T) : fallback;
@@ -151,10 +154,11 @@ export function normalizeParams(input: unknown = {}): Params {
   const sceneIn = (o.scene && typeof o.scene === "object" ? o.scene : o) as Record<string, unknown>;
   const mainIn = o.main ?? (typeof o.scene === "string" ? o.scene : undefined);
   const nameIn = (o.name && typeof o.name === "object" ? o.name : {}) as Record<string, unknown>;
-  const text = typeof nameIn.text === "string" ? nameIn.text.slice(0, 24) : d.name.text;
+  const text = typeof nameIn.text === "string" ? printable(nameIn.text).slice(0, 24) : d.name.text;
+  const seed = typeof o.seed === "string" ? printable(o.seed).trim().slice(0, 64) : typeof o.seed === "number" ? String(o.seed) : "";
   return {
     version: 2,
-    seed: typeof o.seed === "string" && o.seed.trim() ? o.seed.trim().slice(0, 64) : typeof o.seed === "number" ? String(o.seed) : d.seed,
+    seed: seed || d.seed,
     paw: oneOf(o.paw, ["dog", "cat"] as const, d.paw),
     toes,
     main: pad(mainIn, MAIN_MOTIFS, d.main),

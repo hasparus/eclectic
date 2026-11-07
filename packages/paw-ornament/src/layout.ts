@@ -171,7 +171,7 @@ function layoutAt(p: Params, spec: (typeof PAWS)[Paw], u: number, borderMm: numb
     const r = (p.holeMm / 2) * u;
     const x = SIZE / 2;
     let y = Math.min(toes[1]!.cy, toes[2]!.cy);
-    while (y > r + border + 10 && padsSdf(x, y) < r + ring) y -= 1;
+    while (y > -border && padsSdf(x, y) < r + ring) y -= 1;
     hole = { x, y, r };
   }
 

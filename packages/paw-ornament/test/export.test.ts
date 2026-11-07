@@ -50,3 +50,9 @@ describe("PDF", () => {
     expect(body.slice(Number(m[1]), Number(m[1]) + 9)).toBe("endstream");
   });
 });
+
+test("control characters never reach the SVG", () => {
+  const svg = toSVG(generate({ seed: "ż\u0001<x>", resolution: 200 }));
+  // eslint-disable-next-line no-control-regex
+  expect(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(svg)).toBe(false);
+});

@@ -19,7 +19,8 @@ export function pathData(loops: readonly Vec[][], ox = 0, oy = 0, k = 1, digits 
   return d;
 }
 
-const escapeXml = (s: string) => s.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`);
+// eslint-disable-next-line no-control-regex
+const escapeXml = (s: string) => s.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 export function describe(r: Result): string {
   const p = r.params;

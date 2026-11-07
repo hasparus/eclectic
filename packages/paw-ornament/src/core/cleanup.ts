@@ -27,16 +27,13 @@ export function components(field: Field, inside: (v: number) => boolean): { labe
       const i = p % nx;
       const j = (p / nx) | 0;
       if (i === 0 || j === 0 || i === nx - 1 || j === ny - 1) border = true;
-      const visit = (q: number) => {
-        if (label[q]! < 0 && inside(data[q]!)) {
+      for (let k = 0; k < 4; k++) {
+        const q = k === 0 ? (i > 0 ? p - 1 : -1) : k === 1 ? (i < nx - 1 ? p + 1 : -1) : k === 2 ? (j > 0 ? p - nx : -1) : j < ny - 1 ? p + nx : -1;
+        if (q >= 0 && label[q]! < 0 && inside(data[q]!)) {
           label[q] = id;
           stack[sp++] = q;
         }
-      };
-      if (i > 0) visit(p - 1);
-      if (i < nx - 1) visit(p + 1);
-      if (j > 0) visit(p - nx);
-      if (j < ny - 1) visit(p + nx);
+      }
     }
     comps.push({ size, border });
   }
@@ -88,17 +85,14 @@ export function connectIslands(field: Field, sliverCells: number, maxBridge: num
       const p = queue[qh++]!;
       const i = p % nx;
       const j = (p / nx) | 0;
-      const go = (q: number) => {
-        if (steps[q]! < 0) {
+      for (let k = 0; k < 4; k++) {
+        const q = k === 0 ? (i > 0 ? p - 1 : -1) : k === 1 ? (i < nx - 1 ? p + 1 : -1) : k === 2 ? (j > 0 ? p - nx : -1) : j < ny - 1 ? p + nx : -1;
+        if (q >= 0 && steps[q]! < 0) {
           steps[q] = steps[p]! + 1;
           src[q] = src[p]!;
           queue[qt++] = q;
         }
-      };
-      if (i > 0) go(p - 1);
-      if (i < nx - 1) go(p + 1);
-      if (j > 0) go(p - nx);
-      if (j < ny - 1) go(p + nx);
+      }
     }
 
     const best = new Int32Array(comps.length).fill(-1);
@@ -174,11 +168,9 @@ export interface ThinSpot {
 export function findThinSpots(field: Field, minWidth: number, minArea: number): ThinSpot[] {
   const { nx, ny, cs, ox, oy, data } = field;
   const half = minWidth / 2 / cs;
-  const toCut = distanceTransform(
-    Array.from(data, (v) => v >= 0),
-    nx,
-    ny,
-  );
+  const cut = new Uint8Array(nx * ny);
+  for (let p = 0; p < cut.length; p++) cut[p] = data[p]! >= 0 ? 1 : 0;
+  const toCut = distanceTransform(cut, nx, ny);
   const core = new Uint8Array(nx * ny);
   for (let p = 0; p < core.length; p++) core[p] = data[p]! < 0 && toCut[p]! >= half ? 1 : 0;
   const toCore = distanceTransform(core, nx, ny);

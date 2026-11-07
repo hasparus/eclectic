@@ -118,7 +118,7 @@ function setPad(index: number, motif: string, variant?: number): void {
     const cur = p.toes[index]!;
     p.toes[index] = { motif: motif as Params["toes"][number]["motif"], variant: variant ?? (cur.motif === motif ? cur.variant : 0) };
   }
-  commit(p, `pad${index}:${motif}`);
+  commit(p);
 }
 const motifOf = (p: Params, i: number) => (i === MAIN_PAD ? p.main : p.toes[i]!);
 
@@ -268,6 +268,8 @@ function startLaser(): void {
       laser = null;
       $("laser").textContent = S.laser;
       setView("material");
+      drawPicker();
+      schedulePalette();
       const preview = $("preview");
       preview.classList.remove("reveal");
       void preview.getBoundingClientRect();
@@ -390,6 +392,7 @@ async function drawPalette(): Promise<void> {
   if (!pad) return;
   engine.cancel("tile");
   const mask = await currentMask();
+  if (gen !== paletteGen) return;
   const win = padWindow(pad.box, 34);
   const tiles = Array.from(box.children) as HTMLButtonElement[];
   await Promise.all(
@@ -435,20 +438,24 @@ async function drawThumbs(): Promise<void> {
       b.className = "thumb";
       b.append(svgEl("svg", { viewBox: "0 0 1 1", "aria-hidden": "true" }), document.createElement("span"));
       b.addEventListener("click", () => {
-        commit({ ...params, seed: b.dataset.seed }, "seed-pick");
+        if (b.dataset.seed) commit({ ...params, seed: b.dataset.seed });
         window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
       });
       box.append(b);
     }
   }
   engine.cancel("thumb");
+  thumbSeeds.forEach((seed, i) => {
+    const b = box.children[i] as HTMLButtonElement;
+    b.dataset.seed = seed;
+    b.lastElementChild!.textContent = seed;
+    b.setAttribute("aria-label", S.useSeed(seed));
+  });
   const mask = await currentMask();
+  if (gen !== thumbGen) return;
   await Promise.all(
     thumbSeeds.map(async (seed, i) => {
       const b = box.children[i] as HTMLButtonElement;
-      b.dataset.seed = seed;
-      b.lastElementChild!.textContent = seed;
-      b.setAttribute("aria-label", S.useSeed(seed));
       try {
         const r = await engine.request<Preview>(`thumb${i}`, { kind: "preview", params: { ...params, seed, resolution: 300 }, opts: { textMask: mask } }, 3);
         if (gen !== thumbGen) return;
@@ -715,6 +722,13 @@ function wire(): void {
 }
 
 if (!Number.isInteger(selected) || selected < 0 || selected > MAIN_PAD) selected = 1;
+// a web font that finishes loading late redraws a name drawn in the fallback face
+document.fonts?.addEventListener?.("loadingdone", () => {
+  if (params.main.motif === "name" || selected === MAIN_PAD) {
+    void schedulePreview();
+    schedulePalette();
+  }
+});
 wire();
 (document.getElementById(`material-${material}`) as HTMLInputElement).checked = true;
 setView(view);

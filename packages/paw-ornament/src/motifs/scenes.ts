@@ -94,13 +94,14 @@ function textSdf(mask: TextMask): Float32Array {
   const hit = textCache.get(mask.key);
   if (hit) return hit;
   const { width: w, height: h, data } = mask;
-  const inside = Array.from({ length: w * h }, (_, i) => (data[i] ?? 0) >= 128);
+  const inside = new Uint8Array(w * h);
+  const outside = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    inside[i] = (data[i] ?? 0) >= 128 ? 1 : 0;
+    outside[i] = 1 - inside[i]!;
+  }
   const toInk = distanceTransform(inside, w, h);
-  const toPaper = distanceTransform(
-    inside.map((v) => !v),
-    w,
-    h,
-  );
+  const toPaper = distanceTransform(outside, w, h);
   const sdf = new Float32Array(w * h);
   for (let i = 0; i < sdf.length; i++) sdf[i] = inside[i] ? -(toPaper[i]! - 0.5) : toInk[i]! - 0.5;
   if (textCache.size > 8) textCache.clear();
