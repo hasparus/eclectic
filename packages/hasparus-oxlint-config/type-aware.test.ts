@@ -3,10 +3,10 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { config, lint, OXLINT, SENTINEL, SENTINEL_RULE, TSGOLINT } from "./fixture.js";
+import { config, lint, OXLINT, SENTINEL, SENTINEL_RULE, TSRS_LINT } from "./fixture.js";
 
 /**
- * A type-aware rule that never reaches tsgolint reports nothing, which reads
+ * A type-aware rule that never reaches tsrs reports nothing, which reads
  * exactly like a clean file. These prove the rules arrive, that dropping
  * `options` is what takes them away, and that a missing binary says so out
  * loud.
@@ -43,10 +43,10 @@ test("without `options.typeAware` the same rules report nothing at all", () => {
  * one. The fixture imports it for the side effect alone and exports rules of
  * its own, so no JS plugin has to resolve from a temp dir. The temp dir is the
  * other half of the setup: nothing above it holds a `node_modules/.bin/
- * tsgolint`, which is the state a consumer who has not installed it is in.
+ * tsrs-lint`, which is the state a consumer who has not installed it is in.
  */
 function complaint(env: Readonly<Record<string, string | undefined>>) {
-  const root = mkdtempSync(join(tmpdir(), "oxlint-tsgolint-"));
+  const root = mkdtempSync(join(tmpdir(), "oxlint-tsrs-"));
 
   writeFileSync(join(root, "src.ts"), SENTINEL);
   writeFileSync(
@@ -60,14 +60,14 @@ export default { rules: { "no-debugger": "error" } };
     .stderr.toString();
 }
 
-test("a missing tsgolint is announced, not swallowed", () => {
+test("a missing tsrs is announced, not swallowed", () => {
   const { OXLINT_TSGOLINT_PATH: _unset, ...env } = process.env;
   const said = complaint(env);
 
   expect(said).toContain("@hasparus/oxlint-config");
-  expect(said).toContain("npm install --save-dev oxlint-tsgolint");
+  expect(said).toContain("npm install --save-dev tsrs");
   // Silent once oxlint has been told where to find it.
-  expect(complaint({ ...env, OXLINT_TSGOLINT_PATH: TSGOLINT })).not.toContain(
+  expect(complaint({ ...env, OXLINT_TSGOLINT_PATH: TSRS_LINT })).not.toContain(
     "@hasparus/oxlint-config",
   );
 });

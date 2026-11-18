@@ -29,14 +29,14 @@ export const OXLINT = join(
 );
 
 /**
- * The config asks for type-aware linting, and oxlint hunts for tsgolint by
+ * The config asks for type-aware linting, and oxlint hunts for `tsrs-lint` by
  * walking up from the working directory — which here is a temp dir with no
  * `node_modules` above it. Hand it the path instead, or the run dies before it
  * reports a thing.
  */
-export const TSGOLINT = join(
-  dirname(Bun.fileURLToPath(import.meta.resolve("oxlint-tsgolint/package.json"))),
-  "bin/tsgolint.js",
+export const TSRS_LINT = join(
+  dirname(Bun.fileURLToPath(import.meta.resolve("tsrs/package.json"))),
+  "bin/tsrs-lint",
 );
 
 /**
@@ -86,8 +86,14 @@ export function withoutJsPlugins({
 }
 
 /** `JSON.parse` returns `any`; name the shape once, at the boundary. */
-const parseReport: (json: string) => { diagnostics: { code: string; filename: string }[] } =
+const parseReport: (json: string) => { diagnostics: { code?: string; filename: string }[] } =
   JSON.parse;
+
+/**
+ * An unused disable comment is reported by the linter itself, not by a rule,
+ * so its diagnostic carries no code. This stands in for one.
+ */
+export const UNUSED_DIRECTIVE = "unused-disable-directive";
 
 /**
  * Rule ids oxlint reports for each file, laid out at that exact path. Pairs
@@ -109,7 +115,7 @@ export function lint(
   const { stdout } = Bun.spawnSync({
     cmd: [OXLINT, "-c", ".oxlintrc.json", "--format", "json", "."],
     cwd: root,
-    env: { ...process.env, OXLINT_TSGOLINT_PATH: TSGOLINT },
+    env: { ...process.env, OXLINT_TSGOLINT_PATH: TSRS_LINT },
   });
 
   const report = parseReport(stdout.toString());
@@ -118,7 +124,9 @@ export function lint(
   for (const [path] of files) byFile[path] = [];
   for (const { code, filename } of report.diagnostics) {
     // oxlint reports `plugin(rule)`; say it the way the config spells it.
-    byFile[filename.replace(/^\.\//, "")]?.push(code.replace(/^(.+)\((.+)\)$/, "$1/$2"));
+    byFile[filename.replace(/^\.\//, "")]?.push(
+      code?.replace(/^(.+)\((.+)\)$/, "$1/$2") ?? UNUSED_DIRECTIVE,
+    );
   }
 
   return byFile;
