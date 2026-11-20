@@ -9,11 +9,7 @@ export default defineConfig({
   },
   webServer: {
     command: "bun run start --port 3218",
-    url: "http://localhost:3218/login",
+    url: "http://localhost:3218/",
     reuseExistingServer: false,
-    env: {
-      PLAYGROUND_PASSWORD: "integration-test-password",
-      AUTH_SECRET: "integration-test-secret-with-more-than-32-characters",
-    },
   },
 });

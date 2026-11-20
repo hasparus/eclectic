@@ -10,7 +10,7 @@ export const prototypes = [
       "interactive"
     ],
     "createdAt": "2026-11-20",
-    "updatedAt": "2026-11-20T16:36:37Z",
+    "updatedAt": "2026-11-20T18:32:45Z",
     "hidden": false,
     "public": false,
     "slug": "orbit-study",

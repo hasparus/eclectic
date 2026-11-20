@@ -5,11 +5,11 @@ Preserve other workspace packages. Paidotopos is at `packages/paidotopos`; insta
 ## Create a prototype, from request to PR
 
 1. Work on a branch. Read this file and `packages/paidotopos/README.md` first.
-2. Create `packages/paidotopos/app/prototypes/<kebab-case-slug>/` with `page.tsx`, `metadata.json`, and `HOW_IT_WORKS.md`. Build discovery registers it automatically; do not edit `lib/registry.generated.ts` by hand. Direct private URLs use the folder route; `/p/<slug>` imports the same page from the generated registry.
-3. Keep the prototype private unless the owner explicitly asks to publish that specific prototype. Never infer publication permission from a request to build, push, or deploy the playground.
+2. Create `packages/paidotopos/app/prototypes/<kebab-case-slug>/` with `page.tsx`, `metadata.json`, and `HOW_IT_WORKS.md`. Build discovery registers it automatically; do not edit `lib/registry.generated.ts` by hand. Direct prototype URLs use the folder route; `/p/<slug>` imports the same page from the generated registry.
+3. The owner explicitly removed authentication. The gallery, direct prototype routes, and media are open in production; do not reintroduce a password gate unless requested. `public: false` does not provide privacy: it only disables the `/p/<slug>` share alias. Enable that alias only when the owner requests it.
 4. Follow every non-negotiable rule below. Read actual shared component source before assuming a prop exists.
-5. Capture light/dark thumbnails (`bun run --cwd packages/paidotopos thumbnails <slug>`), inspect them, and commit them with the implementation. Before explicitly approved public publication, capture `--video` while private, then set `public: true`. Public metadata must include OG image AND OG video; verify both respond without authentication. Do not leak private names through public errors or media routes.
-6. Run lint, typecheck, tests, and a production build in paidotopos. Check 375px touch layout, light/dark themes, storage failure, actual animation computed styles, password boundary, and unknown/private public slug 404s.
+5. Capture light/dark thumbnails (`bun run --cwd packages/paidotopos thumbnails <slug>`), inspect them, and commit them with the implementation. Before enabling an approved share alias, capture `--video` while the flag is false, then set `public: true`. Public metadata must include OG image AND OG video; verify both respond without authentication. Unknown and unflagged share aliases and their preview endpoints return 404.
+6. Run lint, typecheck, tests, and a production build in paidotopos. Check 375px touch layout, light/dark themes, storage failure, actual animation computed styles, access without authentication, and unknown/unflagged share alias 404s.
 7. Commit, push the branch, and open a pull request. The PR must run the build check and the connected host's preview deployment. End every task with the actual preview URL so the owner can open it on a phone. If hosting isn't connected, report that blocker; never invent a preview URL or call the PR URL a preview.
 8. Keep HOW_IT_WORKS current, bump updatedAt, regenerate affected previews, and add any failure/fix lesson here before finishing.
 
@@ -31,7 +31,7 @@ Every prototype has this complete `metadata.json` shape:
 }
 ```
 
-Bump `updatedAt` on every edit. Gallery sorts newest first. `hidden` is only a gallery filter; it is not access control. Missing previews must show “No preview yet”, never fail a private prototype's build.
+Bump `updatedAt` on every edit. Gallery sorts newest first. `hidden` is only a gallery filter; it is not access control. Missing previews must show “No preview yet”, never fail an unflagged prototype's build.
 
 ### Documentation
 
@@ -81,7 +81,7 @@ Wrap ALL localStorage access in try/catch, load on mount rather than server rend
 
 ### Thumbnails and sharing
 
-New prototype or any visual change: regenerate its light and dark static previews in the same commit. Global style changes: regenerate all. Inspect captures before committing: a stale thumbnail is worse than none. Capture supports one slug, several space/comma-separated slugs, or --missing. Explicitly public prototypes ALWAYS need OG image and MP4 OG video; run --video and verify metadata and validated public media endpoints. Unknown/private public slugs and media return 404, never login redirects.
+New prototype or any visual change: regenerate its light and dark static previews in the same commit. Global style changes: regenerate all. Inspect captures before committing: a stale thumbnail is worse than none. Capture supports one slug, several space/comma-separated slugs, or --missing. Explicitly public prototypes ALWAYS need OG image and MP4 OG video; run --video and verify metadata and validated public media endpoints. Unknown/unflagged share aliases and their preview endpoints return 404. Direct prototype pages and static media are open.
 
 ## Workflow rules
 
@@ -99,3 +99,7 @@ New prototype or any visual change: regenerate its light and dark static preview
 
 - Use webpack for production builds in restricted environments: Turbopack may fail binding a helper port.
 - Playwright video needs its own ffmpeg binary (`bunx playwright install chromium ffmpeg`) even if system ffmpeg is installed.
+
+- The owner removed authentication on 2026-11-20. No PLAYGROUND_PASSWORD or AUTH_SECRET is needed. Keep docs, capture scripts, and production browser checks aligned with the open-access model; metadata flags are not access control.
+
+- After deleting App Router routes, clear generated `.next` output before type-checking: old generated route types can still import the removed files.

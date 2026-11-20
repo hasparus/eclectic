@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { Search, LockKeyhole } from "lucide-react";
+import { Search } from "lucide-react";
 import type { Prototype } from "@/lib/prototype-schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,6 @@ export function Gallery({ prototypes }: { prototypes: Prototype[] }) {
         </Link>
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-2 text-xs text-muted-foreground">
-            <LockKeyhole className="size-3" />
             Personal playground
           </span>
           <ThemeToggle />

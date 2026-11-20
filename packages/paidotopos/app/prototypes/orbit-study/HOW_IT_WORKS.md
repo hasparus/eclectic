@@ -42,5 +42,5 @@ Storage reads/writes are caught; invalid persisted values fall back to defaults 
 - pattern.ts: pure geometry
 - types.ts: Settings and Dot
 - data.ts: defaults and parameter schema
-- metadata.json: gallery information, private by default
+- metadata.json: gallery information; share alias disabled by default, direct page open
 - HOW_IT_WORKS.md: this document
