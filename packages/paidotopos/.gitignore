@@ -1,0 +1,10 @@
+.next/
+.env*
+!.env.example
+*.tsbuildinfo
+playwright-report/
+test-results/
+.open-next/
+.alchemy/
+.wrangler/
+wrangler.jsonc
