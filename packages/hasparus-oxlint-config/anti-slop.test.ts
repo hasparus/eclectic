@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
 import antiSlop from "./anti-slop/index.js";
-import { config, lint, SENTINEL, SENTINEL_RULE } from "./fixture.js";
+import { config, lint, SENTINEL, SENTINEL_RULE } from "./lint.test-utils.js";
 
 /**
  * The vendored plugin is registered by absolute `file:` URL, which is the one
@@ -35,10 +35,17 @@ const VIOLATIONS = [
 
 const path = (rule: string) => `src/${rule}.ts`;
 
-test("every anti-slop rule reports through the config as a consumer loads it", () => {
-  const found = lint(VIOLATIONS.map(([rule, source]) => [path(rule), SENTINEL + source]));
+/** Turned off on purpose, with the reason beside it in the config. */
+const off = new Set(
+  Object.entries(config.rules).flatMap(([id, level]) => (level === "off" ? [id] : [])),
+);
+const isOn = (rule: string) => !off.has(`anti-slop/${rule}`);
 
-  for (const [rule] of VIOLATIONS) {
+test("every anti-slop rule the config turns on reports as a consumer loads it", () => {
+  const on = VIOLATIONS.filter(([rule]) => isOn(rule));
+  const found = lint(on.map(([rule, source]) => [path(rule), SENTINEL + source]));
+
+  for (const [rule] of on) {
     expect(found[path(rule)], `${path(rule)} was never linted`).toContain(SENTINEL_RULE);
     expect(found[path(rule)]).toContain(`anti-slop/${rule}`);
   }

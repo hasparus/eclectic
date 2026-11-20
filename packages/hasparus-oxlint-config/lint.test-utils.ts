@@ -45,8 +45,9 @@ export const TSRS_LINT = join(
  * them, since oxlint refuses a config naming a plugin it has not loaded. None
  * of them owns a rule under test.
  *
- * anti-slop stays. Its specifier is an absolute `file:` URL, which resolves
- * from anywhere, and that it does is half of what these tests are for. Globs
+ * anti-slop and landmines stay. Their specifiers are absolute `file:` URLs,
+ * which resolve from anywhere, and that they do is half of what these tests
+ * are for. Globs
  * and options are untouched.
  */
 type Rules = Readonly<Record<string, DummyRule | undefined>>;

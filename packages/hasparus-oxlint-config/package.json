@@ -31,6 +31,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@interfere/landmines": "0.1.0",
     "@oxlint/plugins": "1.94.0",
     "eslint-plugin-better-tailwindcss": "4.0.2",
     "eslint-plugin-no-only-tests": "3.4.0",

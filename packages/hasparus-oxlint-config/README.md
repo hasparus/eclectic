@@ -25,8 +25,8 @@ export default defineConfig({
 `ignorePatterns` and `overrides` come along by hand because oxlint reads both
 from the root config only — see [below](#what-it-turns-off-for-you).
 
-`sonarjs`, `better-tailwindcss`, `no-only-tests` and `anti-slop` run through
-oxlint's `jsPlugins` and travel with this package.
+`sonarjs`, `better-tailwindcss`, `no-only-tests`, `anti-slop` and `landmines`
+run through oxlint's `jsPlugins` and travel with this package.
 
 ## Sorting
 
@@ -58,6 +58,9 @@ repo can have every other opinion here without it.
   `no-only-tests`, two new `anti-slop` rules, and a few more. Most are
   warnings. Definite bugs are errors, and so are the React Compiler rules,
   because `@hasparus/eslint-config` makes them errors.
+- **landmines.** Nine of its ten rules, as warnings. See [below](#landmines).
+- **`anti-slop/no-module-mocking` is off**, because landmines'
+  `no-test-doubles` reports the same line.
 - **Unused disable comments are reported**, as warnings.
 - **`@nocommit` in a comment is an error**, so it cannot be merged by
   accident.
@@ -77,9 +80,10 @@ rules, under `anti-slop/`.
 
 Twelve of them come from
 [`@nkzw/oxlint-config`](https://github.com/nkzw-tech/oxlint-config)'s port,
-which it calls `quality`. That port is faster — `no-widen-then-assert` runs in
-about half the time — and skips some false positives, such as a
-`Record<"a" | "b", T>` whose keys are all known. It also adds
+which it calls `quality`. It skips some false positives, such as a
+`Record<"a" | "b", T>` whose keys are all known. nkzw also calls it faster:
+`no-widen-then-assert` alone runs in half the time, but with all seventeen
+rules on, the whole run takes as long as before. It also adds
 `no-array-filter-map` and `no-reduce-accumulator-copy`. The other five are the
 ones nkzw dropped, still from dmmulroy's copy. The prefix stays `anti-slop/`,
 so existing disable comments keep working.
@@ -110,6 +114,31 @@ export default defineConfig({
   ),
 });
 ```
+
+## landmines
+
+[landmines](https://github.com/interfere-inc/landmines) is a set of rules
+against tests that pass without being true: mocks of the thing under test,
+fixed sleeps, polling a spy against a deadline, retries, raised timeouts, and
+MSW letting unmocked requests through to the network. It also has rules for
+where tests live, what test files are called, open-ended `package.json`
+exports, and explicit return types on implementations.
+
+It is published as `@interfere/landmines`, so it is a dependency here rather
+than a vendored copy. All ten rules are named; nine are on, as warnings.
+
+Departures from its recommended config:
+
+- **Warnings, not errors**, like everything else here.
+- **`no-comments` is off.** It bans prose comments, and this config is made of
+  them: every override and every rule turned off says why, beside it. Over this
+  repository it reports 124 comments. To turn it on:
+  `rules: { "landmines-style/no-comments": "warn" }`.
+- **`test-file-names` is off for Playwright specs**, in the same `e2e/` and
+  `playwright/` override as below. `.spec.ts` is Playwright's own convention.
+- **`anti-slop/no-module-mocking` is off.** landmines' `no-test-doubles`
+  reports the same `vi.mock` line, and also catches `vi.fn(impl)`, stubbed
+  globals and patched prototypes.
 
 ## Type-aware linting
 

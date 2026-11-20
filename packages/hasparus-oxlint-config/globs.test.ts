@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { lint, SENTINEL, SENTINEL_RULE } from "./fixture.js";
+import { lint, SENTINEL, SENTINEL_RULE } from "./lint.test-utils.js";
 
 /**
  * A glob one star too wide silences a rule in every consumer repo and says

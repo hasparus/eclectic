@@ -3,4 +3,5 @@ node_modules
 dist
 .DS_Store
 packages/hasparus-oxlint-config/oxlint.config.js
+packages/hasparus-oxlint-config/with-sorting.js
 packages/hasparus-oxlint-config/anti-slop/**/*.js

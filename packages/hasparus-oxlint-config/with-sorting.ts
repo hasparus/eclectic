@@ -19,7 +19,7 @@ const natural: DummyRule = ["warn", { order: "asc", type: "natural" }];
 // eslint-disable-next-line import/no-default-export -- oxlint reads a config by default export.
 export default defineConfig({
   ...base,
-  jsPlugins: [...(base.jsPlugins ?? []), "eslint-plugin-perfectionist"],
+  jsPlugins: [...base.jsPlugins, "eslint-plugin-perfectionist"],
   rules: {
     ...base.rules,
     "perfectionist/sort-array-includes": natural,

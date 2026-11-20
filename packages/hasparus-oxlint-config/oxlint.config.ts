@@ -78,6 +78,18 @@ if (isOxlintCli && configuredBackend === "" && !findTypeAwareBackend(process.cwd
  */
 const ANTI_SLOP = new URL("anti-slop/index.js", import.meta.url).href;
 
+/**
+ * landmines publishes a package, so it is a dependency rather than a vendored
+ * copy, with one plugin per subpath. Resolved here, to absolute `file:` URLs,
+ * for the same reason as anti-slop: a bare specifier would be resolved beside
+ * the consumer's config, which under pnpm cannot see this package's
+ * dependencies.
+ */
+const LANDMINES = ["testing", "style", "structure", "types"].map((plugin) => ({
+  name: `landmines-${plugin}`,
+  specifier: import.meta.resolve(`@interfere/landmines/${plugin}`),
+}));
+
 /** App Router conventions. `route` exports GET/POST by name, so it is absent. */
 const NEXT_APP_FILES =
   "{page,layout,template,default,loading,error,global-error,not-found,forbidden,unauthorized,global-not-found,robots,sitemap,manifest}";
@@ -108,13 +120,19 @@ export const overrides: OxlintOverride[] = [
    * renders, `textContent()` reads the source. The rule's fix swaps one for
    * the other and rewrites the assertion. Spec files only — a `page.evaluate`
    * body, and any helper beside the specs, does hold DOM nodes.
+   *
+   * `.spec.ts` is also Playwright's own convention, which landmines' naming
+   * rule would have renamed to `.test.ts`.
    */
   {
     files: [
       "**/e2e/**/*.{spec,test}.{js,jsx,ts,tsx,mjs,cjs}",
       "**/playwright/**/*.{spec,test}.{js,jsx,ts,tsx,mjs,cjs}",
     ],
-    rules: { "unicorn/prefer-dom-node-text-content": "off" },
+    rules: {
+      "landmines-structure/test-file-names": "off",
+      "unicorn/prefer-dom-node-text-content": "off",
+    },
   },
   /**
    * `expect.poll` hands back a promise, and an unawaited one never fails the
@@ -178,6 +196,7 @@ export default defineConfig({
   ignorePatterns,
   jsPlugins: [
     { name: "anti-slop", specifier: ANTI_SLOP },
+    ...LANDMINES,
     "eslint-plugin-no-only-tests",
     "eslint-plugin-sonarjs",
     "eslint-plugin-better-tailwindcss",
@@ -239,7 +258,8 @@ export default defineConfig({
     "anti-slop/no-chained-type-assertions": "warn",
     "anti-slop/no-conditional-empty-object-spread": "warn",
     "anti-slop/no-known-value-widening": "warn",
-    "anti-slop/no-module-mocking": "warn",
+    /** landmines' `no-test-doubles` reports the same `vi.mock` line, and more. */
+    "anti-slop/no-module-mocking": "off",
     "anti-slop/no-object-parameters": "warn",
     "anti-slop/no-reduce-accumulator-copy": "warn",
     "anti-slop/no-reflect-apply": "warn",
@@ -385,6 +405,25 @@ export default defineConfig({
     "jsx-a11y/role-supports-aria-props": "warn",
     "jsx-a11y/scope": "warn",
     "jsx-a11y/tabindex-no-positive": "warn",
+    /**
+     * landmines — rules against the ways a test passes without being true:
+     * mocks of the thing under test, fixed sleeps, retries, raised timeouts,
+     * MSW letting unmocked requests through. Warnings, like the rest.
+     *
+     * `no-comments` is off. It bans prose comments, and this config is made
+     * of them: every override and every rule turned off says why, here, where
+     * the next reader looks. Measured over this repository it reports 124.
+     */
+    "landmines-structure/colocated-tests": "warn",
+    "landmines-structure/package-exports": "warn",
+    "landmines-structure/test-file-names": "warn",
+    "landmines-style/no-comments": "off",
+    "landmines-testing/no-fixed-sleep": "warn",
+    "landmines-testing/no-flake-masking": "warn",
+    "landmines-testing/no-test-doubles": "warn",
+    "landmines-testing/no-unsignaled-poll": "warn",
+    "landmines-testing/strict-msw": "warn",
+    "landmines-types/no-explicit-return-types": "warn",
     "logical-assignment-operators": [
       "warn",
       "always",

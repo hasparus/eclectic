@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { config, lint, OXLINT, SENTINEL, SENTINEL_RULE, TSRS_LINT } from "./fixture.js";
+import { config, lint, OXLINT, SENTINEL, SENTINEL_RULE, TSRS_LINT } from "./lint.test-utils.js";
 
 /**
  * A type-aware rule that never reaches tsrs reports nothing, which reads
