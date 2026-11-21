@@ -61,7 +61,8 @@ repo can have every other opinion here without it.
   `no-only-tests`, two new `anti-slop` rules, and a few more. Most are
   warnings. Definite bugs are errors, and so are the React Compiler rules,
   because `@hasparus/eslint-config` makes them errors.
-- **landmines.** Nine of its ten rules, as warnings. See [below](#landmines).
+- **landmines.** All ten of its rules, as warnings, `no-comments` included.
+  See [below](#landmines).
 - **`anti-slop/no-module-mocking` is off**, because landmines'
   `no-test-doubles` reports the same line.
 - **Unused disable comments are reported**, as warnings.
@@ -128,20 +129,28 @@ where tests live, what test files are called, open-ended `package.json`
 exports, and explicit return types on implementations.
 
 It is published as `@interfere/landmines`, so it is a dependency here rather
-than a vendored copy. All ten rules are named; nine are on, as warnings.
+than a vendored copy. All ten rules are on, as warnings.
 
 Departures from its recommended config:
 
 - **Warnings, not errors**, like everything else here.
-- **`no-comments` is off.** It bans prose comments, and this config is made of
-  them: every override and every rule turned off says why, beside it. Over this
-  repository it reports 124 comments. To turn it on:
-  `rules: { "landmines-style/no-comments": "warn" }`.
 - **`test-file-names` is off for Playwright specs**, in the same `e2e/` and
   `playwright/` override as below. `.spec.ts` is Playwright's own convention.
 - **`anti-slop/no-module-mocking` is off.** landmines' `no-test-doubles`
   reports the same `vi.mock` line, and also catches `vi.fn(impl)`, stubbed
   globals and patched prototypes.
+
+`no-comments` bans prose comments. It still allows directives such as
+`oxlint-disable` and `@ts-expect-error`, single-line `// WARNING:` comments,
+and TSDoc on exported symbols. To turn it off in your repo:
+
+```ts
+rules: { "landmines-style/no-comments": "off" },
+```
+
+This repository does exactly that for its own lint, in
+[`oxlint.local.config.ts`](./oxlint.local.config.ts), because its configs
+explain each rule and override in prose.
 
 ## Type-aware linting
 

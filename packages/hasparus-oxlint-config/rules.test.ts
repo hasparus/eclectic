@@ -132,9 +132,14 @@ test("x", async () => {
   expect(found["e2e/home.spec.ts"]).not.toContain("landmines-structure/test-file-names");
 });
 
-test("landmines' no-comments stays off", () => {
-  const found = lint([["src/a.ts", `${SENTINEL}// A sentence of prose.\nexport const a = 1;\n`]]);
+test("landmines' no-comments reports prose, and lets exported TSDoc through", () => {
+  const found = lint([
+    ["src/a.ts", `${SENTINEL}// A sentence of prose.\nexport const a = 1;\n`],
+    ["src/b.ts", `${SENTINEL}/** What b is. */\nexport const b = 1;\n`],
+  ]);
 
   expect(found["src/a.ts"], "src/a.ts was never linted").toContain(SENTINEL_RULE);
-  expect(found["src/a.ts"]).not.toContain("landmines-style/no-comments");
+  expect(found["src/a.ts"]).toContain("landmines-style/no-comments");
+  expect(found["src/b.ts"], "src/b.ts was never linted").toContain(SENTINEL_RULE);
+  expect(found["src/b.ts"]).not.toContain("landmines-style/no-comments");
 });

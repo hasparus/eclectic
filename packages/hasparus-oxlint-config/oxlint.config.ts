@@ -410,14 +410,15 @@ export default defineConfig({
      * mocks of the thing under test, fixed sleeps, retries, raised timeouts,
      * MSW letting unmocked requests through. Warnings, like the rest.
      *
-     * `no-comments` is off. It bans prose comments, and this config is made
-     * of them: every override and every rule turned off says why, here, where
-     * the next reader looks. Measured over this repository it reports 124.
+     * `no-comments` is on, as in landmines' recommended config. It still
+     * allows directives, single-line `// WARNING:` comments and TSDoc on
+     * exported symbols. This repository explains its configs in prose, so it
+     * turns the rule off for its own lint in `oxlint.local.config.ts`.
      */
     "landmines-structure/colocated-tests": "warn",
     "landmines-structure/package-exports": "warn",
     "landmines-structure/test-file-names": "warn",
-    "landmines-style/no-comments": "off",
+    "landmines-style/no-comments": "warn",
     "landmines-testing/no-fixed-sleep": "warn",
     "landmines-testing/no-flake-masking": "warn",
     "landmines-testing/no-test-doubles": "warn",
