@@ -1,0 +1,22 @@
+name: Paidotopos
+on:
+  pull_request:
+    paths: ['packages/paidotopos/**', 'bun.lock', '.github/workflows/paidotopos.yml']
+  push:
+    branches: [main]
+    paths: ['packages/paidotopos/**', 'bun.lock', '.github/workflows/paidotopos.yml']
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run lint && bun run typecheck && bun run test && bun run build
+        working-directory: packages/paidotopos
+      - run: bunx playwright install --with-deps chromium
+        working-directory: packages/paidotopos
+      - run: bun run test:e2e
+        working-directory: packages/paidotopos
