@@ -10,9 +10,9 @@ import type { DummyRule, ExternalPluginEntry } from "oxlint";
  * knows.
  */
 
-/** As a consumer assembles it: the base, with the shared overrides spread in. */
+/** The base, as shipped. Its own `overrides` reach a consumer through `extends`. */
 const imported = await import("./oxlint.config.js");
-export const config = { ...imported.default, overrides: imported.overrides };
+export const config = imported.default;
 
 /**
  * Every fixture carries a `debugger`, which no override touches. Without it a
@@ -96,13 +96,21 @@ const parseReport: (json: string) => { diagnostics: { code?: string; filename: s
  */
 export const UNUSED_DIRECTIVE = "unused-disable-directive";
 
+/** Where `lint(…, { through: "extends" })` installs the config, as npm would. */
+const INSTALLED = "node_modules/@hasparus/oxlint-config/oxlint.json";
+
 /**
  * Rule ids oxlint reports for each file, laid out at that exact path. Pairs
  * rather than an object, so each case keeps the comment explaining it.
+ *
+ * By default the config is the root config itself. With `through: "extends"`
+ * it is installed under `node_modules` and the root config only extends it,
+ * which is what a consumer does — and what decides which of its fields arrive.
  */
 export function lint(
   files: readonly (readonly [path: string, source: string])[],
   from: Config = config,
+  { through = "root" }: { readonly through?: "extends" | "root" } = {},
 ) {
   const root = mkdtempSync(join(tmpdir(), "oxlint-fixture-"));
 
@@ -111,7 +119,14 @@ export function lint(
     writeFileSync(join(root, path), source);
   }
 
-  writeFileSync(join(root, ".oxlintrc.json"), JSON.stringify(withoutJsPlugins(from)));
+  const shipped = JSON.stringify(withoutJsPlugins(from));
+  if (through === "extends") {
+    mkdirSync(join(root, dirname(INSTALLED)), { recursive: true });
+    writeFileSync(join(root, INSTALLED), shipped);
+    writeFileSync(join(root, ".oxlintrc.json"), JSON.stringify({ extends: [`./${INSTALLED}`] }));
+  } else {
+    writeFileSync(join(root, ".oxlintrc.json"), shipped);
+  }
 
   const { stdout } = Bun.spawnSync({
     cmd: [OXLINT, "-c", ".oxlintrc.json", "--format", "json", "."],

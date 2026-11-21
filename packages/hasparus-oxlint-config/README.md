@@ -13,17 +13,18 @@ npm install --save-dev @hasparus/oxlint-config oxlint tsrs
 ```ts
 // oxlint.config.ts
 import { defineConfig } from "oxlint";
-import base, { ignorePatterns, overrides } from "@hasparus/oxlint-config";
+import base, { ignorePatterns } from "@hasparus/oxlint-config";
 
 export default defineConfig({
   extends: [base],
   ignorePatterns: [...ignorePatterns],
-  overrides: [...overrides, { files: ["src/**/*.ts"], rules: { "no-console": "warn" } }],
+  overrides: [{ files: ["src/**/*.ts"], rules: { "no-console": "warn" } }],
 });
 ```
 
-`ignorePatterns` and `overrides` come along by hand because oxlint reads both
-from the root config only — see [below](#what-it-turns-off-for-you).
+`ignorePatterns` comes along by hand, because `extends` drops a base config's
+ignore patterns — see [below](#what-it-ignores). Everything else, `overrides`
+included, arrives through `extends`.
 
 `sonarjs`, `better-tailwindcss`, `no-only-tests`, `anti-slop` and `landmines`
 run through oxlint's `jsPlugins` and travel with this package.
@@ -33,10 +34,10 @@ run through oxlint's `jsPlugins` and travel with this package.
 The base does not sort anything. For perfectionist's sorting rules — object
 keys, union members, JSX props, interfaces and the rest, all natural order —
 import the other preset instead. It is the base plus those rules, and exports
-the same `ignorePatterns` and `overrides`:
+the same `ignorePatterns`:
 
 ```ts
-import base, { ignorePatterns, overrides } from "@hasparus/oxlint-config/with-sorting";
+import base, { ignorePatterns } from "@hasparus/oxlint-config/with-sorting";
 ```
 
 They were in the base until 0.5.0. Sorting is an opinion about layout, and a
@@ -48,6 +49,8 @@ repo can have every other opinion here without it.
   runs the type-aware rules in it. `npm install --save-dev tsrs` and remove
   `oxlint-tsgolint`.
 - **Sorting moved to `/with-sorting`.** Change the import to keep it.
+- **No need to spread `overrides`.** `extends` brings them; the old advice was
+  wrong. Spreading them still works. Keep spreading `ignorePatterns`.
 - **`jsx-a11y` rules run now.** The config always set them, but never turned
   the plugin on, so oxlint dropped them without a word. Expect new warnings in
   `.jsx` and `.tsx` files.
@@ -183,22 +186,12 @@ and one is right only in a particular place:
 - **`vitest/require-awaited-expect-poll`**, on in test files only. An
   unawaited `expect.poll` never fails the test.
 
-They ship as a named export rather than inside the base, because `extends`
-drops a base config's `overrides`. `ignorePatterns` is the same story — oxlint
-reads those from the root config only — so it is a named export too, covering
-build output and the directories coding agents install their own assets into
-(`.claude`, `.cursor`, `.codex` and the rest; a repo that lints those is
-reviewing somebody else's code). Spread both into your own:
-
-```ts
-import base, { ignorePatterns, overrides } from "@hasparus/oxlint-config";
-
-export default defineConfig({
-  extends: [base],
-  ignorePatterns: [...ignorePatterns],
-  overrides: [...overrides],
-});
-```
+These live in the base's `overrides`, and `extends` brings them along: a repo
+that extends the base gets them with nothing to spread. They are also a named
+export, `overrides`, because until 0.5.0 this README said `extends` dropped
+them and asked you to spread them by hand. That was wrong — checked with
+oxlint 1.78 and 1.94, with the package installed in `node_modules` — but a
+config that still spreads them keeps working.
 
 Where each one looks:
 
@@ -216,6 +209,26 @@ suite in `tests/`, wants a line of its own:
 ```ts
 overrides: [{ files: ["tests/**/*.spec.ts"], rules: { "unicorn/prefer-dom-node-text-content": "off" } }],
 ```
+
+## What it ignores
+
+`ignorePatterns` covers build output and the directories coding agents install
+their own assets into (`.claude`, `.cursor`, `.codex` and the rest; a repo that
+lints those is reviewing somebody else's code).
+
+`extends` drops a base config's ignore patterns, so the list is a named export,
+to spread into your own:
+
+```ts
+import base, { ignorePatterns } from "@hasparus/oxlint-config";
+
+export default defineConfig({
+  extends: [base],
+  ignorePatterns: [...ignorePatterns],
+});
+```
+
+Without it, oxlint lints `dist/`, `.claude/` and even `node_modules/`.
 
 ## License
 

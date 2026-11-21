@@ -98,8 +98,9 @@ const NEXT_APP_FILES =
 const NEXT_IMAGE_FILES = "{icon,apple-icon,opengraph-image,twitter-image}{,[0-9],[0-9][0-9]}";
 
 /**
- * Spread into your own `overrides`. `extends` drops a base config's overrides,
- * so these apply only where the consuming config declares them.
+ * Part of the base's own `overrides`, which reach a consumer through
+ * `extends`. Exported as well, because older versions of this package told
+ * consumers to spread them by hand; a config that still does keeps working.
  *
  * Every glob leads with `**`: a relative one resolves against the config that
  * declares it. The filename is the only thing left to narrow on, which is why
@@ -148,9 +149,8 @@ export const overrides: OxlintOverride[] = [
 ];
 
 /**
- * Spread into your own, the same as `overrides` and for the same reason:
- * oxlint reads ignore patterns from the root config only, so a base config's
- * are dropped on the way through `extends`.
+ * Spread into your own. oxlint reads ignore patterns from the root config
+ * only, so a base config's are dropped on the way through `extends`.
  */
 export const ignorePatterns: string[] = [
   "dist",

@@ -12,9 +12,10 @@ const natural: DummyRule = ["warn", { order: "asc", type: "natural" }];
  * 0.5.0; they are a preset of their own now, so a repo that does not want its
  * keys reordered can say so by importing the other one.
  *
- * Spread rather than `extends`, so the base's `overrides` and `ignorePatterns`
- * stay on the object. Consumers still spread both into their root config, the
- * same as with the base — `extends` drops them whichever config they come from.
+ * Spread rather than `extends`, so the base's `ignorePatterns` stay on the
+ * object. Consumers still spread `ignorePatterns` into their root config, the
+ * same as with the base — `extends` drops them whichever config they come
+ * from.
  */
 // eslint-disable-next-line import/no-default-export -- oxlint reads a config by default export.
 export default defineConfig({

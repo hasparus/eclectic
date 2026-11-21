@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { lint, SENTINEL, SENTINEL_RULE } from "./lint.test-utils.js";
+import { config, lint, SENTINEL, SENTINEL_RULE } from "./lint.test-utils.js";
 
 /**
  * A glob one star too wide silences a rule in every consumer repo and says
@@ -109,4 +109,31 @@ test("unicorn/prefer-dom-node-text-content is off for Playwright specs only", ()
 
   expect(found["e2e/helpers/dom.ts"]).toContain(rule);
   expect(found["src/components/Thing.ts"]).toContain(rule);
+});
+
+/**
+ * What the README tells a consumer to do rests on these two facts: a base
+ * config's `overrides` survive `extends`, its `ignorePatterns` do not. Both
+ * are oxlint's behaviour, not this package's, so pin them where an upgrade
+ * would show it.
+ */
+test("through `extends`, the overrides arrive and the ignore patterns do not", () => {
+  const found = lint(
+    [
+      ["app/page.tsx", DEFAULT_EXPORT],
+      ["e2e/cart.spec.ts", INNER_TEXT],
+      ["src/thing.ts", DEFAULT_EXPORT],
+      [".claude/hooks/stop.ts", SENTINEL],
+    ],
+    config,
+    { through: "extends" },
+  );
+
+  expect(found["app/page.tsx"], "app/page.tsx was never linted").toContain(SENTINEL_RULE);
+  expect(found["app/page.tsx"]).not.toContain("import/no-default-export");
+  expect(found["e2e/cart.spec.ts"]).not.toContain("unicorn/prefer-dom-node-text-content");
+  expect(found["src/thing.ts"]).toContain("import/no-default-export");
+
+  // Ignored at the root, linted once the pattern only comes through `extends`.
+  expect(found[".claude/hooks/stop.ts"]).toContain(SENTINEL_RULE);
 });
