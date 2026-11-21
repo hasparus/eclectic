@@ -18,9 +18,11 @@ export const noReflectApplyRule = defineRule({
   createOnce(context) {
     return {
       CallExpression(node) {
-        if (node.callee.type === "Super" || node.callee.type === "V8IntrinsicExpression") return;
+        if (node.callee.type === "Super" || node.callee.type === "V8IntrinsicExpression") {
+          return;
+        }
         if (isGlobalReflectMethodCall(context.sourceCode, node.callee, "apply")) {
-          context.report({ node, messageId: "reflectApply" });
+          context.report({ messageId: "reflectApply", node });
         }
       },
     };

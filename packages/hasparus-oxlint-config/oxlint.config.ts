@@ -1,25 +1,25 @@
 import { existsSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { defineConfig, type DummyRule, type OxlintOverride } from "oxlint";
-
-/** perfectionist default: natural, ascending. */
-const natural: DummyRule = ["warn", { order: "asc", type: "natural" }];
+import { defineConfig, type OxlintOverride } from "oxlint";
 
 /**
  * `options.typeAware` reaches the linter through `extends`, so a consuming root
  * config inherits it and plain `oxlint` runs the type-aware rules. The binary
  * they need does not travel with it: oxlint looks for `node_modules/.bin/
- * tsgolint` upwards from the working directory, and without it refuses the run
- * behind a single line of output. Say it louder, with the fix.
+ * tsrs-lint` (or the older `tsgolint`) upwards from the working directory,
+ * and without either refuses the run behind a single line of output. Say it
+ * louder, with the fix.
  *
  * A miss here is the whole point, so it prints rather than throws: a config
  * that throws is reported as a load failure, message buried under a stack
  * trace, and takes `--print-config` and the editor down with it. oxlint already
  * exits non-zero on its own, so there is nothing left to enforce.
  */
-function findTsgolint(from: string) {
-  // npm writes a `.cmd` shim beside the shell one on Windows.
-  const shims = ["tsgolint", "tsgolint.cmd"];
+function findTypeAwareBackend(from: string) {
+  // tsrs ships `tsrs-lint`; oxlint still takes oxlint-tsgolint's `tsgolint`
+  // if that is what is installed. npm writes a `.cmd` shim beside each one on
+  // Windows.
+  const shims = ["tsrs-lint", "tsrs-lint.cmd", "tsgolint", "tsgolint.cmd"];
 
   for (let dir = from; ; dir = dirname(dir)) {
     if (shims.some((shim) => existsSync(join(dir, "node_modules", ".bin", shim)))) return true;
@@ -35,10 +35,13 @@ function findTsgolint(from: string) {
 const isOxlintCli =
   basename(process.argv[1] ?? "") === "oxlint" && !process.argv.includes("--lsp");
 
-/** oxlint takes this path over the lookup, so a value here settles the question. */
-const configuredTsgolint = process.env.OXLINT_TSGOLINT_PATH ?? "";
+/**
+ * oxlint takes this path over the lookup, so a value here settles the
+ * question. The name is from the tsgolint days; it points at `tsrs-lint` too.
+ */
+const configuredBackend = process.env.OXLINT_TSGOLINT_PATH ?? "";
 
-if (isOxlintCli && configuredTsgolint === "" && !findTsgolint(process.cwd())) {
+if (isOxlintCli && configuredBackend === "" && !findTypeAwareBackend(process.cwd())) {
   process.stderr.write(`
 ╔══════════════════════════════════════════════════════════════════════╗
 ║   @hasparus/oxlint-config: type-aware linting cannot run             ║
@@ -46,10 +49,10 @@ if (isOxlintCli && configuredTsgolint === "" && !findTsgolint(process.cwd())) {
 
   This config turns on oxlint's type-aware rules — no-floating-promises,
   no-unsafe-argument, no-unnecessary-type-parameters and the rest. They
-  run in tsgolint, which is not installed here, so oxlint will refuse to
+  run in tsrs, which is not installed here, so oxlint will refuse to
   lint anything at all.
 
-      npm install --save-dev oxlint-tsgolint
+      npm install --save-dev tsrs
 
   That is the whole fix. \`options.typeAware\` is already set, so plain
   \`oxlint\` picks the rules up — no \`--type-aware\` flag to add. To decline
@@ -60,7 +63,7 @@ if (isOxlintCli && configuredTsgolint === "" && !findTsgolint(process.cwd())) {
 
 /**
  * anti-slop ships source to vendor rather than a package to depend on, so its
- * fifteen rules travel inside this one, under `anti-slop/`.
+ * seventeen rules travel inside this one, under `anti-slop/`.
  *
  * The specifier has to be absolute. A relative one resolves against the config
  * that declares it, and `extends` inlines this config into the consumer's, so
@@ -75,6 +78,18 @@ if (isOxlintCli && configuredTsgolint === "" && !findTsgolint(process.cwd())) {
  */
 const ANTI_SLOP = new URL("anti-slop/index.js", import.meta.url).href;
 
+/**
+ * landmines publishes a package, so it is a dependency rather than a vendored
+ * copy, with one plugin per subpath. Resolved here, to absolute `file:` URLs,
+ * for the same reason as anti-slop: a bare specifier would be resolved beside
+ * the consumer's config, which under pnpm cannot see this package's
+ * dependencies.
+ */
+const LANDMINES = ["testing", "style", "structure", "types"].map((plugin) => ({
+  name: `landmines-${plugin}`,
+  specifier: import.meta.resolve(`@interfere/landmines/${plugin}`),
+}));
+
 /** App Router conventions. `route` exports GET/POST by name, so it is absent. */
 const NEXT_APP_FILES =
   "{page,layout,template,default,loading,error,global-error,not-found,forbidden,unauthorized,global-not-found,robots,sitemap,manifest}";
@@ -83,8 +98,9 @@ const NEXT_APP_FILES =
 const NEXT_IMAGE_FILES = "{icon,apple-icon,opengraph-image,twitter-image}{,[0-9],[0-9][0-9]}";
 
 /**
- * Spread into your own `overrides`. `extends` drops a base config's overrides,
- * so these apply only where the consuming config declares them.
+ * Part of the base's own `overrides`, which reach a consumer through
+ * `extends`. Exported as well, because older versions of this package told
+ * consumers to spread them by hand; a config that still does keeps working.
  *
  * Every glob leads with `**`: a relative one resolves against the config that
  * declares it. The filename is the only thing left to narrow on, which is why
@@ -105,20 +121,36 @@ export const overrides: OxlintOverride[] = [
    * renders, `textContent()` reads the source. The rule's fix swaps one for
    * the other and rewrites the assertion. Spec files only — a `page.evaluate`
    * body, and any helper beside the specs, does hold DOM nodes.
+   *
+   * `.spec.ts` is also Playwright's own convention, which landmines' naming
+   * rule would have renamed to `.test.ts`.
    */
   {
     files: [
       "**/e2e/**/*.{spec,test}.{js,jsx,ts,tsx,mjs,cjs}",
       "**/playwright/**/*.{spec,test}.{js,jsx,ts,tsx,mjs,cjs}",
     ],
-    rules: { "unicorn/prefer-dom-node-text-content": "off" },
+    rules: {
+      "landmines-structure/test-file-names": "off",
+      "unicorn/prefer-dom-node-text-content": "off",
+    },
+  },
+  /**
+   * `expect.poll` hands back a promise, and an unawaited one never fails the
+   * test. Test files only: elsewhere `expect` is whatever the file says it is.
+   */
+  {
+    files: [
+      "**/*.{test,spec}.{js,jsx,ts,tsx,mjs,mts,cjs,cts}",
+      "**/__tests__/**/*.{js,jsx,ts,tsx,mjs,mts,cjs,cts}",
+    ],
+    rules: { "vitest/require-awaited-expect-poll": "error" },
   },
 ];
 
 /**
- * Spread into your own, the same as `overrides` and for the same reason:
- * oxlint reads ignore patterns from the root config only, so a base config's
- * are dropped on the way through `extends`.
+ * Spread into your own. oxlint reads ignore patterns from the root config
+ * only, so a base config's are dropped on the way through `extends`.
  */
 export const ignorePatterns: string[] = [
   "dist",
@@ -164,7 +196,8 @@ export default defineConfig({
   ignorePatterns,
   jsPlugins: [
     { name: "anti-slop", specifier: ANTI_SLOP },
-    "eslint-plugin-perfectionist",
+    ...LANDMINES,
+    "eslint-plugin-no-only-tests",
     "eslint-plugin-sonarjs",
     "eslint-plugin-better-tailwindcss",
   ],
@@ -172,8 +205,12 @@ export default defineConfig({
    * Type-aware rules that are not asked for are rules that silently do
    * nothing, so this asks. It survives `extends`, which means a consumer gets
    * them from plain `oxlint` with no flag and no lint script to remember.
+   *
+   * A disable comment that no longer silences anything is a rule turned off
+   * for no reason, waiting for the next bug on that line. Say so — as a
+   * warning, like everything else that is not a bug, so `--fix` can clear it.
    */
-  options: { typeAware: true },
+  options: { reportUnusedDisableDirectives: "warn", typeAware: true },
   overrides: [
     {
       files: ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
@@ -196,26 +233,35 @@ export default defineConfig({
       },
     },
   ],
-  plugins: ["typescript", "unicorn", "import", "promise", "react"],
+  /**
+   * A rule whose plugin is not listed here is dropped without a word, so every
+   * prefix the rules below use is named. `jsx-a11y` was missing until 0.5.0,
+   * and its forty-odd rules had never once run.
+   */
+  plugins: ["typescript", "unicorn", "import", "jsx-a11y", "oxc", "promise", "react", "vitest"],
   rules: {
     /**
-     * anti-slop, vendored — fifteen rules against the shapes code takes when
-     * whoever wrote it could not see the type it needed: `unknown` in a
+     * anti-slop, vendored — seventeen rules against the shapes code takes
+     * when whoever wrote it could not see the type it needed: `unknown` in a
      * signature, `Record<string, unknown>` standing in for a shape, an
      * assertion claiming what nothing checked. A model writes them by the
      * dozen and so does a person in a hurry; the rules do not care which.
+     * Twelve come from @nkzw/oxlint-config's faster port, five from
+     * dmmulroy/anti-slop itself; `anti-slop/README.md` says which.
      *
-     * Upstream turns all fifteen on as errors. They are warnings here for the
-     * reason everything else is: none of them is a bug, and the last one asks
-     * for a sentence of prose no `--fix` can write. Measured over this
-     * repository they come to seventeen reports across twenty source files,
-     * which is a morning's work, not a wall.
+     * Both upstreams turn them on as errors. They are warnings here for the
+     * reason everything else is: none of them is a bug, and
+     * `require-safety-comment-for-type-assertion` asks for a sentence of prose
+     * no `--fix` can write.
      */
+    "anti-slop/no-array-filter-map": "warn",
     "anti-slop/no-chained-type-assertions": "warn",
     "anti-slop/no-conditional-empty-object-spread": "warn",
     "anti-slop/no-known-value-widening": "warn",
-    "anti-slop/no-module-mocking": "warn",
+    /** landmines' `no-test-doubles` reports the same `vi.mock` line, and more. */
+    "anti-slop/no-module-mocking": "off",
     "anti-slop/no-object-parameters": "warn",
+    "anti-slop/no-reduce-accumulator-copy": "warn",
     "anti-slop/no-reflect-apply": "warn",
     "anti-slop/no-reflect-get": "warn",
     /**
@@ -238,6 +284,7 @@ export default defineConfig({
     "anti-slop/no-unsafe-dictionary-type": "warn",
     "anti-slop/no-widen-then-assert": "warn",
     "anti-slop/require-safety-comment-for-type-assertion": "warn",
+    "array-callback-return": "warn",
     "constructor-super": "off",
     curly: "off",
     eqeqeq: [
@@ -249,6 +296,7 @@ export default defineConfig({
     ],
     "for-direction": "error",
     "getter-return": "off",
+    "import/export": "error",
     "import/first": "warn",
     "import/newline-after-import": "off",
     "import/no-default-export": "warn",
@@ -281,7 +329,6 @@ export default defineConfig({
           "tree",
           "treegrid",
         ],
-        includeRoles: ["alert", "dialog"],
       },
     ],
     "jsx-a11y/heading-has-content": "warn",
@@ -358,6 +405,26 @@ export default defineConfig({
     "jsx-a11y/role-supports-aria-props": "warn",
     "jsx-a11y/scope": "warn",
     "jsx-a11y/tabindex-no-positive": "warn",
+    /**
+     * landmines — rules against the ways a test passes without being true:
+     * mocks of the thing under test, fixed sleeps, retries, raised timeouts,
+     * MSW letting unmocked requests through. Warnings, like the rest.
+     *
+     * `no-comments` is on, as in landmines' recommended config. It still
+     * allows directives, single-line `// WARNING:` comments and TSDoc on
+     * exported symbols. This repository explains its configs in prose, so it
+     * turns the rule off for its own lint in `oxlint.local.config.ts`.
+     */
+    "landmines-structure/colocated-tests": "warn",
+    "landmines-structure/package-exports": "warn",
+    "landmines-structure/test-file-names": "warn",
+    "landmines-style/no-comments": "warn",
+    "landmines-testing/no-fixed-sleep": "warn",
+    "landmines-testing/no-flake-masking": "warn",
+    "landmines-testing/no-test-doubles": "warn",
+    "landmines-testing/no-unsignaled-poll": "warn",
+    "landmines-testing/strict-msw": "warn",
+    "landmines-types/no-explicit-return-types": "warn",
     "logical-assignment-operators": [
       "warn",
       "always",
@@ -394,6 +461,7 @@ export default defineConfig({
     "no-empty-pattern": "error",
     "no-empty-static-block": "warn",
     "no-ex-assign": "error",
+    "no-extra-bind": "warn",
     "no-extra-boolean-cast": "warn",
     "no-fallthrough": "error",
     "no-func-assign": "off",
@@ -412,8 +480,10 @@ export default defineConfig({
     "no-loss-of-precision": "error",
     "no-misleading-character-class": "error",
     "no-new-native-nonconstructor": "off",
+    "no-new-wrappers": "warn",
     "no-nonoctal-decimal-escape": "error",
     "no-obj-calls": "off",
+    "no-only-tests/no-only-tests": "error",
     "no-prototype-builtins": "error",
     "no-redeclare": "off",
     "no-regex-spaces": "warn",
@@ -474,50 +544,30 @@ export default defineConfig({
         varsIgnorePattern: "^_",
       },
     ],
+    "no-useless-assignment": "warn",
     "no-useless-backreference": "error",
     "no-useless-catch": "warn",
     "no-useless-constructor": "warn",
     "no-useless-escape": "warn",
+    "no-useless-rename": "warn",
     "no-var": "warn",
+    "no-warning-comments": ["error", { terms: ["@nocommit"] }],
     "no-with": "error",
     "object-shorthand": ["warn", "always"],
-    "perfectionist/sort-array-includes": natural,
-    "perfectionist/sort-decorators": natural,
-    "perfectionist/sort-exports": natural,
-    "perfectionist/sort-heritage-clauses": natural,
-    "perfectionist/sort-interfaces": natural,
-    "perfectionist/sort-intersection-types": natural,
-    "perfectionist/sort-jsx-props": "warn",
-    "perfectionist/sort-maps": natural,
-    "perfectionist/sort-named-exports": natural,
-    "perfectionist/sort-named-imports": natural,
-    "perfectionist/sort-object-types": [
-      "warn",
-      {
-        order: "asc",
-        partitionByComment: true,
-        type: "natural",
-      },
-    ],
-    "perfectionist/sort-objects": [
-      "warn",
-      {
-        order: "asc",
-        partitionByComment: true,
-        type: "natural",
-      },
-    ],
-    "perfectionist/sort-sets": natural,
-    "perfectionist/sort-switch-case": natural,
-    "perfectionist/sort-union-types": [
-      "warn",
-      {
-        groups: ["unknown", "keyword", "nullish"],
-        order: "asc",
-        type: "natural",
-      },
-    ],
-    "perfectionist/sort-variable-declarations": natural,
+    "oxc/approx-constant": "warn",
+    "oxc/bad-bitwise-operator": "error",
+    "oxc/bad-char-at-comparison": "error",
+    "oxc/bad-comparison-sequence": "error",
+    "oxc/bad-min-max-func": "error",
+    "oxc/bad-object-literal-comparison": "error",
+    "oxc/bad-replace-all-arg": "error",
+    "oxc/const-comparisons": "error",
+    "oxc/double-comparisons": "warn",
+    "oxc/misrefactored-assign-op": "warn",
+    "oxc/missing-throw": "error",
+    "oxc/no-accumulating-spread": "warn",
+    "oxc/number-arg-out-of-range": "error",
+    "oxc/uninvoked-array-callback": "error",
     "prefer-arrow-callback": [
       "warn",
       {
@@ -541,21 +591,31 @@ export default defineConfig({
     "prefer-object-has-own": "warn",
     "prefer-rest-params": "warn",
     "prefer-spread": "warn",
+    "preserve-caught-error": "warn",
     "promise/no-multiple-resolved": "warn",
     "promise/no-nesting": "warn",
+    "promise/no-return-in-finally": "error",
+    "react/button-has-type": "warn",
+    "react/checked-requires-onchange-or-readonly": "warn",
     "react/display-name": "warn",
+    "react/error-boundaries": "error",
     "react/exhaustive-deps": "warn",
+    "react/globals": "error",
     "react/hook-use-state": "warn",
     "react/iframe-missing-sandbox": "warn",
+    "react/immutability": "error",
+    "react/incompatible-library": "warn",
     "react/jsx-boolean-value": "warn",
     "react/jsx-curly-brace-presence": "warn",
     "react/jsx-key": "error",
     "react/jsx-no-comment-textnodes": "error",
     "react/jsx-no-duplicate-props": "error",
     "react/jsx-no-literals": "off",
+    "react/jsx-no-script-url": "warn",
     "react/jsx-no-target-blank": "error",
     "react/jsx-no-undef": "off",
     "react/jsx-no-useless-fragment": "warn",
+    "react/jsx-props-no-spread-multi": "warn",
     "react/no-children-prop": "error",
     "react/no-danger-with-children": "error",
     "react/no-direct-mutation-state": "error",
@@ -566,9 +626,20 @@ export default defineConfig({
     "react/no-unescaped-entities": "off",
     "react/no-unknown-property": "error",
     "react/no-unsafe": "off",
+    "react/preserve-manual-memoization": "error",
+    "react/purity": "error",
     "react/react-in-jsx-scope": "off",
+    "react/refs": "error",
+    "react/require-render-return": "error",
     "react/rules-of-hooks": "error",
     "react/self-closing-comp": "off",
+    "react/set-state-in-effect": "error",
+    "react/set-state-in-render": "error",
+    "react/static-components": "error",
+    "react/unsupported-syntax": "warn",
+    "react/use-memo": "error",
+    "react/void-dom-elements-no-children": "error",
+    "react/void-use-memo": "error",
     "require-await": "off",
     "require-yield": "warn",
     "sonarjs/no-collapsible-if": "off",
@@ -597,6 +668,7 @@ export default defineConfig({
     "typescript/no-explicit-any": "warn",
     "typescript/no-extra-non-null-assertion": "warn",
     "typescript/no-extraneous-class": "warn",
+    "typescript/no-import-type-side-effects": "warn",
     "typescript/no-inferrable-types": "warn",
     "typescript/no-invalid-void-type": "error",
     "typescript/no-misused-new": "error",
@@ -605,6 +677,7 @@ export default defineConfig({
     "typescript/no-non-null-asserted-optional-chain": "error",
     "typescript/no-require-imports": "warn",
     "typescript/no-this-alias": "warn",
+    "typescript/no-unnecessary-parameter-property-assignment": "warn",
     "typescript/no-unnecessary-type-constraint": "warn",
     "typescript/no-unsafe-declaration-merging": "error",
     "typescript/no-unsafe-function-type": "error",
@@ -617,8 +690,7 @@ export default defineConfig({
     "typescript/triple-slash-reference": "warn",
     "typescript/unified-signatures": "warn",
     /**
-     * Everything tsgolint implements, which is the whole of oxlint's
-     * type-aware set. The sixteen @hasparus/eslint-config already runs keep
+     * Every type-aware rule oxlint has, all of which run in tsrs. The sixteen @hasparus/eslint-config already runs keep
      * the severity they have there — errors for the `no-unsafe-*` family,
      * `only-throw-error` and the type-constituent pair, warnings for the rest
      * — so a file that passes one linter passes the other. The rest default to
@@ -628,8 +700,8 @@ export default defineConfig({
      * ESLint rule of that name off and the type-aware twin says the same
      * thing. `prefer-readonly-parameter-types` and `strict-boolean-expressions`
      * are out too — measured over a real consumer they account for 349 reports
-     * against idiomatic code, which buries the rules that find defects. The three TypeScript rules disabled in
-     * the ESLint config — `consistent-type-definitions`, `no-empty-object-
+     * against idiomatic code, which buries the rules that find defects. The
+     * three TypeScript rules disabled in the ESLint config — `consistent-type-definitions`, `no-empty-object-
      * type`, `no-non-null-assertion` — read syntax, not types, so none of them
      * lands in this set to begin with.
      */
@@ -648,10 +720,10 @@ export default defineConfig({
      * them — 94 to 1 on the repo this was measured against.
      *
      * Named as bare strings rather than `{ from: "package" }` because the
-     * package form matches nothing here: tsgolint does not attribute these
-     * declarations to a package, so `bun:test`, `bun-types` and `@types/bun`
-     * all fail to match. The string form is deprecated upstream; when it goes,
-     * the package form has to work first.
+     * package form matched nothing when measured: tsgolint did not attribute
+     * these declarations to a package, so `bun:test`, `bun-types` and
+     * `@types/bun` all failed to match. The string form is deprecated
+     * upstream; when it goes, the package form has to work first.
      */
     "typescript/no-floating-promises": [
       "warn",
@@ -668,6 +740,7 @@ export default defineConfig({
       },
     ],
     "typescript/no-for-in-array": "warn",
+    "typescript/no-generated-empty-object-type": "warn",
     "typescript/no-implied-eval": "error",
     "typescript/no-meaningless-void-operator": "warn",
     "typescript/no-misused-promises": "error",
@@ -685,6 +758,7 @@ export default defineConfig({
     "typescript/no-unsafe-argument": "error",
     "typescript/no-unsafe-assignment": "error",
     "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-enum-assignment": "warn",
     "typescript/no-unsafe-enum-comparison": "error",
     "typescript/no-unsafe-member-access": "error",
     "typescript/no-unsafe-return": "error",
@@ -728,6 +802,7 @@ export default defineConfig({
     "unicorn/no-abusive-eslint-disable": "warn",
     "unicorn/no-accessor-recursion": "warn",
     "unicorn/no-anonymous-default-export": "warn",
+    "unicorn/no-array-fill-with-reference-type": "warn",
     "unicorn/no-array-for-each": "warn",
     "unicorn/no-array-method-this-argument": "warn",
     "unicorn/no-array-reduce": "warn",
@@ -794,6 +869,7 @@ export default defineConfig({
     "unicorn/prefer-event-target": "warn",
     "unicorn/prefer-export-from": "warn",
     "unicorn/prefer-global-this": "warn",
+    "unicorn/prefer-import-meta-properties": "warn",
     "unicorn/prefer-includes": "warn",
     "unicorn/prefer-keyboard-event-key": "warn",
     "unicorn/prefer-logical-operator-over-ternary": "warn",

@@ -10,9 +10,9 @@ import type { DummyRule, ExternalPluginEntry } from "oxlint";
  * knows.
  */
 
-/** As a consumer assembles it: the base, with the shared overrides spread in. */
+/** The base, as shipped. Its own `overrides` reach a consumer through `extends`. */
 const imported = await import("./oxlint.config.js");
-export const config = { ...imported.default, overrides: imported.overrides };
+export const config = imported.default;
 
 /**
  * Every fixture carries a `debugger`, which no override touches. Without it a
@@ -29,14 +29,14 @@ export const OXLINT = join(
 );
 
 /**
- * The config asks for type-aware linting, and oxlint hunts for tsgolint by
+ * The config asks for type-aware linting, and oxlint hunts for `tsrs-lint` by
  * walking up from the working directory — which here is a temp dir with no
  * `node_modules` above it. Hand it the path instead, or the run dies before it
  * reports a thing.
  */
-export const TSGOLINT = join(
-  dirname(Bun.fileURLToPath(import.meta.resolve("oxlint-tsgolint/package.json"))),
-  "bin/tsgolint.js",
+export const TSRS_LINT = join(
+  dirname(Bun.fileURLToPath(import.meta.resolve("tsrs/package.json"))),
+  "bin/tsrs-lint",
 );
 
 /**
@@ -45,8 +45,9 @@ export const TSGOLINT = join(
  * them, since oxlint refuses a config naming a plugin it has not loaded. None
  * of them owns a rule under test.
  *
- * anti-slop stays. Its specifier is an absolute `file:` URL, which resolves
- * from anywhere, and that it does is half of what these tests are for. Globs
+ * anti-slop and landmines stay. Their specifiers are absolute `file:` URLs,
+ * which resolve from anywhere, and that they do is half of what these tests
+ * are for. Globs
  * and options are untouched.
  */
 type Rules = Readonly<Record<string, DummyRule | undefined>>;
@@ -86,16 +87,30 @@ export function withoutJsPlugins({
 }
 
 /** `JSON.parse` returns `any`; name the shape once, at the boundary. */
-const parseReport: (json: string) => { diagnostics: { code: string; filename: string }[] } =
+const parseReport: (json: string) => { diagnostics: { code?: string; filename: string }[] } =
   JSON.parse;
+
+/**
+ * An unused disable comment is reported by the linter itself, not by a rule,
+ * so its diagnostic carries no code. This stands in for one.
+ */
+export const UNUSED_DIRECTIVE = "unused-disable-directive";
+
+/** Where `lint(…, { through: "extends" })` installs the config, as npm would. */
+const INSTALLED = "node_modules/@hasparus/oxlint-config/oxlint.json";
 
 /**
  * Rule ids oxlint reports for each file, laid out at that exact path. Pairs
  * rather than an object, so each case keeps the comment explaining it.
+ *
+ * By default the config is the root config itself. With `through: "extends"`
+ * it is installed under `node_modules` and the root config only extends it,
+ * which is what a consumer does — and what decides which of its fields arrive.
  */
 export function lint(
   files: readonly (readonly [path: string, source: string])[],
   from: Config = config,
+  { through = "root" }: { readonly through?: "extends" | "root" } = {},
 ) {
   const root = mkdtempSync(join(tmpdir(), "oxlint-fixture-"));
 
@@ -104,12 +119,19 @@ export function lint(
     writeFileSync(join(root, path), source);
   }
 
-  writeFileSync(join(root, ".oxlintrc.json"), JSON.stringify(withoutJsPlugins(from)));
+  const shipped = JSON.stringify(withoutJsPlugins(from));
+  if (through === "extends") {
+    mkdirSync(join(root, dirname(INSTALLED)), { recursive: true });
+    writeFileSync(join(root, INSTALLED), shipped);
+    writeFileSync(join(root, ".oxlintrc.json"), JSON.stringify({ extends: [`./${INSTALLED}`] }));
+  } else {
+    writeFileSync(join(root, ".oxlintrc.json"), shipped);
+  }
 
   const { stdout } = Bun.spawnSync({
     cmd: [OXLINT, "-c", ".oxlintrc.json", "--format", "json", "."],
     cwd: root,
-    env: { ...process.env, OXLINT_TSGOLINT_PATH: TSGOLINT },
+    env: { ...process.env, OXLINT_TSGOLINT_PATH: TSRS_LINT },
   });
 
   const report = parseReport(stdout.toString());
@@ -118,7 +140,9 @@ export function lint(
   for (const [path] of files) byFile[path] = [];
   for (const { code, filename } of report.diagnostics) {
     // oxlint reports `plugin(rule)`; say it the way the config spells it.
-    byFile[filename.replace(/^\.\//, "")]?.push(code.replace(/^(.+)\((.+)\)$/, "$1/$2"));
+    byFile[filename.replace(/^\.\//, "")]?.push(
+      code?.replace(/^(.+)\((.+)\)$/, "$1/$2") ?? UNUSED_DIRECTIVE,
+    );
   }
 
   return byFile;
