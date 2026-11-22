@@ -8,5 +8,5 @@
     // The vendored sources import each other by `.ts` path. Emit them as `.js`.
     "rewriteRelativeImportExtensions": true
   },
-  "include": ["oxlint.config.ts", "anti-slop/index.ts"]
+  "include": ["oxlint.config.ts", "with-sorting.ts", "anti-slop/index.ts"]
 }

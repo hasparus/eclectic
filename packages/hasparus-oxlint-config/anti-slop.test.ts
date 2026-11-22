@@ -1,24 +1,26 @@
 import { expect, test } from "bun:test";
 
 import antiSlop from "./anti-slop/index.js";
-import { config, lint, SENTINEL, SENTINEL_RULE } from "./fixture.js";
+import { config, lint, SENTINEL, SENTINEL_RULE } from "./lint.test-utils.js";
 
 /**
  * The vendored plugin is registered by absolute `file:` URL, which is the one
  * thing that has to hold for a config a consumer loads out of their
  * `node_modules`: a relative specifier would be resolved beside *their* config
- * and found nowhere, and fifteen rules that never load report nothing, which
+ * and found nowhere, and seventeen rules that never load report nothing, which
  * reads exactly like clean code. So these run the binary from a temp directory
  * with no `node_modules` above it and read the rule ids back.
  */
 
-/** One violation apiece, taken from anti-slop's README. */
+/** One violation apiece, taken from each rule's upstream README or tests. */
 const VIOLATIONS = [
+  ["no-array-filter-map", `const ys = [1, 2].filter(Boolean).map(String);`],
   ["no-chained-type-assertions", `const user = input as object as User;`],
   ["no-conditional-empty-object-spread", `const o = { ...(t !== undefined ? { t } : {}) };`],
   ["no-known-value-widening", `const hs: Record<string, Handler> = { start: startHandler };`],
   ["no-module-mocking", `vi.mock("./user-store");`],
   ["no-object-parameters", `export function save(value: object) {}`],
+  ["no-reduce-accumulator-copy", `const zs = [1, 2].reduce((acc, x) => acc.concat(x), []);`],
   ["no-reflect-apply", `const v = Reflect.apply(operation, owner, args);`],
   ["no-reflect-get", `const v = Reflect.get(owner, key);`],
   ["no-runtime-typeof", `if (typeof input === "string") useName(input);`],
@@ -33,10 +35,17 @@ const VIOLATIONS = [
 
 const path = (rule: string) => `src/${rule}.ts`;
 
-test("every anti-slop rule reports through the config as a consumer loads it", () => {
-  const found = lint(VIOLATIONS.map(([rule, source]) => [path(rule), SENTINEL + source]));
+/** Turned off on purpose, with the reason beside it in the config. */
+const off = new Set(
+  Object.entries(config.rules).flatMap(([id, level]) => (level === "off" ? [id] : [])),
+);
+const isOn = (rule: string) => !off.has(`anti-slop/${rule}`);
 
-  for (const [rule] of VIOLATIONS) {
+test("every anti-slop rule the config turns on reports as a consumer loads it", () => {
+  const on = VIOLATIONS.filter(([rule]) => isOn(rule));
+  const found = lint(on.map(([rule, source]) => [path(rule), SENTINEL + source]));
+
+  for (const [rule] of on) {
     expect(found[path(rule)], `${path(rule)} was never linted`).toContain(SENTINEL_RULE);
     expect(found[path(rule)]).toContain(`anti-slop/${rule}`);
   }

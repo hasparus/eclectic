@@ -1,18 +1,24 @@
 {
   "name": "@hasparus/oxlint-config",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "my shared oxlint config",
   "license": "MIT",
   "files": [
     "anti-slop",
     "oxlint.config.ts",
-    "oxlint.config.js"
+    "oxlint.config.js",
+    "with-sorting.ts",
+    "with-sorting.js"
   ],
   "type": "module",
   "exports": {
     ".": {
       "types": "./oxlint.config.ts",
       "default": "./oxlint.config.js"
+    },
+    "./with-sorting": {
+      "types": "./with-sorting.ts",
+      "default": "./with-sorting.js"
     }
   },
   "publishConfig": {
@@ -20,24 +26,26 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "lint": "oxlint --deny-warnings --ignore-pattern \"anti-slop/**\"",
+    "lint": "oxlint -c oxlint.local.config.ts --deny-warnings --ignore-pattern \"anti-slop/**\"",
     "prepublishOnly": "bun run build",
     "test": "bun test"
   },
   "dependencies": {
-    "@oxlint/plugins": "1.78.0",
+    "@interfere/landmines": "0.1.0",
+    "@oxlint/plugins": "1.94.0",
     "eslint-plugin-better-tailwindcss": "4.0.2",
-    "eslint-plugin-perfectionist": "5.4.0",
+    "eslint-plugin-no-only-tests": "3.4.0",
+    "eslint-plugin-perfectionist": "5.14.0",
     "eslint-plugin-sonarjs": "4.2.0"
   },
   "devDependencies": {
     "@types/bun": "1.3.7",
-    "oxlint": "1.78.0",
-    "oxlint-tsgolint": "7.0.2001",
+    "oxlint": "1.94.0",
+    "tsrs": "0.25.0-ts7.1.0-beta",
     "typescript": "^5.9.3"
   },
   "peerDependencies": {
-    "oxlint": "^1.78.0",
-    "oxlint-tsgolint": ">=0.22.1"
+    "oxlint": "^1.94.0",
+    "tsrs": ">=0.25.0-ts7.1.0-beta"
   }
 }
